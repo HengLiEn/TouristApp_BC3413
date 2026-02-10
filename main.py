@@ -14,7 +14,6 @@ def display_main_menu():
     print("-" * 50)
 
 
-def main():
     while True:
         display_main_menu()
         choice = input("\nSelect an option (1-4): ")
