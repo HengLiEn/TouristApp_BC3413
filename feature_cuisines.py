@@ -1,6 +1,7 @@
 """
 Feature: Cuisine Preferences Module for TouristApp_BC3413
-Author: Li En
+Author: LiEn
+Project: Singapore Tourist App BC3413
 """
 
 import pandas as pd
@@ -11,9 +12,9 @@ from dataclasses import dataclass
 
 @dataclass
 class CuisinePreferences:
-    #using None first creates a brand-new list per instance and to prevent appending to the wrong list
+    #reason of branching this to none instead of empty list such that it doesn append to the same instance by accident.
     """User's cuisine preferences - ONLY food-related attributes"""
-    cuisines: List[str] = None  # e.g., ['Chinese', 'Malay', 'Indian','Western]
+    cuisines: List[str] = None  # e.g., ['Chinese', 'Malay', 'Indian']
     dietary_restrictions: List[str] = None  # e.g., ['vegetarian', 'halal']
     allergens_to_avoid: List[str] = None  # e.g., ['Dairy', 'Nuts']
 
@@ -30,6 +31,12 @@ class CuisineFeatureHandler:
     """Main class for handling cuisine preferences in the TouristApp"""
 
     def __init__(self, project_root: str = None):
+        """
+        Initialize the cuisine handler
+
+        Args:
+            project_root: Path to project root (defaults to current directory)
+        """
         if project_root is None:
             project_root = os.path.dirname(os.path.abspath(__file__))
 
@@ -82,6 +89,7 @@ class CuisineFeatureHandler:
     def filter_by_cuisine_preferences(self, preferences: CuisinePreferences) -> pd.DataFrame:
         """
         Filter menu items based ONLY on cuisine preferences (no price/rating)
+        Case-insensitive filtering
 
         Args:
             preferences: CuisinePreferences object with user's choices
@@ -97,21 +105,25 @@ class CuisineFeatureHandler:
         print(f"\n🔍 Filtering by cuisine preferences...")
         print(f"Starting with: {len(df):,} items\n")
 
-        # Filter by cuisine type
+        # Filter by cuisine type (case-insensitive)
         if preferences.cuisines:
-            df = df[df['cuisine_type'].isin(preferences.cuisines)]
+            # Convert to lowercase for case-insensitive matching
+            cuisines_lower = [c.lower() for c in preferences.cuisines]
+            df = df[df['cuisine_type'].str.lower().isin(cuisines_lower)]
             print(f"✅ Cuisines ({', '.join(preferences.cuisines)}): {len(df):,} items")
 
-        # Filter by dietary restrictions
-        if 'vegetarian' in preferences.dietary_restrictions:
-            df = df[df['vegetarian'] == 'Yes']
+        # Filter by dietary restrictions (case-insensitive)
+        dietary_lower = [d.lower() for d in preferences.dietary_restrictions]
+
+        if 'vegetarian' in dietary_lower:
+            df = df[df['vegetarian'].str.lower() == 'yes']
             print(f"✅ Vegetarian only: {len(df):,} items")
 
-        if 'halal' in preferences.dietary_restrictions:
-            df = df[df['halal'] == 'Yes']
+        if 'halal' in dietary_lower:
+            df = df[df['halal'].str.lower() == 'yes']
             print(f"✅ Halal only: {len(df):,} items")
 
-        # Filter by allergens
+        # Filter by allergens (already case-insensitive)
         if preferences.allergens_to_avoid:
             for allergen in preferences.allergens_to_avoid:
                 df = df[~df['allergens'].str.contains(allergen, case=False, na=False)]
@@ -153,19 +165,22 @@ class CuisineFeatureHandler:
         return stats
 
     def display_filtered_items(self, filtered_df: pd.DataFrame, max_display: int = 20):
-        """Display filtered items in a formatted way"""
+        """Display filtered items in a formatted way - shows in PyCharm console"""
         if filtered_df.empty:
             print("\n❌ No items match your cuisine preferences.")
+            print("Try selecting different cuisines or removing some restrictions.\n")
             return
 
-        print(f"\n{'='*80}")
+        print(f"\n{'=' * 80}")
         print(f"🍽️  ITEMS MATCHING YOUR CUISINE PREFERENCES")
-        print(f"{'='*80}\n")
-        print(f"Found {len(filtered_df):,} items. Showing first {min(max_display, len(filtered_df))}:\n")
+        print(f"{'=' * 80}\n")
+        print(f"Found {len(filtered_df):,} total items. Showing first {min(max_display, len(filtered_df))}:\n")
 
         for idx, (_, row) in enumerate(filtered_df.head(max_display).iterrows(), 1):
             print(f"{idx}. {row['item_name']} - {row['cuisine_type']}")
-            print(f"   📍 {row['stall_name']}")
+            print(f"   📍 Stall: {row['stall_name']}")
+            print(f"   💰 Price: ${row['price']:.2f}")
+            print(f"   ⭐ Rating: {row['average_rating']:.1f}/5.0 ({row['total_reviews']} reviews)")
 
             # Dietary info
             diet_info = []
@@ -181,9 +196,17 @@ class CuisineFeatureHandler:
 
             print()
 
-    def export_for_team(self, preferences: CuisinePreferences, output_filename: str = 'filtered_cuisine_data.csv') -> pd.DataFrame:
+        if len(filtered_df) > max_display:
+            print(f"... and {len(filtered_df) - max_display:,} more items")
+            print(f"\nTip: Export to CSV to see all {len(filtered_df):,} items!")
+
+        print(f"{'=' * 80}\n")
+
+    def export_for_team(self, preferences: CuisinePreferences,
+                        output_filename: str = 'filtered_cuisine_data.csv') -> pd.DataFrame:
         """
         Export filtered data for other team members (with all price/rating data intact)
+        Also displays sample results in PyCharm console
 
         Args:
             preferences: User's cuisine preferences
@@ -194,22 +217,47 @@ class CuisineFeatureHandler:
         """
         filtered_df = self.filter_by_cuisine_preferences(preferences)
 
+        if filtered_df.empty:
+            print("\n⚠️ No data to export - no items match your preferences.")
+            return filtered_df
+
         # Save to project root
         output_path = os.path.join(self.project_root, output_filename)
         filtered_df.to_csv(output_path, index=False)
 
-        print(f"\n💾 Exported {len(filtered_df):,} items to: {output_filename}")
+        print(f"\n{'=' * 80}")
+        print(f"💾 EXPORT COMPLETE")
+        print(f"{'=' * 80}")
+        print(f"✅ Exported {len(filtered_df):,} items to: {output_filename}")
         print(f"📂 Location: {output_path}")
         print(f"✅ All columns preserved for price/rating filtering by team!")
+
+        # Show sample in console
+        print(f"\n📋 SAMPLE OF EXPORTED DATA (First 5 items):")
+        print(f"{'-' * 80}")
+
+        for idx, (_, row) in enumerate(filtered_df.head(5).iterrows(), 1):
+            print(f"\n{idx}. {row['item_name']} - {row['cuisine_type']}")
+            print(f"   Stall: {row['stall_name']}")
+            print(f"   Price: ${row['price']:.2f} | Rating: {row['average_rating']:.1f}⭐")
+            if row['vegetarian'] == 'Yes':
+                print(f"   🌱 Vegetarian", end='')
+            if row['halal'] == 'Yes':
+                print(f" | ☪️ Halal", end='')
+            print()
+
+        print(f"\n{'-' * 80}")
+        print(f"Full data saved to {output_filename}")
+        print(f"{'=' * 80}\n")
 
         return filtered_df
 
 
 def interactive_cuisine_selector():
-    """Interactive CLI for selecting cuisine preferences"""
-    print("\n" + "="*80)
+    """Interactive CLI for selecting cuisine preferences - case-insensitive"""
+    print("\n" + "=" * 80)
     print("🍜 SINGAPORE TOURIST APP - CUISINE PREFERENCES")
-    print("="*80 + "\n")
+    print("=" * 80 + "\n")
 
     # Initialize handler
     handler = CuisineFeatureHandler()
@@ -222,17 +270,35 @@ def interactive_cuisine_selector():
         print(f"   {i}. {cuisine}")
 
     # Cuisine selection
-    print("\n✨ Select your preferred cuisines (comma-separated numbers, or 'all'):")
+    print("\n✨ Select your preferred cuisines:")
+    print("   • Enter numbers (comma-separated): e.g., 2,10,17")
+    print("   • Or type cuisine names: e.g., chinese,malay")
+    print("   • Or type 'all' for all cuisines")
     cuisine_input = input("→ ").strip()
 
     if cuisine_input.lower() == 'all':
         selected_cuisines = available_cuisines
-    else:
+    elif cuisine_input.replace(',', '').replace(' ', '').isdigit():
+        # Number input
         try:
             indices = [int(x.strip()) - 1 for x in cuisine_input.split(',')]
             selected_cuisines = [available_cuisines[i] for i in indices if 0 <= i < len(available_cuisines)]
         except:
             print("⚠️ Invalid input. Using all cuisines.")
+            selected_cuisines = available_cuisines
+    else:
+        # Name input (case-insensitive)
+        input_cuisines = [c.strip().lower() for c in cuisine_input.split(',')]
+        available_lower = {c.lower(): c for c in available_cuisines}
+        selected_cuisines = []
+        for input_cuisine in input_cuisines:
+            if input_cuisine in available_lower:
+                selected_cuisines.append(available_lower[input_cuisine])
+            else:
+                print(f"⚠️ '{input_cuisine}' not found, skipping...")
+
+        if not selected_cuisines:
+            print("⚠️ No valid cuisines found. Using all cuisines.")
             selected_cuisines = available_cuisines
 
     print(f"✅ Selected: {', '.join(selected_cuisines)}")
@@ -242,12 +308,12 @@ def interactive_cuisine_selector():
     print("   1. Vegetarian")
     print("   2. Halal")
     print("   3. None")
-    dietary_input = input("→ Select (comma-separated numbers): ").strip()
+    dietary_input = input("→ Select (comma-separated numbers or names): ").strip().lower()
 
     dietary_restrictions = []
-    if '1' in dietary_input:
+    if '1' in dietary_input or 'veg' in dietary_input:
         dietary_restrictions.append('vegetarian')
-    if '2' in dietary_input:
+    if '2' in dietary_input or 'halal' in dietary_input:
         dietary_restrictions.append('halal')
 
     # Allergens
@@ -267,32 +333,38 @@ def interactive_cuisine_selector():
     )
 
     # Get filtered items
-    print("\n🔍 Finding matching items...")
+    print("\n" + "=" * 80)
     filtered_items = handler.get_filtered_items(preferences)
 
-    # Display
-    handler.display_filtered_items(filtered_items, max_display=15)
+    # Display in console
+    handler.display_filtered_items(filtered_items, max_display=20)
 
     # Show statistics
     stats = handler.get_statistics(preferences)
-    print(f"\n{'='*80}")
+    print(f"{'=' * 80}")
     print("📊 STATISTICS")
-    print(f"{'='*80}")
+    print(f"{'=' * 80}")
     print(f"Total matching items: {stats['total_items']:,}")
     print(f"From {stats['total_stalls']:,} different stalls")
-    print(f"Vegetarian options: {stats['vegetarian_items']:,}")
-    print(f"Halal options: {stats['halal_items']:,}")
-    print("\nBreakdown by cuisine:")
+    print(f"🌱 Vegetarian options: {stats['vegetarian_items']:,}")
+    print(f"☪️ Halal options: {stats['halal_items']:,}")
+    print("\n📈 Breakdown by cuisine:")
     for cuisine, count in sorted(stats['items_by_cuisine'].items(), key=lambda x: x[1], reverse=True):
         print(f"  • {cuisine}: {count:,} items")
 
     # Export option
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     export_choice = input("💾 Export results for team? (y/n): ").strip().lower()
-    if export_choice == 'y':
+    if export_choice in ['y', 'yes']:
         handler.export_for_team(preferences, 'filtered_cuisine_data.csv')
 
+    print("\n✅ Session complete! Results are displayed above.")
+    print("=" * 80 + "\n")
+
     return preferences, filtered_items, handler
+
+
+
 
 if __name__ == "__main__":
     # Run interactive mode when executed directly
