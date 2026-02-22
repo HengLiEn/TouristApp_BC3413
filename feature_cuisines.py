@@ -29,6 +29,20 @@ class CuisinePreferences:
 
 
 
+    #function created on an exportion where the filtered data based on user choose is exported out to csv for easier ereference
+    def export(self, prefs: CuisinePreferences, filename: str = 'filtered_cuisine_data.csv') -> pd.DataFrame:
+        df = self.filter(prefs)
+        if df.empty:
+            print(" Nothing to export.")
+            return df
+
+        output_path = os.path.join(self.project_root, filename)
+        df.to_csv(output_path, index=False)
+        print(f" Saved {len(df):,} items to {output_path}")
+        return df
+
+
+
 
 
 if __name__ == "__main__":

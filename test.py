@@ -334,4 +334,3 @@ def interactive_cuisine_selector():
     print("=" * 80 + "\n")
 
     return preferences, filtered_items, handler
-
