@@ -26,24 +26,43 @@ class CuisinePreferences:
         if self.allergens_to_avoid is None:
             self.allergens_to_avoid = []
 
+class CuisineFeatureHandler:
+    #return the list of cuisines available
+    def get_available_cuisines(self) -> List[str]:
+        return sorted(self.stalls_df['cuisine_type'].unique())
 
+#display function for a nicer presentation
+def display(df: pd.DataFrame, max_display: int = 20):
+    if df.empty:
+        print("No items found. Try adjusting your preferences.")
+        return
 
+    print(f"\n{'=' * 60}\n🍽️  {len(df):,} items found — showing {min(max_display, len(df))}\n{'=' * 60}\n")
 
-    #function created on an exportion where the filtered data based on user choose is exported out to csv for easier ereference
-    def export(self, prefs: CuisinePreferences, filename: str = 'filtered_cuisine_data.csv') -> pd.DataFrame:
-        df = self.filter(prefs)
-        if df.empty:
-            print(" Nothing to export.")
-            return df
+    for i, (_, row) in enumerate(df.head(max_display).iterrows(), 1):
+        tags = []
+        if row['vegetarian'] == 'Yes': tags.append("Veg")
+        if row['halal'] == 'Yes': tags.append("Halal")
 
-        output_path = os.path.join(self.project_root, filename)
-        df.to_csv(output_path, index=False)
-        print(f" Saved {len(df):,} items to {output_path}")
+        print(f"{i}. {row['item_name']} ({row['cuisine_type']})")
+        print(f"   📍 {row['stall_name']}  💰 ${row['price']:.2f} ")
+        if tags: print(f"   {' | '.join(tags)}")
+        print()
+
+    if len(df) > max_display:
+        print(f"... and {len(df) - max_display:,} more. Export CSV using 'export' function.")
+
+#function created on an exportion where the filtered data based on user choose is exported out to csv for easier ereference
+def export(self, prefs: CuisinePreferences, filename: str = 'filtered_cuisine_data.csv') -> pd.DataFrame:
+    df = self.filter(prefs)
+    if df.empty:
+        print(" Nothing to export.")
         return df
 
-
-
-
+    output_path = os.path.join(self.project_root, filename)
+    df.to_csv(output_path, index=False)
+    print(f" Saved {len(df):,} items to {output_path}")
+    return df
 
 if __name__ == "__main__":
     # Run interactive mode when executed directly
