@@ -1,4 +1,13 @@
 # my code asks tourists what is the min and max price they prefer and if they are looking at specifically Food/Drinks/Both
+# i changed my menu_items file name to menu_items.csv
+# 1st half of my code will ask for the csv files we want to use (i.e. type out the correct csv file names)
+# then it will ask which columns we want to use to merge the files together, which i have indicated below:
+# menu_items (1).csv merge with stalls.csv using stall_id
+# stalls.csv merge with hawker_centers.csv merge with hawker_center_id (in the stalls.csv) and center_id (in the hawker_centers.csv)
+# 2nd half of my code asks for min and max price that tourists are looking at
+# and then choose between Food or Drinks or Both
+
+
 import pandas as pd
 import sqlite3
 
