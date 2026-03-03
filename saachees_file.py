@@ -1,11 +1,20 @@
 """
-onboarding.py
-Simple Tourist App
+saachees_file.py
+Simple Tourist App (onboarding)
 
 Features:
 1) Create Account
 2) Login
 """
+
+import sqlite3
+from dataclasses import dataclass
+from datetime import datetime
+from typing import List, Optional
+
+DB_FILE = "tourist_profiles.db"
+DIETARY_OPTIONS = ["Vegetarian", "Halal", "Gluten-free", "Vegan", "Dairy-free"]
+
 
 # -----------------------------
 # Model
@@ -31,10 +40,10 @@ class TouristProfileDA:
         self.db_file = db_file
         self._create_table()
 
-    def _connect(self):
+    def _connect(self) -> sqlite3.Connection:
         return sqlite3.connect(self.db_file)
 
-    def _create_table(self):
+    def _create_table(self) -> None:
         sql = """
         CREATE TABLE IF NOT EXISTS tourist_profiles (
             username TEXT PRIMARY KEY,
@@ -57,12 +66,12 @@ class TouristProfileDA:
         return "|".join(lst)
 
     @staticmethod
-    def _unpack(text: str) -> List[str]:
+    def _unpack(text: Optional[str]) -> List[str]:
         if not text:
             return []
         return text.split("|")
 
-    def insert_profile(self, p: TouristProfile):
+    def insert_profile(self, p: TouristProfile) -> None:
         sql = """
         INSERT INTO tourist_profiles VALUES
         (?, ?, ?, ?, ?, ?, ?, ?, ?);
@@ -82,7 +91,7 @@ class TouristProfileDA:
             con.execute(sql, data)
             con.commit()
 
-    def get_profile(self, username: str):
+    def get_profile(self, username: str) -> Optional[TouristProfile]:
         sql = "SELECT * FROM tourist_profiles WHERE username = ?;"
         with self._connect() as con:
             row = con.execute(sql, (username,)).fetchone()
@@ -95,7 +104,7 @@ class TouristProfileDA:
             password=row[1],
             name=row[2],
             country=row[3],
-            spice_level=row[4],
+            spice_level=int(row[4]),
             dietary=self._unpack(row[5]),
             allergens=self._unpack(row[6]),
             preferred_cuisines=self._unpack(row[7]),
@@ -106,11 +115,11 @@ class TouristProfileDA:
 # -----------------------------
 # Helper Functions
 # -----------------------------
-def now_iso():
+def now_iso() -> str:
     return datetime.now().isoformat(timespec="seconds")
 
 
-def input_nonempty(prompt):
+def input_nonempty(prompt: str) -> str:
     while True:
         value = input(prompt).strip()
         if value:
@@ -118,7 +127,7 @@ def input_nonempty(prompt):
         print("Please enter a value.")
 
 
-def input_int(prompt, lo, hi):
+def input_int(prompt: str, lo: int, hi: int) -> int:
     while True:
         try:
             value = int(input(prompt))
@@ -129,7 +138,7 @@ def input_int(prompt, lo, hi):
         print(f"Enter number between {lo} and {hi}.")
 
 
-def input_dietary():
+def input_dietary() -> List[str]:
     print("\nSelect dietary needs:")
     for i, option in enumerate(DIETARY_OPTIONS, start=1):
         print(f"{i}) {option}")
@@ -138,27 +147,45 @@ def input_dietary():
     if not raw:
         return []
 
-    selected = []
+    selected: List[str] = []
     for choice in raw.split(","):
-        if choice.strip().isdigit():
-            idx = int(choice.strip())
+        choice = choice.strip()
+        if choice.isdigit():
+            idx = int(choice)
             if 1 <= idx <= len(DIETARY_OPTIONS):
                 selected.append(DIETARY_OPTIONS[idx - 1])
 
-    return selected
+    # de-duplicate while preserving order
+    seen = set()
+    deduped: List[str] = []
+    for x in selected:
+        if x not in seen:
+            seen.add(x)
+            deduped.append(x)
+
+    return deduped
 
 
-def input_list(prompt):
+def input_list(prompt: str) -> List[str]:
     raw = input(prompt).strip()
     if not raw:
         return []
-    return [x.strip() for x in raw.split(",")]
+    # split by comma, strip spaces, drop empties, de-duplicate preserving order
+    items = [x.strip() for x in raw.split(",")]
+    items = [x for x in items if x]
+    seen = set()
+    out: List[str] = []
+    for x in items:
+        if x not in seen:
+            seen.add(x)
+            out.append(x)
+    return out
 
 
 # -----------------------------
 # Create Account Flow
 # -----------------------------
-def create_account(da):
+def create_account(da: TouristProfileDA) -> None:
     print("\n=== Create Account ===")
 
     username = input_nonempty("Username: ")
@@ -173,22 +200,26 @@ def create_account(da):
 
     name = input_nonempty("What is your name? ")
     country = input_nonempty("Which country are you from? ")
-    spice = input_int(" What is your spice tolerance from 0-5? ", 0, 5)
+    spice = input_int("What is your spice tolerance from 0-5? ", 0, 5)
 
     dietary = input_dietary()
-    allergens = input_list("Allergens to avoid (comma-separated, e.g. peanut, shellfish) [optional]: ")
-    cuisines = input_list("Preferred cuisines (comma-separated, e.g. Chinese, Malay, Indian) [optional]: ")
+    allergens = input_list(
+        "Allergens to avoid (comma-separated, e.g. peanut, shellfish) [optional]: "
+    )
+    cuisines = input_list(
+        "Preferred cuisines (comma-separated, e.g. Chinese, Malay, Indian) [optional]: "
+    )
 
     profile = TouristProfile(
-        username,
-        password,
-        name,
-        country,
-        spice,
-        dietary,
-        allergens,
-        cuisines,
-        now_iso(),
+        username=username,
+        password=password,
+        name=name,
+        country=country,
+        spice_level=spice,
+        dietary=dietary,
+        allergens=allergens,
+        preferred_cuisines=cuisines,
+        created_at=now_iso(),
     )
 
     try:
@@ -201,7 +232,7 @@ def create_account(da):
 # -----------------------------
 # Login Flow
 # -----------------------------
-def login(da):
+def login(da: TouristProfileDA) -> None:
     print("\n=== Login ===")
 
     username = input_nonempty("Username: ")
@@ -220,3 +251,9 @@ def login(da):
     print(f"\nWelcome back, {profile.name}!")
     print(f"Country: {profile.country}")
     print(f"Spice Level: {profile.spice_level}/5")
+    if profile.dietary:
+        print("Dietary:", ", ".join(profile.dietary))
+    if profile.allergens:
+        print("Allergens to avoid:", ", ".join(profile.allergens))
+    if profile.preferred_cuisines:
+        print("Preferred cuisines:", ", ".join(profile.preferred_cuisines))
