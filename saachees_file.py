@@ -220,27 +220,3 @@ def login(da):
     print(f"\nWelcome back, {profile.name}!")
     print(f"Country: {profile.country}")
     print(f"Spice Level: {profile.spice_level}/5")
-
-
-# -----------------------------
-# Main Menu
-# -----------------------------
-if __name__ == "__main__":
-    da = TouristProfileDA()
-
-    while True:
-        print("\n=== Tourist App ===")
-        print("1) Create Account")
-        print("2) Login")
-        print("0) Exit")
-
-        choice = input("Choose: ").strip()
-
-        if choice == "1":
-            create_account(da)
-        elif choice == "2":
-            login(da)
-        elif choice == "0":
-            break
-        else:
-            print("Invalid choice.")
