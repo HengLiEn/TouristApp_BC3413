@@ -108,10 +108,10 @@ class CuisineFeatureHandler:
         print(f" Saved {len(df):,} items to {output_path}")
         return df
 
-    def save_preferences(self, prefs: CuisinePreferences, username: str):
+    def save_preferences(self, prefs: CuisinePreferences, user_id: str):
         """
         Updates the tourist's cuisine preferences in tourist_profiles.db.
-        Looks up the tourist by username (primary key) and updates their record.
+        Looks up the tourist by user_id (primary key) and updates their record.
         """
         try:
             with sqlite3.connect(DB_FILE) as con:
@@ -120,21 +120,21 @@ class CuisineFeatureHandler:
                             SET preferred_cuisines = ?,
                                 dietary            = ?,
                                 allergens          = ?
-                            WHERE username = ?
+                            WHERE user_id = ?
                             """, (
                                 "|".join(prefs.cuisines),
                                 "|".join(prefs.dietary_restrictions),
                                 "|".join(prefs.allergens_to_avoid),
-                                username
+                                user_id
                             ))
                 con.commit()
-            print(f"Preferences updated in database for '{username}'.")
+            print(f"Preferences updated in database for '{user_id}'.")
         except Exception as e:
             print(f"Error saving preferences: {e}")
 
-    def load_preferences(self, username: str) -> Optional[CuisinePreferences]:
+    def load_preferences(self, user_id: str) -> Optional[CuisinePreferences]:
         """
-        Loads cuisine preferences from tourist_profiles.db by username (primary key).
+        Loads cuisine preferences from tourist_profiles.db by user_id (primary key).
         Returns CuisinePreferences object or None if not found.
         """
         try:
@@ -142,17 +142,17 @@ class CuisineFeatureHandler:
                 row = con.execute("""
                                   SELECT preferred_cuisines, dietary, allergens
                                   FROM tourist_profiles
-                                  WHERE username = ?
-                                  """, (username,)).fetchone()
+                                  WHERE user_id = ?
+                                  """, (user_id,)).fetchone()
 
             if not row:
-                print(f"No profile found for '{username}'.")
+                print(f"No profile found for '{user_id}'.")
                 return None
 
             def unpack(s):
                 return [x.strip() for x in s.split("|") if x.strip()] if s else []
 
-            print(f"Loaded preferences for '{username}' from database.")
+            print(f"Loaded preferences for '{user_id}' from database.")
             return CuisinePreferences(
                 cuisines=unpack(row[0]),
                 dietary_restrictions=unpack(row[1]),
