@@ -15,18 +15,10 @@ def display_main_menu():
     print("4. Exit")
     print("-" * 50)
 
-import sqlite3
-from dataclasses import dataclass
-from datetime import datetime
-from typing import List
 
-DB_FILE = "tourist_profiles.db"
-DIETARY_OPTIONS = ["Vegetarian", "Halal", "Gluten-free", "Vegan", "Dairy-free"]
-
-#main
 def main():
     """Main program loop"""
-    da = TouristProfileDA()
+    da = saachees_file.TouristProfileDA()
 
     while True:
         print("\n=== Tourist App ===")
@@ -37,9 +29,9 @@ def main():
         choice = input("Choose: ").strip()
 
         if choice == "1":
-            create_account(da)
+            saachees_file.create_account(da)
         elif choice == "2":
-            login(da)
+            saachees_file.login(da)
         elif choice == "0":
             break
         else:
