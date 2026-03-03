@@ -8,7 +8,8 @@ DB_FILE = "tourist_profiles.db"
 
 #insert importation to link with other py and function
 from feature_cuisines import CuisineFeatureHandler, CuisinePreferences
-from Felicia_Project import DataManager, DatabaseManager, filter_by_price
+from Felicia_Project import DataManager, DatabaseManager
+
 # -----------------------------
 # Model (OOP)
 # -----------------------------
@@ -206,6 +207,14 @@ while True:
         )
         results = cuisine_handler.filter(prefs)
         cuisine_handler.display(results)
+
+        # --- Link to Felicia's price filter ---
+        data_manager = DataManager()
+        full_data = data_manager.load_csv_files()
+
+        if full_data is not None:
+            db_manager = DatabaseManager()
+            db_manager.save_to_database(full_data, "merged_data")
 
     elif choice == "2":
         profiles = da.get_all_profiles()
