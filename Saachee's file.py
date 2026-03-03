@@ -1,18 +1,28 @@
+"""
+onboarding.py
+Simple Tourist App
+
+Features:
+1) Create Account
+2) Login
+"""
+
 import sqlite3
 from dataclasses import dataclass
 from datetime import datetime
-from typing import List, Optional
-
+from typing import List
 
 DB_FILE = "tourist_profiles.db"
 
+DIETARY_OPTIONS = ["Vegetarian", "Halal", "Gluten-free", "Vegan", "Dairy-free"]
 
 # -----------------------------
-# Model (OOP)
+# Model
 # -----------------------------
 @dataclass
 class TouristProfile:
-    user_id: str
+    username: str
+    password: str
     name: str
     country: str
     spice_level: int
@@ -21,31 +31,23 @@ class TouristProfile:
     preferred_cuisines: List[str]
     created_at: str
 
-    def summary(self) -> str:
-        return (
-            f"[{self.user_id}] {self.name} (From {self.country}) | "
-            f"Spice {self.spice_level}/5 | "
-            f"Dietary: {', '.join(self.dietary) if self.dietary else 'None'} | "
-            f"Allergens: {', '.join(self.allergens) if self.allergens else 'None'} | "
-            f"Cuisines: {', '.join(self.preferred_cuisines) if self.preferred_cuisines else 'Any'}"
-        )
-
 
 # -----------------------------
-# DB Access (SQLite)
+# Database
 # -----------------------------
 class TouristProfileDA:
-    def __init__(self, db_file: str = DB_FILE) -> None:
+    def __init__(self, db_file: str = DB_FILE):
         self.db_file = db_file
         self._create_table()
 
     def _connect(self):
         return sqlite3.connect(self.db_file)
 
-    def _create_table(self) -> None:
+    def _create_table(self):
         sql = """
         CREATE TABLE IF NOT EXISTS tourist_profiles (
-            user_id TEXT PRIMARY KEY,
+            username TEXT PRIMARY KEY,
+            password TEXT NOT NULL,
             name TEXT NOT NULL,
             country TEXT NOT NULL,
             spice_level INTEGER NOT NULL,
@@ -61,21 +63,22 @@ class TouristProfileDA:
 
     @staticmethod
     def _pack(lst: List[str]) -> str:
-        return "|".join([x.strip() for x in lst if x.strip()])
+        return "|".join(lst)
 
     @staticmethod
-    def _unpack(s: Optional[str]) -> List[str]:
-        if not s:
+    def _unpack(text: str) -> List[str]:
+        if not text:
             return []
-        return [x.strip() for x in s.split("|") if x.strip()]
+        return text.split("|")
 
-    def insert_profile(self, p: TouristProfile) -> None:
+    def insert_profile(self, p: TouristProfile):
         sql = """
         INSERT INTO tourist_profiles VALUES
-        (?, ?, ?, ?, ?, ?, ?, ?);
+        (?, ?, ?, ?, ?, ?, ?, ?, ?);
         """
         data = (
-            p.user_id,
+            p.username,
+            p.password,
             p.name,
             p.country,
             p.spice_level,
@@ -88,122 +91,165 @@ class TouristProfileDA:
             con.execute(sql, data)
             con.commit()
 
-    def get_all_profiles(self) -> List[TouristProfile]:
-        sql = "SELECT * FROM tourist_profiles ORDER BY created_at DESC;"
+    def get_profile(self, username: str):
+        sql = "SELECT * FROM tourist_profiles WHERE username = ?;"
         with self._connect() as con:
-            rows = con.execute(sql).fetchall()
+            row = con.execute(sql, (username,)).fetchone()
 
-        profiles = []
-        for r in rows:
-            profiles.append(
-                TouristProfile(
-                    user_id=r[0],
-                    name=r[1],
-                    country=r[2],
-                    spice_level=int(r[3]),
-                    dietary=self._unpack(r[4]),
-                    allergens=self._unpack(r[5]),
-                    preferred_cuisines=self._unpack(r[6]),
-                    created_at=r[7],
-                )
-            )
-        return profiles
+        if not row:
+            return None
+
+        return TouristProfile(
+            username=row[0],
+            password=row[1],
+            name=row[2],
+            country=row[3],
+            spice_level=row[4],
+            dietary=self._unpack(row[5]),
+            allergens=self._unpack(row[6]),
+            preferred_cuisines=self._unpack(row[7]),
+            created_at=row[8],
+        )
 
 
 # -----------------------------
-# Input helpers
+# Helper Functions
 # -----------------------------
-def now_iso() -> str:
+def now_iso():
     return datetime.now().isoformat(timespec="seconds")
 
 
-def gen_user_id(name: str) -> str:
-    stamp = datetime.now().strftime("%Y%m%d%H%M%S")
-    base = "".join([c for c in name.upper() if c.isalnum()])[:8] or "USER"
-    return f"{base}-{stamp}"
-
-
-def input_nonempty(prompt: str) -> str:
+def input_nonempty(prompt):
     while True:
-        s = input(prompt).strip()
-        if s:
-            return s
-        print("Please enter a non-empty value.")
+        value = input(prompt).strip()
+        if value:
+            return value
+        print("Please enter a value.")
 
 
-def input_int(prompt: str, lo: int, hi: int) -> int:
+def input_int(prompt, lo, hi):
     while True:
         try:
-            v = int(input(prompt).strip())
-            if lo <= v <= hi:
-                return v
+            value = int(input(prompt))
+            if lo <= value <= hi:
+                return value
         except ValueError:
             pass
-        print(f"Enter an integer between {lo} and {hi}.")
+        print(f"Enter number between {lo} and {hi}.")
 
 
-def input_list(prompt: str) -> List[str]:
+def input_dietary():
+    print("\nSelect dietary needs:")
+    for i, option in enumerate(DIETARY_OPTIONS, start=1):
+        print(f"{i}) {option}")
+
+    raw = input("Choose numbers (comma separated) or press Enter: ").strip()
+    if not raw:
+        return []
+
+    selected = []
+    for choice in raw.split(","):
+        if choice.strip().isdigit():
+            idx = int(choice.strip())
+            if 1 <= idx <= len(DIETARY_OPTIONS):
+                selected.append(DIETARY_OPTIONS[idx - 1])
+
+    return selected
+
+
+def input_list(prompt):
     raw = input(prompt).strip()
     if not raw:
         return []
-    return [x.strip() for x in raw.split(",") if x.strip()]
+    return [x.strip() for x in raw.split(",")]
 
 
 # -----------------------------
-# Onboarding flow
+# Create Account Flow
 # -----------------------------
-def create_profile() -> TouristProfile:
-    print("\n=== Tourist Onboarding (New Profile) ===")
+def create_account(da):
+    print("\n=== Create Account ===")
+
+    username = input_nonempty("Username: ")
+
+    while True:
+        password = input_nonempty("Password: ")
+        confirm = input_nonempty("Confirm Password: ")
+
+        if password == confirm:
+            break
+        print("Passwords do not match. Try again.")
+
     name = input_nonempty("What is your name? ")
     country = input_nonempty("Which country are you from? ")
-    spice_level = input_int("Spice tolerance (0-5): ", 0, 5)
+    spice = input_int(" What is your spice tolerance from 0-5? ", 0, 5)
 
-    dietary = input_list("Dietary needs (comma-separated, e.g. halal, vegetarian) [optional]: ")
+    dietary = input_dietary()
     allergens = input_list("Allergens to avoid (comma-separated, e.g. peanut, shellfish) [optional]: ")
-    preferred_cuisines = input_list("Preferred cuisines (comma-separated, e.g. Chinese, Malay, Indian) [optional]: ")
+    cuisines = input_list("Preferred cuisines (comma-separated, e.g. Chinese, Malay, Indian) [optional]: ")
 
-    user_id = gen_user_id(name)
-
-    return TouristProfile(
-        user_id=user_id,
-        name=name,
-        country=country,
-        spice_level=spice_level,
-        dietary=dietary,
-        allergens=allergens,
-        preferred_cuisines=preferred_cuisines,
-        created_at=now_iso(),
+    profile = TouristProfile(
+        username,
+        password,
+        name,
+        country,
+        spice,
+        dietary,
+        allergens,
+        cuisines,
+        now_iso(),
     )
 
-
-# -----------------------------
-# CLI
-# -----------------------------
-
-da = TouristProfileDA()
-
-while True:
-    print("\n=== Tourist App (Onboarding Module) ===")
-    print("1) Create new tourist profile")
-    print("2) View all profiles")
-    print("0) Exit")
-    choice = input("Choose: ").strip()
-
-    if choice == "1":
-        profile = create_profile()
+    try:
         da.insert_profile(profile)
-        print("\nSaved!")
-        print(profile.summary())
+        print("Account created successfully!")
+    except sqlite3.IntegrityError:
+        print("Username already exists.")
 
-    elif choice == "2":
-        profiles = da.get_all_profiles()
-        if not profiles:
-            print("No profiles found.")
+
+# -----------------------------
+# Login Flow
+# -----------------------------
+def login(da):
+    print("\n=== Login ===")
+
+    username = input_nonempty("Username: ")
+    password = input_nonempty("Password: ")
+
+    profile = da.get_profile(username)
+
+    if not profile:
+        print("User not found.")
+        return
+
+    if profile.password != password:
+        print("Wrong password.")
+        return
+
+    print(f"\nWelcome back, {profile.name}!")
+    print(f"Country: {profile.country}")
+    print(f"Spice Level: {profile.spice_level}/5")
+
+
+# -----------------------------
+# Main Menu
+# -----------------------------
+if __name__ == "__main__":
+    da = TouristProfileDA()
+
+    while True:
+        print("\n=== Tourist App ===")
+        print("1) Create Account")
+        print("2) Login")
+        print("0) Exit")
+
+        choice = input("Choose: ").strip()
+
+        if choice == "1":
+            create_account(da)
+        elif choice == "2":
+            login(da)
+        elif choice == "0":
+            break
         else:
-            for p in profiles:
-                print("-", p.summary())
-
-    elif choice == "0":
-        break
-    else:
-        print("Invalid option.")
+            print("Invalid choice.")
