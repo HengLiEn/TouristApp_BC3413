@@ -26,23 +26,24 @@ DIETARY_OPTIONS = ["Vegetarian", "Halal", "Gluten-free", "Vegan", "Dairy-free"]
 #main
 def main():
     """Main program loop"""
-    while True:
-        display_main_menu()
-        choice = input("\nSelect an option (1-4): ")
+    da = TouristProfileDA()
 
-        if choice == '1':
-            # feature_closing.run_closing_dates()
-            print("Feature coming soon!")  # Placeholder until module is ready
-        elif choice == '2':
-            # feature_location.run_itinerary()
-            print("Feature coming soon!")  # Placeholder until module is ready
-        elif choice == '3':
-            feature_cuisine.run_menu_recommendations()
-        elif choice == '4':
-            print("Thank you for using Hawker Guide!")
+    while True:
+        print("\n=== Tourist App ===")
+        print("1) Create Account")
+        print("2) Login")
+        print("0) Exit")
+
+        choice = input("Choose: ").strip()
+
+        if choice == "1":
+            create_account(da)
+        elif choice == "2":
+            login(da)
+        elif choice == "0":
             break
         else:
-            print("Invalid choice. Please try again.")
+            print("Invalid choice.")
 
 
 if __name__ == "__main__":
