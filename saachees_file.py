@@ -7,15 +7,6 @@ Features:
 2) Login
 """
 
-import sqlite3
-from dataclasses import dataclass
-from datetime import datetime
-from typing import List
-
-DB_FILE = "tourist_profiles.db"
-
-DIETARY_OPTIONS = ["Vegetarian", "Halal", "Gluten-free", "Vegan", "Dairy-free"]
-
 # -----------------------------
 # Model
 # -----------------------------

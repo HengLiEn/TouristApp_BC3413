@@ -1,4 +1,5 @@
-import feature_cuisine
+import feature_cuisines
+import saachees_file
 # import feature_closing
 # import feature_location
 
@@ -13,6 +14,14 @@ def display_main_menu():
     print("3. Browse Menu & Get Recommendations")
     print("4. Exit")
     print("-" * 50)
+
+import sqlite3
+from dataclasses import dataclass
+from datetime import datetime
+from typing import List
+
+DB_FILE = "tourist_profiles.db"
+DIETARY_OPTIONS = ["Vegetarian", "Halal", "Gluten-free", "Vegan", "Dairy-free"]
 
 #main
 def main():
