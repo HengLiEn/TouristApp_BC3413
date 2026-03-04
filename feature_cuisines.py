@@ -8,8 +8,10 @@ import pandas as pd
 import os
 from typing import List, Optional
 from dataclasses import dataclass
-import json
 import sqlite3
+
+# Same DB as Saachee's main.py
+DB_FILE = "tourist_profiles.db"
 
 
 @dataclass
@@ -106,19 +108,31 @@ class CuisineFeatureHandler:
         print(f" Saved {len(df):,} items to {output_path}")
         return df
 
-    # this with the assumption of only one tourist at a time
-    # need json file as an additional data source "this is selected based on user preferences"
-    def save_preferences(self, prefs: CuisinePreferences, name: str, filename: str = 'user_preferences.json'):
-        data = {
-            'name': name,
-            'cuisines': prefs.cuisines,
-            'dietary_restrictions': prefs.dietary_restrictions,
-            'allergens_to_avoid': prefs.allergens_to_avoid
-        }
-        with open(os.path.join(self.project_root, filename), 'w') as fp:
-            json.dump(data, fp, indent=4)
-        print(f" Preferences saved to {filename}")
+    def save_preferences(self, prefs: CuisinePreferences, user_id: str):
+        """
+        Updates the tourist's cuisine preferences in tourist_profiles.db.
+        Looks up the tourist by user_id (primary key) and updates their record.
+        """
+        try:
+            with sqlite3.connect(DB_FILE) as con:
+                con.execute("""
+                            UPDATE tourist_profiles
+                            SET preferred_cuisines = ?,
+                                dietary            = ?,
+                                allergens          = ?
+                            WHERE user_id = ?
+                            """, (
+                                "|".join(prefs.cuisines),
+                                "|".join(prefs.dietary_restrictions),
+                                "|".join(prefs.allergens_to_avoid),
+                                user_id
+                            ))
+                con.commit()
+            print(f"Preferences updated in database for '{user_id}'.")
+        except Exception as e:
+            print(f"Error saving preferences: {e}")
 
+<<<<<<< HEAD
     def load_preferences(self, filename: str = 'user_preferences.json') -> CuisinePreferences:
         path = os.path.join(self.project_root, filename)
         # in case crash, should have an if else statement
@@ -140,3 +154,35 @@ if __name__ == "__main__":
     prefs = CuisinePreferences(cuisines=["Chinese"], dietary_restrictions=["halal"])
     df = handler.filter(prefs)
     handler.display(df)
+=======
+    def load_preferences(self, user_id: str) -> Optional[CuisinePreferences]:
+        """
+        Loads cuisine preferences from tourist_profiles.db by user_id (primary key).
+        Returns CuisinePreferences object or None if not found.
+        """
+        try:
+            with sqlite3.connect(DB_FILE) as con:
+                row = con.execute("""
+                                  SELECT preferred_cuisines, dietary, allergens
+                                  FROM tourist_profiles
+                                  WHERE user_id = ?
+                                  """, (user_id,)).fetchone()
+
+            if not row:
+                print(f"No profile found for '{user_id}'.")
+                return None
+
+            def unpack(s):
+                return [x.strip() for x in s.split("|") if x.strip()] if s else []
+
+            print(f"Loaded preferences for '{user_id}' from database.")
+            return CuisinePreferences(
+                cuisines=unpack(row[0]),
+                dietary_restrictions=unpack(row[1]),
+                allergens_to_avoid=unpack(row[2])
+            )
+
+        except Exception as e:
+            print(f"Error loading preferences: {e}")
+            return None
+>>>>>>> a996cb89d30093b7244c821b6b30959d52237f0f

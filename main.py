@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import sqlite3
 from dataclasses import dataclass
 from datetime import datetime
@@ -7,6 +8,12 @@ from feature_cuisines import CuisineFeatureHandler, CuisinePreferences
 import feature_pricing
 
 DB_FILE = "tourist_profiles.db"
+=======
+import feature_cuisines
+import saachees_file
+# import feature_closing
+# import feature_location
+>>>>>>> a996cb89d30093b7244c821b6b30959d52237f0f
 
 
 # -----------------------------
@@ -23,6 +30,7 @@ class TouristProfile:
     preferred_cuisines: List[str]
     created_at: str
 
+<<<<<<< HEAD
     def summary(self) -> str:
         return (
             f"[{self.user_id}] {self.name} (From {self.country}) | "
@@ -209,6 +217,29 @@ while True:
         else:
             for p in profiles:
                 print("-", p.summary())
+=======
+
+def main():
+    """Main program loop"""
+    da = saachees_file.TouristProfileDA()
+
+    while True:
+        print("\n=== Tourist App ===")
+        print("1) Create Account")
+        print("2) Login")
+        print("0) Exit")
+
+        choice = input("Choose: ").strip()
+
+        if choice == "1":
+            saachees_file.create_account(da)
+        elif choice == "2":
+            saachees_file.login(da)
+        elif choice == "0":
+            break
+        else:
+            print("Invalid choice.")
+>>>>>>> a996cb89d30093b7244c821b6b30959d52237f0f
 
     # ---------------- OPTION 3 (YOUR FEATURE) ----------------
     elif choice == "3":
