@@ -56,7 +56,7 @@ import saachees_file
 
 
 def display_main_menu():
-    """Display the menu options"""
+    "Display the menu options"
     print("\n" + "=" * 50)
     print("   WELCOME TO HAWKER CENTER GUIDE")
     print("=" * 50)
