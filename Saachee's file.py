@@ -7,6 +7,20 @@ from typing import List, Optional
 
 from feature_cuisines import CuisineFeatureHandler, CuisinePreferences
 from Felicia_Project import DataManager, DatabaseManager
+from features_reviews import ReviewFeature
+from features_location import LocationPlanner
+from features_closure import HawkerClosureFeature
+# Nicole: For now I just import everything first. In my mind the overall flow is:
+"""
+1. Onboard/Login
+2. Ask trip dates
+3. Filter out closed hawker centres (HawkerClosureFeature)
+4. Filter by cuisine preferences (from feature_cuisines)
+5. Filter by price (from felicia_project)
+6. Attach review stats and sort based on review ranks
+7. Let use view stall's revies / add a new review / select stalls to visit
+8. Generate best visit sequence (LocationPlanner)
+"""
 
 DB_FILE = "tourist_profiles.db"
 
@@ -15,10 +29,15 @@ DB_FILE = "tourist_profiles.db"
 # ─────────────────────────────────────────
 DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                         'dataset', 'Multiple Stalls Menu and Data')
+DATA_DIR_HAWKER = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                               'dataset', 'Hawker Centre Data')
 
 MENU_CSV   = os.path.join(DATA_DIR, 'menu_items.csv')
 STALLS_CSV = os.path.join(DATA_DIR, 'stalls.csv')
 HAWKER_CSV = os.path.join(DATA_DIR, 'hawker_centers.csv')
+REVIEWS_CSV = os.path.join(DATA_DIR, 'reviews.csv')
+
+
 
 
 # ─────────────────────────────────────────
