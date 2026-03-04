@@ -133,3 +133,10 @@ class CuisineFeatureHandler:
             dietary_restrictions=data['dietary_restrictions'],
             allergens_to_avoid=data['allergens_to_avoid']
         )
+
+
+if __name__ == "__main__":
+    handler = CuisineFeatureHandler()
+    prefs = CuisinePreferences(cuisines=["Chinese"], dietary_restrictions=["halal"])
+    df = handler.filter(prefs)
+    handler.display(df)
