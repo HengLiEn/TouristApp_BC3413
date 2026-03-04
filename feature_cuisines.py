@@ -81,7 +81,7 @@ class CuisineFeatureHandler:
             print("No items found. Try adjusting your preferences.")
             return
 
-        print(f"\n{'='*60}\n🍽️  {len(df):,} items found — showing {min(max_display, len(df))}\n{'='*60}\n")
+        print(f"\n{'='*60}\n  {len(df):,} items found — showing {min(max_display, len(df))}\n{'='*60}\n")
 
         for i, (_, row) in enumerate(df.head(max_display).iterrows(), 1):
             tags = []
@@ -89,7 +89,7 @@ class CuisineFeatureHandler:
             if row['vegetarian'] == 1: tags.append("Veg")
 
             print(f"{i}. {row['item_name']} ({row['cuisine_type']})")
-            print(f"   📍 {row['stall_name']}  💰 ${row['price']:.2f} ")
+            print(f"   📍 {row['stall_name']}  ")
             if tags: print(f"   {' | '.join(tags)}")
             print()
 
