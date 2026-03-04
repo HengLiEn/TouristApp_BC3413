@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import List, Optional
 
 from feature_cuisines import CuisineFeatureHandler, CuisinePreferences
-from Felicia_Project import DataManager, DatabaseManager
+from feature_pricing import DataManager, DatabaseManager
 from features_reviews import ReviewFeature
 from features_location import LocationPlanner
 from features_closure import HawkerClosureFeature
