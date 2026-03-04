@@ -132,29 +132,7 @@ class CuisineFeatureHandler:
         except Exception as e:
             print(f"Error saving preferences: {e}")
 
-<<<<<<< HEAD
-    def load_preferences(self, filename: str = 'user_preferences.json') -> CuisinePreferences:
-        path = os.path.join(self.project_root, filename)
-        # in case crash, should have an if else statement
-        if not os.path.exists(path):
-            print("No saved preferences found.")
-            return None
-        with open(path, 'r') as fp:
-            data = json.load(fp)
-        print(f"Loaded preferences for {data['name']}")
-        return CuisinePreferences(
-            cuisines=data['cuisines'],
-            dietary_restrictions=data['dietary_restrictions'],
-            allergens_to_avoid=data['allergens_to_avoid']
-        )
 
-
-if __name__ == "__main__":
-    handler = CuisineFeatureHandler()
-    prefs = CuisinePreferences(cuisines=["Chinese"], dietary_restrictions=["halal"])
-    df = handler.filter(prefs)
-    handler.display(df)
-=======
     def load_preferences(self, user_id: str) -> Optional[CuisinePreferences]:
         """
         Loads cuisine preferences from tourist_profiles.db by user_id (primary key).
@@ -185,4 +163,10 @@ if __name__ == "__main__":
         except Exception as e:
             print(f"Error loading preferences: {e}")
             return None
->>>>>>> a996cb89d30093b7244c821b6b30959d52237f0f
+
+
+if __name__ == "__main__":
+    handler = CuisineFeatureHandler()
+    prefs = CuisinePreferences(cuisines=["Chinese"], dietary_restrictions=["halal"])
+    df = handler.filter(prefs)
+    handler.display(df)
