@@ -37,7 +37,7 @@ def main():
             # feature_location.run_itinerary()
             print("Feature coming soon!")  # Placeholder until module is ready
         elif choice == '3':
-            feature_cuisine.run_menu_recommendations()
+            feature_cuisines.run_menu_recommendations()
         elif choice == '4':
             print("Thank you for using Hawker Guide!")
             break
