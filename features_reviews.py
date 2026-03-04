@@ -4,16 +4,10 @@ Content:
 2. Let users select stalls they want to visit (build plan_places list).
 3. Optimise the visit order using linear-distance and render a Folium map.
 4. Allow users to submit new reviews (OOP - Review / ReviewManager classes).
-
-Current Limitation:
-- When inputting new review, must match the stall name
-- Haven't tested whether the code works with the filtered cuisine df
-- How to change the helpful_counter and verify_purchases
 """
 
 # CONSTANTS / CONFIGURATION
-db_path = "hawker_trip.db"
-# expects an SQLite DB that has already been initialised
+db_path = "tourist_profiles.db"
 stalls_data = "stalls.csv"
 reviews_data = "reviews.csv"
 
@@ -25,25 +19,20 @@ bayes_prior_mean = global average rating across all stalls
 bayes_prior_count = mean number of reviews per stall
 """
 
-import csv, statistics
 import math
 import os
 import sqlite3
-from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import List
 import pandas as pd
-
-# Will need the CuisinePreferences class from Li En
 
 class ReviewFeature:
     def __init__(self,
                  project_root: str = None,
                  stalls_path: str = None,
                  reviews_path: str = None,
-                 db_path: str = "hawker_recommender.db"): # to be changed to combine with the db
+                 db_path: str = "tourist_profiles.db"):
         self.project_root = project_root or os.path.dirname(os.path.abspath(__file__))
-        default_data_dir = os.path.join(self.project_root, "dataet", "Multiple Stalls Menu and Data")
+        default_data_dir = os.path.join(self.project_root, "dataset", "Multiple Stalls Menu and Data")
 
         self.stalls_path = stalls_path or os.path.join(default_data_dir, "stalls.csv")
         self.reviews_path = reviews_path or os.path.join(default_data_dir, "reviews.csv")
@@ -53,7 +42,7 @@ class ReviewFeature:
         self.reviews_df = pd.read_csv(self.reviews_path)
 
         self._normalize_reviews_df()
-        # self._init_db() - if needed
+        self._build_stall_name_index()
 
         print(f"Loaded stalls: {len(self.stalls_df):, } reviews: {len(self.reviews_df):, }")
 
@@ -84,7 +73,7 @@ class ReviewFeature:
         self.reviews_df["review_date"] = pd.to_datetime(self.reviews_df["review_date"], errors="coerce", utc=True)
         self.reviews_df["review_date"] = self.reviews_df["review_date"].fillna(pd.Timestamp.now(tz="UTC"))
 
-# Stall Name Function
+    # Stall Name Function
     def _build_stall_name_index(self):
         tmp = self.stalls_df.copy()
         tmp["stall_name_key"] = tmp["stall_name"].astype(str).str.strip().str.lower()
@@ -125,127 +114,29 @@ class ReviewFeature:
         agg["bayes_score"] = (bayes_m * global_mean + agg["n_reviews"] * agg["weighted_mean"]) / (
                 bayes_m + agg["n_reviews"])
 
-        out = agg.merge(self.stalls_df, on="stalls_id", how="left")
-
-        cols = ["stall_id", "stall_name", "cuisine_type", "specialty_items", "avg_rating", "n_reviews", "bayes_score"]
-        out = out[cols].copy()
-
+        out = agg[["stall_id", "avg_rating", "n_reviews", "bayes_score"]].copy()
         out["avg_rating"] = out["avg_rating"].round(2)
         out["bayes_score"] = out["bayes_score"].round(4)
 
         return out
 
-    # Display Rank
-    def rank_filtered_results(self,
-                              filtered_df: pd.DataFrame,
-                              max_results: int = 20,
-                              min_total_reviews: int = 0,
-                              min_avg_rating: float = 0.0,) -> pd.DataFrame:
-        """
-        Input: LiEn's filtered df (already cuisine/dietary filtered)
-            Must contain at least: stall_id, stall_name, cuisine_type
-        Output: same df + avg_rating/n_reviews/bayes_score, sorted best-first.
-
-        For the minimum total reviews and minimum average rating, its just an optional threshold so we can deliver the "trusted" stalls -> can be deleted
-        """
+    def attach_scores(self, df: pd.DataFrame) -> pd.DataFrame:
         scores = self.compute_bayes_scores()
-        ranked = filtered_df.merge(scores, on="stall_id", how="left") # need to change the filtered_df with the real df from Li En's cuisine preferences
+        out = df.merge(scores, on="stall_id", how="left")
+        out["n_reviews"] = out["n_reviews"].fillna(0).astype(int)
+        out["avg_rating"] = out["avg_rating"].fillna(0.0).astype(float)
+        out["bayes_score"] = out["bayes_score"].fillna(0.0).astype(float)
+        return out
 
-        # If a stall has no reviews, avg_rating/n_reviews/bayes_score will be NaN
-        ranked["n_reviews"] = ranked["n_reviews"].fillna(0).astype(int)
-        ranked["avg_rating"] = ranked["avg_rating"].fillna(0.0).astype(float)
-        ranked["bayes_score"] = ranked["bayes_score"].fillna(0.0).astype(float)
+    @staticmethod
+    def sort_by_reviews(df: pd.DataFrame) -> pd.DataFrame:
+        if df is None or df.empty:
+            return df
+        return df.sort_values(["bayes_score", "avg_rating", "n_reviews"], ascending = [False, False, False])
 
-        # Optional thresholds (can be deleted)
-        ranked = ranked[ranked["n_reviews"] >= min_total_reviews]
-        ranked = ranked[ranked["avg_rating"] >= min_avg_rating]
-
-        ranked = ranked.sort_values(["bayes_score", "n_reviews"], ascending=False)
-        return ranked.head(max_results) # will show the top 20, based on the max_results (can be changed)
-
-    # Display Reviews
-    def display_ranked(self,
-                       ranked_df: pd.DataFrame,
-                       max_display: int = 20):
-        if ranked_df.empty:
-            print("No results to display")
-            return
-
-        df = ranked_df.head(max_display).reset_index(drop=True)
-
-        print(f"\n{'=' * 60}\n⭐ Ranked stalls (showing {len(df)})\n{'=' * 60}\n")
-        for i, row in df.iterrows():
-            print(
-                f"{i + 1}. {row.get('stall_name', '(unknown)')} ({row.get('cuisine_type', '')})"
-                f"  |  {row['avg_rating']:.2f} / {int(row['n_reviews'])} reviews"
-            )
-        print()
-
-    # Selection loop -> plan_places (might be redundant with Zi Xing, but for reference purposes)
-    def choose_stalls_loop (self, ranked_df: pd.DataFrame) -> List[int]:
-        """
-        Lets user select stalls by index to append into plan_places.
-        Return list of stall_id (plan_places).
-        """
-        plan_places: List[int] = []
-        if ranked_df.empty:
-            return plan_places
-
-        df = ranked_df.reset_index(drop=True)
-        while True:
-            self.display_ranked(df, max_display=min(20, len(df)))
-
-            raw = input(
-                "Which stalls do you want to visit? Enter the number (e.g, 1,3,5) (or 'Quit' to stop): ").strip().lower()
-            if raw == "Quit":
-                break
-
-            try:
-                picks = [int(x.strip()) for x in raw.split(",") if x.strip()]
-            except ValueError:
-                print("Invalid input. Please enter numbers separated by commas (e.g., 1,3,5).\n")
-                continue
-
-            for idx in picks:
-                if 1 <= idx <= len(df):
-                    stall_id = int(df.loc[idx - 1, "stall_id"])
-                    if stall_id not in plan_places:
-                        plan_places.append(stall_id)
-
-            more = input("Do you want to visit other cuisine / stalls? (Y/N): ").strip().lower()
-            if more != "y":
-                break
-
-            print("\n(You can input your cuisine preferences and keep adding.)\n")
-
-        return plan_places
-
-    # User Prompt for New Reviews
-    def prompt_and_add_review (self, user_name: str) -> int:
-        stall_name = input("Stall Name: ").strip() # Limitation: Must match stall name
-
-        while True:
-            try:
-                rating = float(input("Rating (0 to 5): ").strip())
-                if 0.0 <= rating <= 5.0:
-                    break
-                print("Please enter a rating between 0 and 5.")
-            except ValueError:
-                print("Please enter a valid number (e.g. 4.5).")
-
-        review_text = input("Review text: ").strip()
-
-        review_id = self.add_review(
-            stall_name = stall_name,
-            rating = rating,
-            review_text = review_text,
-            helpful_count = 0,
-            user_name = user_name,
-            is_verified_purchase=False
-        )
-
-        print(f"Review saved (review_id = {review_id}.")
-        return review_id
+    def list_reviews_for_stall(self, stall_id: int) -> pd.DataFrame:
+        df = self.reviews_df.copy()
+        return df[df["stall_id"] == int(stall_id)].sort_values("review_date", ascending=False)
 
     # Add New Reviews Into Database
     def add_review(
@@ -253,10 +144,18 @@ class ReviewFeature:
             stall_name: str,
             rating: float,
             review_text: str,
-            helpful_count: int = 0,
             user_name: str = None,
-            is_verified_purchase: bool = False, #User_name waiting for Saachee's result
     ) -> int:
+        if not self.db_path:
+            raise ValueError("add_review requires db_path to be set in ReviewFeature(...)")
+
+        try:
+            rating_f = float(rating)
+        except ValueError:
+            raise ValueError("Rating must be a number")
+
+        if not 0.0 <= rating_f <= 5.0:
+            raise ValueError("Rating must be between 0 and 5")
 
         key = stall_name.strip().lower()
         if key not in self.stall_name_to_id:
@@ -264,6 +163,8 @@ class ReviewFeature:
 
         stall_id = int(self.stall_name_to_id[key])
         now_iso = datetime.now(timezone.utc).isoformat()
+        helpful_count = 0
+        is_verified_purchase = False
 
         with sqlite3.connect(self.db_path) as conn:
             cur = conn.execute("""
@@ -288,11 +189,25 @@ class ReviewFeature:
             "rating": float(rating),
             "review_text": review_text,
             "review_date": now_iso,
-            "helpful_count": int(helpful_count),
-            "is_verified_purchase": bool(is_verified_purchase),
+            "helpful_count": helpful_count,
+            "is_verified_purchase": is_verified_purchase,
         }])
         self.reviews_df = pd.concat([self.reviews_df, new_row], ignore_index=True)
         self._normalize_reviews_df()
 
         return review_id
 
+    def mark_review_helpful(self, review_id: int) -> None:
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute("""
+                UPDATE reviews
+                SET helpful_count = helpful_count+1
+                WHERE review_id = ?
+            """, (review_id,))
+            conn.commit()
+
+        if "review_id" in self.reviews_df.columns:
+            idx = self.reviews_df["review_id"] == review_id
+            self.reviews_df.loc[idx,"helpful_count"] +=1
+
+        print(f"Review {review_id} marked as helpful")
