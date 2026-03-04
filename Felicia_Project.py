@@ -1,3 +1,9 @@
+"""
+Feature: Price Filtering for TouristApp_BC3413
+Author: Felicia
+Project: Singapore Tourist App BC3413
+"""
+
 # my code asks tourists what is the min and max price they prefer and if they are looking at specifically Food/Drinks/Both
 # i changed my menu_items file name to menu_items.csv
 # 1st half of my code will ask for the csv files we want to use (i.e. type out the correct csv file names)
@@ -89,7 +95,7 @@ class DataManager:
 
 
 class DatabaseManager:
-    def __init__(self, db_name="hawker_data.db"):
+    def __init__(self, db_name="tourist_profiles.db"):
         self.conn = sqlite3.connect(db_name)
 
     def save_to_database(self, df, table_name):
@@ -97,7 +103,7 @@ class DatabaseManager:
         print(f"Data saved into SQLite database table '{table_name}'.\n")
 
 
-class Tourist:
+class PricingPreferences:
     def __init__(self, min_price, max_price, preference):
         self.min_price = min_price
         self.max_price = max_price
