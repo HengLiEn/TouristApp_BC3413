@@ -1,28 +1,38 @@
 """
 Feature: Cuisine Preferences Module for TouristApp_BC3413
 Author: LiEn
-Project: Singapore Tourist App BC3407
+Project: Singapore Tourist App BC3413
+
+This module:
+- Loads menu_items.csv and stalls.csv
+- Lets users filter menu items based on cuisine/dietary/allergen preferences
+- Saves/loads preferences into tourist_profiles.db (table: tourist_profiles)
+
+IMPORTANT (integration):
+- We use `username` as the primary key (matches saachees_file.py)
 """
 
-import pandas as pd
-import os
-from typing import List, Optional
-from dataclasses import dataclass
-import sqlite3
+from __future__ import annotations
 
-# Same DB as Saachee's main.py
+import os
+import sqlite3
+from dataclasses import dataclass
+from typing import List, Optional
+
+import pandas as pd
+
 DB_FILE = "tourist_profiles.db"
 
 
 @dataclass
 class CuisinePreferences:
-    # reason of branching this to none instead of empty list such that it doesn't append to the same instance by accident.
-    """User's cuisine preferences - ONLY food-related attributes"""
-    cuisines: List[str] = None          # e.g., ['Chinese', 'Malay', 'Indian']
-    dietary_restrictions: List[str] = None  # e.g., ['vegetarian', 'halal']
-    allergens_to_avoid: List[str] = None    # e.g., ['Dairy', 'Nuts']
+    """User's cuisine preferences (food-related attributes)."""
+    cuisines: List[str] = None
+    dietary_restrictions: List[str] = None
+    allergens_to_avoid: List[str] = None
 
     def __post_init__(self):
+        # Avoid mutable default list bugs
         if self.cuisines is None:
             self.cuisines = []
         if self.dietary_restrictions is None:
@@ -32,72 +42,83 @@ class CuisinePreferences:
 
 
 class CuisineFeatureHandler:
-
     def __init__(self, project_root: str = None):
         self.project_root = project_root or os.path.dirname(os.path.abspath(__file__))
-        data_dir = os.path.join(self.project_root, 'dataset', 'Multiple Stalls Menu and Data')
+        data_dir = os.path.join(self.project_root, "dataset", "Multiple Stalls Menu and Data")
 
-        self.menu_df = pd.read_csv(os.path.join(data_dir, 'menu_items.csv'))
-        self.stalls_df = pd.read_csv(os.path.join(data_dir, 'stalls.csv'))
-        self.merged_df = self.menu_df.merge(self.stalls_df, on='stall_id', how='left')
-        print(f" Loaded {len(self.menu_df):,} items from {len(self.stalls_df):,} stalls")
+        self.menu_df = pd.read_csv(os.path.join(data_dir, "menu_items.csv"))
+        self.stalls_df = pd.read_csv(os.path.join(data_dir, "stalls.csv"))
+        self.merged_df = self.menu_df.merge(self.stalls_df, on="stall_id", how="left")
 
-    # return the list of cuisines available
+        print(f"Loaded {len(self.menu_df):,} items from {len(self.stalls_df):,} stalls")
+
     def get_available_cuisines(self) -> List[str]:
-        return sorted(self.stalls_df['cuisine_type'].unique())
+        return sorted(self.stalls_df["cuisine_type"].dropna().unique())
 
     def get_available_allergens(self) -> List[str]:
         all_allergens = set()
-        for entry in self.menu_df['allergens'].dropna():
-            # make sure it is a string and not 'none'
-            if isinstance(entry, str) and entry.lower() != 'none':
-                # split by comma and remove empty spaces using strip
-                all_allergens.update(a.strip() for a in entry.split(','))
+        if "allergens" not in self.menu_df.columns:
+            return []
+
+        for entry in self.menu_df["allergens"].dropna():
+            if isinstance(entry, str) and entry.strip() and entry.lower() != "none":
+                all_allergens.update(a.strip() for a in entry.split(",") if a.strip())
         return sorted(all_allergens)
 
-    def filter(self, prefs: CuisinePreferences):
+    def filter(self, prefs: CuisinePreferences) -> pd.DataFrame:
         df = self.merged_df.copy()
 
-        if prefs.cuisines:
-            df = df[df['cuisine_type'].str.lower().isin([c.lower() for c in prefs.cuisines])]
+        # Cuisine type
+        if prefs.cuisines and "cuisine_type" in df.columns:
+            df = df[df["cuisine_type"].astype(str).str.lower().isin([c.lower() for c in prefs.cuisines])]
 
+        # Dietary
         dietary = [d.lower() for d in prefs.dietary_restrictions]
-        if 'vegetarian' in dietary:
-            df = df[df['vegetarian'] == 1]  # binary 0/1
-        if 'halal' in dietary:
-            df = df[df['halal'] == 1]  # binary 0/1
+        if "vegetarian" in dietary and "vegetarian" in df.columns:
+            df = df[df["vegetarian"] == 1]
+        if "halal" in dietary and "halal" in df.columns:
+            df = df[df["halal"] == 1]
 
-        for allergen in prefs.allergens_to_avoid:
-            # remove rows that contain those allergens with ~
-            df = df[~df['allergens'].str.contains(allergen, case=False, na=False)]
+        # Allergens
+        if "allergens" in df.columns:
+            for allergen in prefs.allergens_to_avoid:
+                df = df[~df["allergens"].astype(str).str.contains(allergen, case=False, na=False)]
 
-        df = df[df['is_available'] == True]
+        # Availability (if present)
+        if "is_available" in df.columns:
+            df = df[df["is_available"] == True]
+
         print(f"{len(df):,} items match your preferences")
         return df
 
-    # display function for a nicer presentation
-    def display(self, df: pd.DataFrame, max_display: int = 20):
-        if df.empty:
+    def display(self, df: pd.DataFrame, max_display: int = 20) -> None:
+        if df is None or df.empty:
             print("No items found. Try adjusting your preferences.")
             return
 
-        print(f"\n{'='*60}\n  {len(df):,} items found — showing {min(max_display, len(df))}\n{'='*60}\n")
+        print(f"\n{'=' * 60}\n  {len(df):,} items found — showing {min(max_display, len(df))}\n{'=' * 60}\n")
 
         for i, (_, row) in enumerate(df.head(max_display).iterrows(), 1):
             tags = []
-            if row['halal'] == 1: tags.append("Halal")
-            if row['vegetarian'] == 1: tags.append("Veg")
+            if "halal" in row and row.get("halal", 0) == 1:
+                tags.append("Halal")
+            if "vegetarian" in row and row.get("vegetarian", 0) == 1:
+                tags.append("Veg")
 
-            print(f"{i}. {row['item_name']} ({row['cuisine_type']})")
-            print(f"   📍 {row['stall_name']}  ")
-            if tags: print(f"   {' | '.join(tags)}")
+            item = row.get("item_name", "Unknown item")
+            cuisine = row.get("cuisine_type", "Unknown cuisine")
+            stall = row.get("stall_name", "Unknown stall")
+
+            print(f"{i}. {item} ({cuisine})")
+            print(f"   📍 {stall}")
+            if tags:
+                print(f"   {' | '.join(tags)}")
             print()
 
         if len(df) > max_display:
-            print(f"... and {len(df) - max_display:,} more. Export CSV using 'export' function.")
+            print(f"... and {len(df) - max_display:,} more.")
 
-    # export filtered data to CSV
-    def export(self, prefs: CuisinePreferences, filename: str = 'filtered_cuisine_data.csv'):
+    def export(self, prefs: CuisinePreferences, filename: str = "filtered_cuisine_data.csv") -> pd.DataFrame:
         df = self.filter(prefs)
         if df.empty:
             print("Nothing to export.")
@@ -105,59 +126,63 @@ class CuisineFeatureHandler:
 
         output_path = os.path.join(self.project_root, filename)
         df.to_csv(output_path, index=False)
-        print(f" Saved {len(df):,} items to {output_path}")
+        print(f"Saved {len(df):,} items to {output_path}")
         return df
 
-    def save_preferences(self, prefs: CuisinePreferences, user_id: str):
+    # -----------------------------
+    # DB integration (username PK)
+    # -----------------------------
+    def save_preferences(self, prefs: CuisinePreferences, username: str) -> None:
         """
-        Updates the tourist's cuisine preferences in tourist_profiles.db.
-        Looks up the tourist by user_id (primary key) and updates their record.
+        Updates cuisine-related preferences in tourist_profiles.db for the given username.
         """
         try:
             with sqlite3.connect(DB_FILE) as con:
-                con.execute("""
-                            UPDATE tourist_profiles
-                            SET preferred_cuisines = ?,
-                                dietary            = ?,
-                                allergens          = ?
-                            WHERE user_id = ?
-                            """, (
-                                "|".join(prefs.cuisines),
-                                "|".join(prefs.dietary_restrictions),
-                                "|".join(prefs.allergens_to_avoid),
-                                user_id
-                            ))
+                con.execute(
+                    """
+                    UPDATE tourist_profiles
+                    SET preferred_cuisines = ?,
+                        dietary            = ?,
+                        allergens          = ?
+                    WHERE username = ?;
+                    """,
+                    (
+                        "|".join(prefs.cuisines),
+                        "|".join(prefs.dietary_restrictions),
+                        "|".join(prefs.allergens_to_avoid),
+                        username,
+                    ),
+                )
                 con.commit()
-            print(f"Preferences updated in database for '{user_id}'.")
+            print(f"Preferences updated for '{username}'.")
         except Exception as e:
             print(f"Error saving preferences: {e}")
 
-
-    def load_preferences(self, user_id: str) -> Optional[CuisinePreferences]:
+    def load_preferences(self, username: str) -> Optional[CuisinePreferences]:
         """
-        Loads cuisine preferences from tourist_profiles.db by user_id (primary key).
-        Returns CuisinePreferences object or None if not found.
+        Loads cuisine-related preferences from tourist_profiles.db for the given username.
         """
         try:
             with sqlite3.connect(DB_FILE) as con:
-                row = con.execute("""
-                                  SELECT preferred_cuisines, dietary, allergens
-                                  FROM tourist_profiles
-                                  WHERE user_id = ?
-                                  """, (user_id,)).fetchone()
+                row = con.execute(
+                    """
+                    SELECT preferred_cuisines, dietary, allergens
+                    FROM tourist_profiles
+                    WHERE username = ?;
+                    """,
+                    (username,),
+                ).fetchone()
 
             if not row:
-                print(f"No profile found for '{user_id}'.")
                 return None
 
-            def unpack(s):
-                return [x.strip() for x in s.split("|") if x.strip()] if s else []
+            def unpack(s: Optional[str]) -> List[str]:
+                return [x.strip() for x in str(s).split("|") if x.strip()] if s else []
 
-            print(f"Loaded preferences for '{user_id}' from database.")
             return CuisinePreferences(
                 cuisines=unpack(row[0]),
                 dietary_restrictions=unpack(row[1]),
-                allergens_to_avoid=unpack(row[2])
+                allergens_to_avoid=unpack(row[2]),
             )
 
         except Exception as e:

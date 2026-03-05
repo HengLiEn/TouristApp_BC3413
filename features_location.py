@@ -1,269 +1,298 @@
-#possible improvements im considering:
-#1. live location - abit hard
-#2. do i need to export the final itinerary out?
-#3. include car / public transportation
+"""
+Feature: Location & Itinerary Planner for TouristApp_BC3413
+Author: Nicole (refactored for importability)
 
-#IMPROVED VERSION:
-#1. Used OneMap for a more accurante distance measurement other than geodesic.
-#2. show travel distance and time
+Key changes for integration:
+- No code runs on import (everything is behind class methods / __main__)
+- Fixes previous script-level references (df/get_coords/merged_stalls) by using self.*
+- Provides `run_interactive()` so main.py can call it cleanly
 
-import pandas as pd
-from geopy.distance import geodesic
-import sys
+Notes:
+- Uses OneMap Search API to geocode user input.
+- Uses OneMap Routing API (walking) when available; falls back to geodesic distance.
+"""
+
+from __future__ import annotations
+
 import os
 from datetime import datetime
+from typing import Dict, List, Optional, Tuple
+
+import pandas as pd
 import requests
+from geopy.distance import geodesic
+
+
+Coord = Tuple[float, float]
 
 
 class LocationPlanner:
-    def __init__(self):
-        # import datasets
-        try:
-            self.df = pd.read_csv(os.path.join("dataset", "Hawker Centre Data", "DatesofHawkerCentresClosure.csv"))
-            try:
-                self.df_stalls = pd.read_csv(os.path.join("dataset", "Multiple Stalls Menu and Data", "stalls.csv"))
-                self.merged_stalls = pd.merge(self.df_stalls, self.df, left_on='hawker_center_id', right_on='serial_no', how='inner')
-            except FileNotFoundError:
-                print("Warning: 'stalls.csv' not found.")
-                self.merged_stalls = pd.DataFrame()
-        except FileNotFoundError:
-            print("Error: Hawker dataset not found.")
-            sys.exit()
+    def __init__(self, project_root: str = None):
+        self.project_root = project_root or os.path.dirname(os.path.abspath(__file__))
 
-    def get_coords(self, address):
-        "Uses OneMap API to turn SG address/postal code into coordinates"
+        # Load datasets
+        hc_path = os.path.join(self.project_root, "dataset", "Hawker Centre Data", "DatesofHawkerCentresClosure.csv")
+        stalls_path = os.path.join(self.project_root, "dataset", "Multiple Stalls Menu and Data", "stalls.csv")
+
         try:
-            # OneMap Search Endpoint
-            url = f"https://www.onemap.gov.sg/api/common/elastic/search?searchVal={address}&returnGeom=Y&getAddrDetails=Y&pageNum=1"
-            response = requests.get(url, timeout=5)
-            data = response.json()
-            # Check if OneMap found any results
-            if data.get('found', 0) > 0:
-                result = data['results'][0]
-                return (float(result['LATITUDE']), float(result['LONGITUDE']))
-            else:
-                print(f"OneMap could not find: {address}")
-                return None
-        except Exception as e:
-            print(f"Connection error: {e}")
+            self.hc_df = pd.read_csv(hc_path)
+        except FileNotFoundError:
+            print(f"Error: Hawker closure dataset not found at: {hc_path}")
+            self.hc_df = pd.DataFrame()
+
+        try:
+            self.stalls_df = pd.read_csv(stalls_path)
+        except FileNotFoundError:
+            print(f"Warning: stalls.csv not found at: {stalls_path}")
+            self.stalls_df = pd.DataFrame()
+
+        # Attempt to merge stalls -> hawker centre info if keys exist
+        self.merged_stalls = pd.DataFrame()
+        if not self.hc_df.empty and not self.stalls_df.empty:
+            if "hawker_center_id" in self.stalls_df.columns and "serial_no" in self.hc_df.columns:
+                self.merged_stalls = pd.merge(
+                    self.stalls_df,
+                    self.hc_df,
+                    left_on="hawker_center_id",
+                    right_on="serial_no",
+                    how="inner",
+                )
+
+    # -----------------------------
+    # OneMap helpers
+    # -----------------------------
+    @staticmethod
+    def get_coords(address_or_postal: str) -> Optional[Coord]:
+        """
+        Uses OneMap API to turn SG address/postal code into coordinates.
+        """
+        address_or_postal = (address_or_postal or "").strip()
+        if not address_or_postal:
             return None
 
-    def calculate_best_route(self, start_coords, hcs_df):
-        "Finds the nearest next stop and tracks total distance/time"
-        route = []
-        remaining = hcs_df.copy()
-        current_loc = start_coords
-        total_km = 0
-        total_mins = 0
+        try:
+            url = (
+                "https://www.onemap.gov.sg/api/common/elastic/search"
+                f"?searchVal={address_or_postal}&returnGeom=Y&getAddrDetails=Y&pageNum=1"
+            )
+            resp = requests.get(url, timeout=8)
+            data = resp.json()
 
-        print("\nCalculating real-world travel distances via OneMap...")
+            if data.get("found", 0) > 0 and data.get("results"):
+                r0 = data["results"][0]
+                return float(r0["LATITUDE"]), float(r0["LONGITUDE"])
+
+            print(f"OneMap could not find: {address_or_postal}")
+            return None
+        except Exception as e:
+            print(f"Connection error (OneMap search): {e}")
+            return None
+
+    @staticmethod
+    def _route_walk_km_mins(start: Coord, end: Coord) -> Tuple[float, float]:
+        """
+        Returns (distance_km, time_minutes) using OneMap routing if possible.
+        Falls back to geodesic distance and a rough walking pace (12 mins/km).
+        """
+        try:
+            url = (
+                "https://www.onemap.gov.sg/api/public/routing/route"
+                f"?start={start[0]},{start[1]}&end={end[0]},{end[1]}&routeType=walk"
+            )
+            data = requests.get(url, timeout=8).json()
+            summary = data.get("route_summary") or {}
+            dist_km = float(summary.get("total_distance", 0)) / 1000.0
+            time_mins = float(summary.get("total_time", 0)) / 60.0
+
+            if dist_km > 0 and time_mins > 0:
+                return dist_km, time_mins
+        except Exception:
+            pass
+
+        # fallback
+        dist_km = geodesic(start, end).km
+        time_mins = dist_km * 12.0
+        return float(dist_km), float(time_mins)
+
+    # -----------------------------
+    # Route planning
+    # -----------------------------
+    def calculate_best_route(self, start_coords: Coord, stops_df: pd.DataFrame) -> Tuple[List[Dict], float, float]:
+        """
+        Greedy nearest-next routing by walking distance.
+        Expects stops_df contains columns:
+          - name (hawker name)
+          - latitude_hc
+          - longitude_hc
+        """
+        required = {"latitude_hc", "longitude_hc"}
+        if stops_df is None or stops_df.empty or not required.issubset(set(stops_df.columns)):
+            return [], 0.0, 0.0
+
+        route: List[Dict] = []
+        remaining = stops_df.copy()
+        current = start_coords
+        total_km = 0.0
+        total_mins = 0.0
 
         while not remaining.empty:
-            best_dist = float('inf')
-            best_time = 0
-            nearest_idx = None
+            best_idx = None
+            best_dist = float("inf")
+            best_time = 0.0
 
             for idx, row in remaining.iterrows():
-                url = f"https://www.onemap.gov.sg/api/public/routing/route?start={current_loc[0]},{current_loc[1]}&end={row['latitude_hc']},{row['longitude_hc']}&routeType=walk"
-                try:
-                    response = requests.get(url, timeout=5).json()
-                    dist_km = response['route_summary']['total_distance'] / 1000
-                    time_mins = response['route_summary']['total_time'] / 60
-                except:
-                    # Fallback: Approx 12 mins per km for walking
-                    dist_km = geodesic(current_loc, (row['latitude_hc'], row['longitude_hc'])).km
-                    time_mins = dist_km * 12
+                end = (float(row["latitude_hc"]), float(row["longitude_hc"]))
+                dist_km, time_mins = self._route_walk_km_mins(current, end)
 
                 if dist_km < best_dist:
+                    best_idx = idx
                     best_dist = dist_km
                     best_time = time_mins
-                    nearest_idx = idx
 
-            nearest_row = remaining.loc[nearest_idx].to_dict()
-            # Store travel stats from the PREVIOUS stop to THIS stop
-            nearest_row['leg_dist'] = best_dist
-            nearest_row['leg_time'] = best_time
+            chosen = remaining.loc[best_idx].to_dict()
+            chosen["leg_dist_km"] = best_dist
+            chosen["leg_time_mins"] = best_time
 
             total_km += best_dist
             total_mins += best_time
+            route.append(chosen)
 
-            route.append(nearest_row)
-            current_loc = (nearest_row['latitude_hc'], nearest_row['longitude_hc'])
-            remaining = remaining.drop(nearest_idx)
+            current = (float(chosen["latitude_hc"]), float(chosen["longitude_hc"]))
+            remaining = remaining.drop(best_idx)
 
         return route, total_km, total_mins
 
-# --- MAIN PROGRAM ---
-print("--- Advanced Hawker Centre & Stall Itinerary Planner ---")
+    # -----------------------------
+    # Interactive runner
+    # -----------------------------
+    def run_interactive(self) -> None:
+        if self.hc_df.empty:
+            print("Location planner cannot run because hawker centre dataset is missing.")
+            return
 
-# 1. Get User Location (Only happens once at start)
-# Nicole: This part might not be needed since we are combining with cuisine preferences and price filter.
-while True:
-    user_addr = input("Enter your current location (e.g. 'Bedok' or '639798'): ")
-    user_coords = get_coords(user_addr)
-    if user_coords:
-        print("Location recognized!")
-        break
-    print("Location not found. Try again.")
+        print("\n--- Advanced Hawker Centre & Stall Itinerary Planner ---")
 
-all_itineraries = []
-
-# 2. Main Planning Loop (Allows multiple itineraries)
-# Nicole: Can use this for the main programme.
-while True:
-    # --- Date Validation ---
-    while True:
-        date_input = input("\nEnter the date (YYYY-MM-DD): ").strip()
-        try:
-            valid_date = datetime.strptime(date_input, "%Y-%m-%d")
-            explore_date = date_input
-            break
-        except ValueError:
-            print("Invalid format! Please use YYYY-MM-DD (e.g., 2026-08-09).")
-
-    selected_rows = []
-
-    # 2. Select up to 5 Hawker Centres
-    while len(selected_rows) < 5:
-        print(f"\n--- Itinerary for {explore_date} (Stops: {len(selected_rows)}/5) ---")
-        print("[1] Search Hawker Centre Name  [2] Search Stall Name  [done] Finish Selection")
-        search_mode = input("Option: ").strip().lower()
-
-        if search_mode == 'done':
-            if selected_rows:
+        # 1) Get user start location
+        while True:
+            user_addr = input("Enter your current location (e.g. 'Bedok' or '639798'): ").strip()
+            user_coords = self.get_coords(user_addr)
+            if user_coords:
+                print("Location recognized!")
                 break
+            print("Location not found. Try again.")
+
+        # 2) Validate date (currently used as a label; closure filtering can be added later)
+        while True:
+            date_input = input("\nEnter the date (YYYY-MM-DD): ").strip()
+            try:
+                datetime.strptime(date_input, "%Y-%m-%d")
+                explore_date = date_input
+                break
+            except ValueError:
+                print("Invalid format! Please use YYYY-MM-DD (e.g., 2026-08-09).")
+
+        # 3) Select up to 5 stops
+        selected_rows: List[Dict] = []
+
+        while len(selected_rows) < 5:
+            print(f"\n--- Itinerary for {explore_date} (Stops: {len(selected_rows)}/5) ---")
+            print("[1] Search Hawker Centre Name  [2] Search Stall Name  [done] Finish Selection")
+            mode = input("Option: ").strip().lower()
+
+            if mode == "done":
+                if selected_rows:
+                    break
+                print("Pick at least one stop.")
+                continue
+
+            query = input("Enter search term: ").strip()
+            if not query:
+                continue
+
+            matches = pd.DataFrame()
+
+            if mode == "1":
+                if "name" not in self.hc_df.columns:
+                    print("Dataset missing 'name' column for hawker centres.")
+                    continue
+                matches = self.hc_df[self.hc_df["name"].astype(str).str.contains(query, case=False, na=False)]
+
+            elif mode == "2":
+                if self.merged_stalls.empty or "stall_name" not in self.merged_stalls.columns:
+                    print("Stall search not available (stalls dataset missing).")
+                    continue
+                matches = self.merged_stalls[self.merged_stalls["stall_name"].astype(str).str.contains(query, case=False, na=False)]
+
+                # If too many matches, prompt user to pick hawker centre
+                if len(matches) > 10 and "name" in matches.columns:
+                    print(f"Found {len(matches)} stalls. Filter by hawker centre:")
+                    locs = list(matches["name"].dropna().unique())
+                    for i, l in enumerate(locs, 1):
+                        print(f"{i}. {l}")
+                    pick = input("Choose hawker centre number (or press Enter to skip): ").strip()
+                    if pick.isdigit():
+                        idx = int(pick) - 1
+                        if 0 <= idx < len(locs):
+                            matches = matches[matches["name"] == locs[idx]]
+
+                # Keep only hawker-centre-level columns for routing
+                if not matches.empty and "serial_no" in matches.columns:
+                    matches = matches.drop_duplicates(subset=["serial_no"])
+
             else:
-                print("Pick at least one!"); continue
+                print("Invalid option.")
+                continue
 
-        query = input("Enter Search Term: ").strip()
-        matches = pd.DataFrame()
+            if matches.empty:
+                print("No results.")
+                continue
 
-        if search_mode == '1':
-            matches = df[df['name'].str.contains(query, case=False, na=False)]
-        elif search_mode == '2' and not merged_stalls.empty:
-            matches = merged_stalls[merged_stalls['stall_name'].str.contains(query, case=False, na=False)]
-            if len(matches) > 10:
-                print(f"Found {len(matches)} stalls. Filter by location:")
-                locs = matches['name'].unique()
-                for i, l in enumerate(locs, 1): print(f"{i}. {l}")
+            # Display up to 15 results
+            show_df = matches.head(15).reset_index(drop=True)
+            for i, row in show_df.iterrows():
+                if mode == "1":
+                    print(f"[{i + 1}] {row.get('name', 'Unknown')}")
+                else:
+                    print(f"[{i + 1}] {row.get('stall_name', 'Unknown')} ({row.get('name', 'Unknown')})")
 
-                user_selection = input("Enter choice number: ")
-                try:
-                    sel_idx = int(user_selection) - 1
-                    if 0 <= sel_idx < len(locs):
-                        matches = matches[matches['name'] == locs[sel_idx]]
-                    else:
-                        print("Invalid number. Showing all stalls.")
-                except ValueError:
-                    print("Invalid input. Showing all stalls.")
+            choice = input("Enter choice number(s), comma-separated: ").strip()
+            if not choice:
+                continue
 
-        if matches.empty:
-            print("No results.");
-            continue
-
-        #Display results with temporary IDs starting from index 1
-        for i, (idx, row) in enumerate(matches.iterrows()):
-            name_str = row['name'] if search_mode == '1' else f"{row['stall_name']} ({row['name']})"
-            print(f"[{i + 1}] {name_str}")
-
-        choice = input("\nEnter choice number: ")
-        if not choice.strip(): continue
-
-        try:
-            indices = [int(x.strip()) - 1 for x in choice.split(',')]
-            for i in indices:
-                if 0 <= i < len(matches):
-                    selected_rows.append(matches.iloc[i].to_dict())
-                    print(f"Added: {matches.iloc[i]['name']}")
-        except:
-            print("Invalid selection.")
-
-    # 3. Calculate Initial Best Route
-    selected_df = pd.DataFrame(selected_rows)
-    if not selected_df.empty:
-        selected_df = selected_df.drop_duplicates(subset=['serial_no'])
-    itinerary, total_dist, total_time = calculate_best_route(user_coords, selected_df)
-
-    # 4. Edit Loop
-    while True:
-        print("\n--- CURRENT ITINERARY ---")
-        for i, hc in enumerate(itinerary, 1): print(f"{i}. {hc['name']}")
-
-        action = input("\n[1] Finalize  [2] Reorder  [3] Remove a stop: ")
-
-        if action == '1':
-            break
-        elif action == '2':
-            order = input("Enter order (e.g. 2,1): ")
             try:
-                itinerary = [itinerary[int(x) - 1] for x in order.split(',')]
-            except:
-                print("Error reordering.")
-        elif action == '3':
-            try:
-                itinerary.pop(int(input("Enter the stop number to remove: ")) - 1)
-            except:
-                print("Error removing.")
+                picks = [int(x.strip()) - 1 for x in choice.split(",")]
+                for p in picks:
+                    if 0 <= p < len(show_df):
+                        selected_rows.append(show_df.iloc[p].to_dict())
+                        print(f"Added: {show_df.iloc[p].get('name', 'Unknown')}")
+            except Exception:
+                print("Invalid selection.")
 
-        if not itinerary: break
+        # Build dataframe of selected hawker centres (unique)
+        selected_df = pd.DataFrame(selected_rows)
+        if "serial_no" in selected_df.columns:
+            selected_df = selected_df.drop_duplicates(subset=["serial_no"])
 
-# 5. Final Display
-    if itinerary:
-        print("\n" + "═" * 50)
+        itinerary, total_km, total_mins = self.calculate_best_route(user_coords, selected_df)
+
+        if not itinerary:
+            print("No itinerary created.")
+            return
+
+        print("\n" + "═" * 60)
         print(f"SAVED ITINERARY FOR: {explore_date}")
-        print("═" * 50)
+        print("═" * 60)
 
         for i, hc in enumerate(itinerary, 1):
-            travel_info = "STARTING POINT" if i == 1 else f"🚶 Travel: {hc['leg_dist']:.2f} km (~{round(hc['leg_time'])} mins)"
-
-            print(f"\n📍 STOP {i}: {hc['name']}")
+            travel_info = "STARTING POINT" if i == 1 else f"🚶 Travel: {hc['leg_dist_km']:.2f} km (~{round(hc['leg_time_mins'])} mins)"
+            print(f"\n📍 STOP {i}: {hc.get('name', 'Unknown')}")
             print(f"   {travel_info}")
-            print(f"   🏠 Address: {hc['address_myenv']}")
-            print(f"   🔗 Maps: {hc['google_3d_view']}")
-            print(f"   📸 Photo: {hc['photourl']}")
-            print("-" * 30)
 
-        print(f"\nDAILY SUMMARY:")
-        print(f"   Total Distance: {total_dist:.2f} km")
-        print(f"   Total Travel Time: {round(total_time)} mins")
-        print("═" * 50)
+        print("\n" + "-" * 60)
+        print(f"Total walking distance: {total_km:.2f} km")
+        print(f"Estimated total walking time: {round(total_mins)} mins")
+        print("-" * 60)
 
-        # Store for history
-        all_itineraries.append({
-            'date': explore_date,
-            'route': itinerary,
-            'total_dist': total_dist,
-            'total_time': total_time
-        })
 
-    # 6. Exit Strategy & Detailed Master History
-    cont = input("\nPlan another itinerary for a different date? (yes/no): ").lower()
-    if cont != 'yes':
-        print("═" * 19 + "YOUR MASTER HAWKER PLAN" + "═" * 19)
-
-        if not all_itineraries:
-            print("No itineraries saved. Happy eating!")
-        else:
-            # Sort chronologically by date
-            all_itineraries.sort(key=lambda x: x['date'])
-
-            for session in all_itineraries:
-                print(f"\nDATE: {session['date']}")
-                print(f"TOTALS: {session['total_dist']:.2f}km | ~{round(session['total_time'])} mins travel")
-                print("─" * 40)
-
-                for i, stop in enumerate(session['route'], 1):
-                    # Using 'stop' instead of 'hc' ensures the correct data is shown for each entry
-                    dist_info = "START" if i == 1 else f"🚶 {stop['leg_dist']:.2f}km (~{round(stop['leg_time'])}m)"
-
-                    print(f"📍 STOP {i}: {stop['name']}")
-                    print(f"   {dist_info}")
-                    print(f"   🏠 Address: {stop['address_myenv']}")
-                    print(f"   🔗 Maps: {stop['google_3d_view']}")
-                    print(f"   📸 Photo: {stop['photourl']}")
-                    print("   " + "┈" * 20)
-
-                print("═" * 45)
-
-        print("\nAll plans finalized. Have a great time exploring Singapore's delicacy!")
-        break
+if __name__ == "__main__":
+    LocationPlanner().run_interactive()

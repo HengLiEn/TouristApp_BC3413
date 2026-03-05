@@ -5,7 +5,13 @@ Simple Tourist App (onboarding)
 Features:
 1) Create Account
 2) Login
+
+Integration changes:
+- create_account(...) returns the created TouristProfile (or None on failure)
+- login(...) returns the TouristProfile on success (or None on failure)
 """
+
+from __future__ import annotations
 
 import sqlite3
 from dataclasses import dataclass
@@ -69,7 +75,7 @@ class TouristProfileDA:
     def _unpack(text: Optional[str]) -> List[str]:
         if not text:
             return []
-        return text.split("|")
+        return [x for x in text.split("|") if x]
 
     def insert_profile(self, p: TouristProfile) -> None:
         sql = """
@@ -170,7 +176,6 @@ def input_list(prompt: str) -> List[str]:
     raw = input(prompt).strip()
     if not raw:
         return []
-    # split by comma, strip spaces, drop empties, de-duplicate preserving order
     items = [x.strip() for x in raw.split(",")]
     items = [x for x in items if x]
     seen = set()
@@ -185,7 +190,7 @@ def input_list(prompt: str) -> List[str]:
 # -----------------------------
 # Create Account Flow
 # -----------------------------
-def create_account(da: TouristProfileDA) -> None:
+def create_account(da: TouristProfileDA) -> Optional[TouristProfile]:
     print("\n=== Create Account ===")
 
     username = input_nonempty("Username: ")
@@ -203,12 +208,8 @@ def create_account(da: TouristProfileDA) -> None:
     spice = input_int("What is your spice tolerance from 0-5? ", 0, 5)
 
     dietary = input_dietary()
-    allergens = input_list(
-        "Allergens to avoid (comma-separated, e.g. peanut, shellfish) [optional]: "
-    )
-    cuisines = input_list(
-        "Preferred cuisines (comma-separated, e.g. Chinese, Malay, Indian) [optional]: "
-    )
+    allergens = input_list("Allergens to avoid (comma-separated) [optional]: ")
+    cuisines = input_list("Preferred cuisines (comma-separated) [optional]: ")
 
     profile = TouristProfile(
         username=username,
@@ -225,35 +226,48 @@ def create_account(da: TouristProfileDA) -> None:
     try:
         da.insert_profile(profile)
         print("Account created successfully!")
+        return profile
     except sqlite3.IntegrityError:
         print("Username already exists.")
+        return None
 
 
 # -----------------------------
 # Login Flow
 # -----------------------------
-def login(da: TouristProfileDA) -> None:
+def login(da: TouristProfileDA) -> Optional[TouristProfile]:
     print("\n=== Login ===")
 
     username = input_nonempty("Username: ")
     password = input_nonempty("Password: ")
 
     profile = da.get_profile(username)
-
     if not profile:
         print("User not found.")
-        return
+        return None
 
     if profile.password != password:
         print("Wrong password.")
-        return
+        return None
 
     print(f"\nWelcome back, {profile.name}!")
-    print(f"Country: {profile.country}")
-    print(f"Spice Level: {profile.spice_level}/5")
-    if profile.dietary:
-        print("Dietary:", ", ".join(profile.dietary))
-    if profile.allergens:
-        print("Allergens to avoid:", ", ".join(profile.allergens))
-    if profile.preferred_cuisines:
-        print("Preferred cuisines:", ", ".join(profile.preferred_cuisines))
+    return profile
+
+
+if __name__ == "__main__":
+    da = TouristProfileDA()
+    while True:
+        print("\n=== Tourist App ===")
+        print("1) Create Account")
+        print("2) Login")
+        print("0) Exit")
+
+        c = input("Choose: ").strip()
+        if c == "1":
+            create_account(da)
+        elif c == "2":
+            login(da)
+        elif c == "0":
+            break
+        else:
+            print("Invalid choice.")
