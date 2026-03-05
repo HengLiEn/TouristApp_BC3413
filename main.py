@@ -1,6 +1,9 @@
 """
-main.py
-Adds a "Set your location" step immediately after login.
+main.py — UX cleanup
+Changes:
+- "=== Account ===" -> "=== Account Page ==="
+- Remove "Logged in as: <username>"
+- Cuisine feature asks for location inside itself (as requested)
 """
 
 from __future__ import annotations
@@ -24,7 +27,7 @@ def print_banner() -> None:
 
 
 def auth_menu() -> str:
-    print("\n=== Account ===")
+    print("\n=== Account Page ===")
     print("1) Create Account")
     print("2) Login")
     print("0) Exit")
@@ -33,7 +36,7 @@ def auth_menu() -> str:
 
 def main_menu() -> str:
     print("\n=== Main Menu ===")
-    print("1) Browse Menu & Get Recommendations (Cuisine)")
+    print("1) Browse Menu & Get Recommendations")
     print("2) Price Filter Recommendations")
     print("3) Hawker Centre Closure Checker")
     print("4) Plan Your Visit (Location & Itinerary)")
@@ -52,57 +55,142 @@ def reviews_menu() -> str:
     return input("Choose: ").strip()
 
 
-def ask_for_location(planner: LocationPlanner) -> Optional[Coord]:
-    """
-    Runs once after login to store a session starting point.
-    Returns (lat, lng) or None if user skips.
-    """
-    print("\n=== Set Your Location ===")
-    print("This helps us estimate walking time and suggest nearby options.")
-    print("You can skip this and set it later.\n")
+def ask_location_and_radius_for_feature(planner: LocationPlanner) -> tuple[Optional[Coord], float]:
+    print("\n=== Use Nearby Filtering ===")
+    print("This will show stalls close to you first.")
+    use = input("Use location filtering? (Y/N): ").strip().lower()
+    if use not in ("y", "yes"):
+        print("Nearby filtering: OFF")
+        return None, 2.0
 
+    coords: Optional[Coord] = None
     while True:
-        raw = input("Enter your current postal code/address (or press Enter to skip): ").strip()
+        raw = input("Enter your postal code/address (e.g., '560101' or 'Bedok'): ").strip()
         if not raw:
-            return None
+            print("No location entered. Nearby filtering OFF.")
+            return None, 2.0
 
         coords = planner.get_coords(raw)
         if coords:
-            print(f"✅ Location saved: ({coords[0]:.6f}, {coords[1]:.6f})")
-            return coords
+            print(f"✅ Location set: ({coords[0]:.6f}, {coords[1]:.6f})")
+            break
+        print("Could not recognize that location. Try again (or press Enter to cancel).")
 
-        print("Could not recognize that location. Try again, or press Enter to skip.")
+    radius_km = 2.0
+    raw_r = input("Nearby radius in km (default 2): ").strip()
+    if raw_r:
+        try:
+            radius_km = max(0.1, float(raw_r))
+        except ValueError:
+            radius_km = 2.0
+
+    print(f"Nearby filtering: ON (within {radius_km:g} km)")
+    return coords, radius_km
 
 
-def run_cuisine_flow(handler: CuisineFeatureHandler, username: str) -> None:
+def run_cuisine_flow(
+    handler: CuisineFeatureHandler,
+    username: str,
+    planner: LocationPlanner,
+    session_coords: Optional[Coord],
+    session_radius_km: float,
+) -> tuple[Optional[Coord], float]:
     prefs = handler.load_preferences(username) or CuisinePreferences()
 
-    print("\n=== Cuisine Preferences ===")
-    print("Press Enter to skip any section.\n")
+    print("\n=== Browse Menu & Get Recommendations ===")
+    print("Press Enter to skip any section.")
 
-    edit = input("Do you want to update your cuisine/allergen preferences now? (Y/N): ").strip().lower()
+    # 1) Update preferences
+    edit = input("\nDo you want to update your cuisine preferences now? (Y/N): ").strip().lower()
     if edit in ("y", "yes"):
-        available_cuisines = handler.get_available_cuisines()
-        available_allergens = handler.get_available_allergens()
+        cuisines = handler.get_available_cuisines()
+        allergens = handler.get_available_allergens()
 
-        print("\nAvailable cuisines (examples):")
-        print(", ".join(available_cuisines[:20]) + (" ..." if len(available_cuisines) > 20 else ""))
+        print("Available cuisines (examples):")
+        print(", ".join(cuisines[:20]) + (" ..." if len(cuisines) > 20 else ""))
 
-        raw_cuisines = input("Preferred cuisines (comma-separated): ").strip()
-        if raw_cuisines:
-            prefs.cuisines = [x.strip() for x in raw_cuisines.split(",") if x.strip()]
-
-        print("\nCommon allergens (examples):")
-        print(", ".join(available_allergens[:20]) + (" ..." if len(available_allergens) > 20 else ""))
-
-        raw_all = input("Allergens to avoid (comma-separated): ").strip()
-        if raw_all:
-            prefs.allergens_to_avoid = [x.strip() for x in raw_all.split(",") if x.strip()]
-
+        raw_c = input("Preferred cuisines (comma-separated): ").strip()
+        if raw_c:
+            prefs.cuisines = [x.strip() for x in raw_c.split(",") if x.strip()]
         handler.save_preferences(prefs, username)
 
-    df = handler.filter(prefs)
-    handler.display(df)
+    # 2) Ask location/radius inside this feature
+    if session_coords is None:
+        session_coords, session_radius_km = ask_location_and_radius_for_feature(planner)
+    else:
+        print("\n=== Nearby Filtering (Current) ===")
+        print(f"Current saved location: ({session_coords[0]:.6f}, {session_coords[1]:.6f})")
+        print(f"Current radius: {session_radius_km:g} km")
+        change = input("Change location/radius for this session? (Y/N): ").strip().lower()
+        if change in ("y", "yes"):
+            session_coords, session_radius_km = ask_location_and_radius_for_feature(planner)
+
+    # 3) Recommend top 5 stalls
+    top = handler.get_top_nearby_stalls(
+        prefs,
+        coords=session_coords,
+        radius_km=session_radius_km,
+        top_n=5,
+        m=20.0,
+    )
+
+    if top.empty:
+        print("\nNo stalls matched your preferences.")
+        print("Try: increasing radius, removing allergens, or choosing a different cuisine.\n")
+        return session_coords, session_radius_km
+
+    print("\nTop Recommended Stalls:")
+    print("-" * 70)
+    for i, row in top.iterrows():
+        stall = row.get("stall_name", "Unknown stall")
+        hawker = row.get("hawker_name", "Unknown hawker centre")
+        dist = row.get("distance_km", None)
+        bayes = float(row.get("bayes_score", 0.0) or 0.0)
+        avg = float(row.get("avg_rating", 0.0) or 0.0)
+        n = int(row.get("n_reviews", 0) or 0)
+
+        dist_txt = f"{float(dist):.2f} km" if dist is not None and str(dist) != "nan" else "N/A"
+        print(f"[{i+1}] {stall}  @  {hawker}")
+        print(f"     Distance: {dist_txt} | Average Rating: {avg:.2f} | No. of Reviews: {n}\n")
+
+    # 4) Drill-down into menu items
+    while True:
+        choice = input("Enter stall number to view its menu (or 0 to go back): ").strip()
+        if choice == "0":
+            return session_coords, session_radius_km
+        if not choice.isdigit():
+            print("Please enter a number.")
+            continue
+
+        idx = int(choice) - 1
+        if idx < 0 or idx >= len(top):
+            print("Invalid stall number.")
+            continue
+
+        stall_id = int(top.loc[idx, "stall_id"])
+        stall_name = top.loc[idx, "stall_name"]
+        hawker_name = top.loc[idx, "hawker_name"]
+
+        menu = handler.get_menu_for_stall(stall_id, prefs)
+
+        print("\n" + "=" * 70)
+        print(f"Menu for: {stall_name}")
+        print("=" * 70)
+
+        if menu.empty:
+            print("No menu items found (or all removed due to allergen filters).")
+            continue
+
+        cols = [c for c in ["item_name", "price"] if c in menu.columns]
+        show_n = 20
+        print(menu[cols].head(show_n).to_string(index=False))
+
+        if len(menu) > show_n:
+            more = input(f"\nShow all {len(menu)} items? (Y/N): ").strip().lower()
+            if more in ("y", "yes"):
+                print("\n" + menu[cols].to_string(index=False))
+
+        print()
 
 
 def run_closure_flow(closure: HawkerClosureFeature) -> None:
@@ -139,9 +227,9 @@ def run_closure_flow(closure: HawkerClosureFeature) -> None:
         print(f"{i}. {name}")
 
 
-def run_location_flow(planner: LocationPlanner, session_start_coords: Optional[Coord]) -> None:
+def run_location_flow(planner: LocationPlanner, coords: Optional[Coord]) -> None:
     print("\n=== Location & Itinerary Planner ===")
-    planner.run_interactive(start_coords=session_start_coords)
+    planner.run_interactive(start_coords=coords)
 
 
 def run_reviews_flow(reviews: ReviewFeature, username: str) -> None:
@@ -203,14 +291,19 @@ def main() -> None:
 
     da = saachees_file.TouristProfileDA()
 
+    # These constructors used to print "Loaded ..." — we removed those prints in their files.
     cuisine_handler = CuisineFeatureHandler()
     closure_feature = HawkerClosureFeature()
     location_planner = LocationPlanner()
     reviews_feature = ReviewFeature()
+
     merged_pricing_df = load_default_merged_dataset()
 
     current_user: Optional[saachees_file.TouristProfile] = None
-    session_start_coords: Optional[Coord] = None
+
+    # Session location info (set from inside Cuisine feature)
+    session_coords: Optional[Coord] = None
+    session_radius_km: float = 2.0
 
     while True:
         if current_user is None:
@@ -229,33 +322,43 @@ def main() -> None:
             elif c == "0":
                 print("Bye!")
                 return
+
             else:
                 print("Invalid choice.")
                 continue
 
-            # After login, ask for location once per session
-            if current_user is not None:
-                session_start_coords = ask_for_location(location_planner)
-
             continue
 
-        print(f"\nLogged in as: {current_user.username}")
+        # NOTE: removed "Logged in as: ..."
         choice = main_menu()
 
         if choice == "1":
-            run_cuisine_flow(cuisine_handler, current_user.username)
+            session_coords, session_radius_km = run_cuisine_flow(
+                cuisine_handler,
+                current_user.username,
+                location_planner,
+                session_coords,
+                session_radius_km,
+            )
+
         elif choice == "2":
             run_pricing_filter(merged_pricing_df)
+
         elif choice == "3":
             run_closure_flow(closure_feature)
+
         elif choice == "4":
-            run_location_flow(location_planner, session_start_coords)
+            run_location_flow(location_planner, session_coords)
+
         elif choice == "5":
             run_reviews_flow(reviews_feature, current_user.username)
+
         elif choice == "0":
             print("Logged out.")
             current_user = None
-            session_start_coords = None
+            session_coords = None
+            session_radius_km = 2.0
+
         else:
             print("Invalid choice.")
 
