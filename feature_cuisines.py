@@ -1,20 +1,16 @@
 """
-Feature: Cuisine Preferences Module for TouristApp_BC3413
-Author: LiEn
-Project: Singapore Tourist App BC3413
+feature_cuisines.py — dietary removed
 
-This module:
-- Loads menu_items.csv and stalls.csv
-- Lets users filter menu items based on cuisine/dietary/allergen preferences
-- Saves/loads preferences into tourist_profiles.db (table: tourist_profiles)
-
-IMPORTANT (integration):
-- We use `username` as the primary key (matches saachees_file.py)
+Changes:
+- CuisinePreferences no longer has dietary_restrictions
+- filter() no longer checks vegetarian/halal/vegan columns
+- save_preferences/load_preferences no longer writes/reads dietary
 """
 
 from __future__ import annotations
 
 import os
+import re
 import sqlite3
 from dataclasses import dataclass
 from typing import List, Optional
@@ -26,17 +22,12 @@ DB_FILE = "tourist_profiles.db"
 
 @dataclass
 class CuisinePreferences:
-    """User's cuisine preferences (food-related attributes)."""
     cuisines: List[str] = None
-    dietary_restrictions: List[str] = None
     allergens_to_avoid: List[str] = None
 
     def __post_init__(self):
-        # Avoid mutable default list bugs
         if self.cuisines is None:
             self.cuisines = []
-        if self.dietary_restrictions is None:
-            self.dietary_restrictions = []
         if self.allergens_to_avoid is None:
             self.allergens_to_avoid = []
 
@@ -52,41 +43,86 @@ class CuisineFeatureHandler:
 
         print(f"Loaded {len(self.menu_df):,} items from {len(self.stalls_df):,} stalls")
 
+    @staticmethod
+    def _norm(s: str) -> str:
+        return str(s).strip().lower()
+
+    @staticmethod
+    def _split_cell(cell: str) -> List[str]:
+        if cell is None or (isinstance(cell, float) and pd.isna(cell)):
+            return []
+        text = str(cell).strip().lower()
+        if not text or text == "nan":
+            return []
+        parts = re.split(r"[,\;/\|]+", text)
+        return [p.strip() for p in parts if p.strip()]
+
     def get_available_cuisines(self) -> List[str]:
-        return sorted(self.stalls_df["cuisine_type"].dropna().unique())
+        if "cuisine_type" not in self.stalls_df.columns:
+            return []
+        vals = self.stalls_df["cuisine_type"].dropna().astype(str).tolist()
+        tokens = set()
+        for v in vals:
+            for t in self._split_cell(v):
+                tokens.add(t.title())
+        return sorted(tokens)
 
     def get_available_allergens(self) -> List[str]:
         all_allergens = set()
         if "allergens" not in self.menu_df.columns:
             return []
-
         for entry in self.menu_df["allergens"].dropna():
             if isinstance(entry, str) and entry.strip() and entry.lower() != "none":
                 all_allergens.update(a.strip() for a in entry.split(",") if a.strip())
         return sorted(all_allergens)
 
+    @staticmethod
+    def _apply_availability_filter_if_possible(df: pd.DataFrame) -> pd.DataFrame:
+        if "is_available" not in df.columns:
+            return df
+        col = df["is_available"]
+
+        # numeric 0/1
+        if pd.api.types.is_numeric_dtype(col):
+            uniques = set(pd.to_numeric(col, errors="coerce").dropna().unique().tolist())
+            if uniques.issubset({0, 1}) and 1 in uniques:
+                return df[pd.to_numeric(col, errors="coerce") == 1]
+            return df
+
+        # string yes/no style
+        sample = col.dropna().astype(str).str.strip().str.lower()
+        if sample.empty:
+            return df
+        uniques = set(sample.unique().tolist())
+        truthy = {"y", "yes", "true", "t", "1", "available", "open"}
+        falsy = {"n", "no", "false", "f", "0", "unavailable", "closed"}
+        if uniques.issubset(truthy.union(falsy)):
+            return df[sample.isin(truthy).reindex(df.index, fill_value=False)]
+
+        return df
+
     def filter(self, prefs: CuisinePreferences) -> pd.DataFrame:
         df = self.merged_df.copy()
 
-        # Cuisine type
+        # Cuisine filter
         if prefs.cuisines and "cuisine_type" in df.columns:
-            df = df[df["cuisine_type"].astype(str).str.lower().isin([c.lower() for c in prefs.cuisines])]
+            wanted = [self._norm(c) for c in prefs.cuisines if str(c).strip()]
 
-        # Dietary
-        dietary = [d.lower() for d in prefs.dietary_restrictions]
-        if "vegetarian" in dietary and "vegetarian" in df.columns:
-            df = df[df["vegetarian"] == 1]
-        if "halal" in dietary and "halal" in df.columns:
-            df = df[df["halal"] == 1]
+            def match_cell(cell: str) -> bool:
+                tokens = self._split_cell(cell)
+                return any(w in tokens for w in wanted) or any(w in str(cell).lower() for w in wanted)
+
+            df = df[df["cuisine_type"].apply(match_cell)]
 
         # Allergens
-        if "allergens" in df.columns:
+        if prefs.allergens_to_avoid and "allergens" in df.columns:
             for allergen in prefs.allergens_to_avoid:
-                df = df[~df["allergens"].astype(str).str.contains(allergen, case=False, na=False)]
+                a = str(allergen).strip()
+                if a:
+                    df = df[~df["allergens"].astype(str).str.contains(a, case=False, na=False)]
 
-        # Availability (if present)
-        if "is_available" in df.columns:
-            df = df[df["is_available"] == True]
+        # Availability (safe)
+        df = self._apply_availability_filter_if_possible(df)
 
         print(f"{len(df):,} items match your preferences")
         return df
@@ -99,57 +135,36 @@ class CuisineFeatureHandler:
         print(f"\n{'=' * 60}\n  {len(df):,} items found — showing {min(max_display, len(df))}\n{'=' * 60}\n")
 
         for i, (_, row) in enumerate(df.head(max_display).iterrows(), 1):
-            tags = []
-            if "halal" in row and row.get("halal", 0) == 1:
-                tags.append("Halal")
-            if "vegetarian" in row and row.get("vegetarian", 0) == 1:
-                tags.append("Veg")
-
             item = row.get("item_name", "Unknown item")
             cuisine = row.get("cuisine_type", "Unknown cuisine")
             stall = row.get("stall_name", "Unknown stall")
+            price = row.get("price", None)
 
             print(f"{i}. {item} ({cuisine})")
             print(f"   📍 {stall}")
-            if tags:
-                print(f"   {' | '.join(tags)}")
+            if price is not None and str(price) != "nan":
+                print(f"   💲 {price}")
             print()
 
         if len(df) > max_display:
             print(f"... and {len(df) - max_display:,} more.")
 
-    def export(self, prefs: CuisinePreferences, filename: str = "filtered_cuisine_data.csv") -> pd.DataFrame:
-        df = self.filter(prefs)
-        if df.empty:
-            print("Nothing to export.")
-            return df
-
-        output_path = os.path.join(self.project_root, filename)
-        df.to_csv(output_path, index=False)
-        print(f"Saved {len(df):,} items to {output_path}")
-        return df
-
     # -----------------------------
-    # DB integration (username PK)
+    # DB integration (username PK) — dietary removed
     # -----------------------------
     def save_preferences(self, prefs: CuisinePreferences, username: str) -> None:
-        """
-        Updates cuisine-related preferences in tourist_profiles.db for the given username.
-        """
         try:
             with sqlite3.connect(DB_FILE) as con:
                 con.execute(
                     """
                     UPDATE tourist_profiles
                     SET preferred_cuisines = ?,
-                        dietary            = ?,
                         allergens          = ?
                     WHERE username = ?;
                     """,
                     (
-                        "|".join(prefs.cuisines),
-                        "|".join(prefs.dietary_restrictions),
-                        "|".join(prefs.allergens_to_avoid),
+                        "|".join([str(x).strip() for x in prefs.cuisines if str(x).strip()]),
+                        "|".join([str(x).strip() for x in prefs.allergens_to_avoid if str(x).strip()]),
                         username,
                     ),
                 )
@@ -159,14 +174,11 @@ class CuisineFeatureHandler:
             print(f"Error saving preferences: {e}")
 
     def load_preferences(self, username: str) -> Optional[CuisinePreferences]:
-        """
-        Loads cuisine-related preferences from tourist_profiles.db for the given username.
-        """
         try:
             with sqlite3.connect(DB_FILE) as con:
                 row = con.execute(
                     """
-                    SELECT preferred_cuisines, dietary, allergens
+                    SELECT preferred_cuisines, allergens
                     FROM tourist_profiles
                     WHERE username = ?;
                     """,
@@ -181,17 +193,9 @@ class CuisineFeatureHandler:
 
             return CuisinePreferences(
                 cuisines=unpack(row[0]),
-                dietary_restrictions=unpack(row[1]),
-                allergens_to_avoid=unpack(row[2]),
+                allergens_to_avoid=unpack(row[1]),
             )
 
         except Exception as e:
             print(f"Error loading preferences: {e}")
             return None
-
-
-if __name__ == "__main__":
-    handler = CuisineFeatureHandler()
-    prefs = CuisinePreferences(cuisines=["Chinese"], dietary_restrictions=["halal"])
-    df = handler.filter(prefs)
-    handler.display(df)

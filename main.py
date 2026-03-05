@@ -1,20 +1,11 @@
 """
 main.py
-Hawker Center Guide - Main CLI Application
-
-Flow:
-1) Create Account / Login (saachees_file.py)
-2) After login, user can access features:
-   - Closure checker
-   - Location itinerary planner
-   - Cuisine/menu recommendations (with preferences saved to tourist_profiles)
-   - Pricing filter
-   - Reviews (top stalls, read, write, helpful)
+Adds a "Set your location" step immediately after login.
 """
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Optional, Tuple
 
 import saachees_file
 from feature_cuisines import CuisineFeatureHandler, CuisinePreferences
@@ -23,10 +14,9 @@ from features_closure import HawkerClosureFeature
 from features_location import LocationPlanner
 from features_reviews import ReviewFeature
 
+Coord = Tuple[float, float]
 
-# -----------------------------
-# Menus
-# -----------------------------
+
 def print_banner() -> None:
     print("\n" + "=" * 60)
     print("        WELCOME TO HAWKER CENTER GUIDE")
@@ -62,20 +52,35 @@ def reviews_menu() -> str:
     return input("Choose: ").strip()
 
 
-# -----------------------------
-# Feature runners
-# -----------------------------
+def ask_for_location(planner: LocationPlanner) -> Optional[Coord]:
+    """
+    Runs once after login to store a session starting point.
+    Returns (lat, lng) or None if user skips.
+    """
+    print("\n=== Set Your Location ===")
+    print("This helps us estimate walking time and suggest nearby options.")
+    print("You can skip this and set it later.\n")
+
+    while True:
+        raw = input("Enter your current postal code/address (or press Enter to skip): ").strip()
+        if not raw:
+            return None
+
+        coords = planner.get_coords(raw)
+        if coords:
+            print(f"✅ Location saved: ({coords[0]:.6f}, {coords[1]:.6f})")
+            return coords
+
+        print("Could not recognize that location. Try again, or press Enter to skip.")
+
+
 def run_cuisine_flow(handler: CuisineFeatureHandler, username: str) -> None:
-    """
-    Loads user prefs from tourist_profiles, lets user update them, then filters & displays.
-    """
     prefs = handler.load_preferences(username) or CuisinePreferences()
 
     print("\n=== Cuisine Preferences ===")
     print("Press Enter to skip any section.\n")
 
-    # Ask if user wants to edit prefs
-    edit = input("Do you want to update your cuisine/dietary/allergen preferences now? (Y/N): ").strip().lower()
+    edit = input("Do you want to update your cuisine/allergen preferences now? (Y/N): ").strip().lower()
     if edit in ("y", "yes"):
         available_cuisines = handler.get_available_cuisines()
         available_allergens = handler.get_available_allergens()
@@ -87,10 +92,6 @@ def run_cuisine_flow(handler: CuisineFeatureHandler, username: str) -> None:
         if raw_cuisines:
             prefs.cuisines = [x.strip() for x in raw_cuisines.split(",") if x.strip()]
 
-        raw_diet = input("Dietary restrictions (comma-separated, e.g. vegetarian, halal): ").strip()
-        if raw_diet:
-            prefs.dietary_restrictions = [x.strip() for x in raw_diet.split(",") if x.strip()]
-
         print("\nCommon allergens (examples):")
         print(", ".join(available_allergens[:20]) + (" ..." if len(available_allergens) > 20 else ""))
 
@@ -100,15 +101,8 @@ def run_cuisine_flow(handler: CuisineFeatureHandler, username: str) -> None:
 
         handler.save_preferences(prefs, username)
 
-    # Filter + display
     df = handler.filter(prefs)
     handler.display(df)
-
-    if not df.empty:
-        export = input("\nExport results to CSV? (Y/N): ").strip().lower()
-        if export in ("y", "yes"):
-            filename = input("Filename (default filtered_cuisine_data.csv): ").strip() or "filtered_cuisine_data.csv"
-            handler.export(prefs, filename=filename)
 
 
 def run_closure_flow(closure: HawkerClosureFeature) -> None:
@@ -116,9 +110,27 @@ def run_closure_flow(closure: HawkerClosureFeature) -> None:
     print("Enter your trip dates in dd/mm/yyyy (example: 09/08/2026)")
     start = input("Trip start date (dd/mm/yyyy): ").strip()
     end = input("Trip end date (dd/mm/yyyy): ").strip()
+
     open_hcs = closure.get_open_hawker_centres(start, end)
 
-    if not open_hcs:
+    try:
+        import pandas as pd
+        if isinstance(open_hcs, (pd.DataFrame, pd.Series)):
+            if open_hcs.empty:
+                print("\nNo open hawker centres found for that range (or invalid dates).")
+                return
+            print(f"\nOpen hawker centres between {start} and {end}:")
+            if hasattr(open_hcs, "columns") and "name" in open_hcs.columns:
+                names = open_hcs["name"].dropna().unique().tolist()
+                for i, name in enumerate(names, 1):
+                    print(f"{i}. {name}")
+            else:
+                print(open_hcs.head(30).to_string(index=False))
+            return
+    except Exception:
+        pass
+
+    if open_hcs is None or (isinstance(open_hcs, list) and len(open_hcs) == 0):
         print("\nNo open hawker centres found for that range (or invalid dates).")
         return
 
@@ -127,9 +139,9 @@ def run_closure_flow(closure: HawkerClosureFeature) -> None:
         print(f"{i}. {name}")
 
 
-def run_location_flow(planner: LocationPlanner) -> None:
+def run_location_flow(planner: LocationPlanner, session_start_coords: Optional[Coord]) -> None:
     print("\n=== Location & Itinerary Planner ===")
-    planner.run_interactive()
+    planner.run_interactive(start_coords=session_start_coords)
 
 
 def run_reviews_flow(reviews: ReviewFeature, username: str) -> None:
@@ -169,7 +181,6 @@ def run_reviews_flow(reviews: ReviewFeature, username: str) -> None:
             if not text:
                 print("Review text cannot be empty.")
                 continue
-
             try:
                 review_id = reviews.add_review(stall_name=stall, rating=float(rating), review_text=text, user_name=username)
                 print(f"✅ Review submitted! (review_id={review_id})")
@@ -187,24 +198,19 @@ def run_reviews_flow(reviews: ReviewFeature, username: str) -> None:
             print("Invalid choice.")
 
 
-# -----------------------------
-# Main app
-# -----------------------------
 def main() -> None:
     print_banner()
 
     da = saachees_file.TouristProfileDA()
 
-    # Load features once
     cuisine_handler = CuisineFeatureHandler()
     closure_feature = HawkerClosureFeature()
     location_planner = LocationPlanner()
     reviews_feature = ReviewFeature()
-
-    # Pricing: load merged dataset once (fast later)
     merged_pricing_df = load_default_merged_dataset()
 
     current_user: Optional[saachees_file.TouristProfile] = None
+    session_start_coords: Optional[Coord] = None
 
     while True:
         if current_user is None:
@@ -213,20 +219,26 @@ def main() -> None:
             if c == "1":
                 created = saachees_file.create_account(da)
                 if created:
-                    # Optional: auto-login after create
                     auto = input("Login now? (Y/N): ").strip().lower()
                     if auto in ("y", "yes"):
                         current_user = saachees_file.login(da)
+
             elif c == "2":
                 current_user = saachees_file.login(da)
+
             elif c == "0":
                 print("Bye!")
                 return
             else:
                 print("Invalid choice.")
+                continue
+
+            # After login, ask for location once per session
+            if current_user is not None:
+                session_start_coords = ask_for_location(location_planner)
+
             continue
 
-        # Logged in
         print(f"\nLogged in as: {current_user.username}")
         choice = main_menu()
 
@@ -237,12 +249,13 @@ def main() -> None:
         elif choice == "3":
             run_closure_flow(closure_feature)
         elif choice == "4":
-            run_location_flow(location_planner)
+            run_location_flow(location_planner, session_start_coords)
         elif choice == "5":
             run_reviews_flow(reviews_feature, current_user.username)
         elif choice == "0":
             print("Logged out.")
             current_user = None
+            session_start_coords = None
         else:
             print("Invalid choice.")
 
