@@ -1,153 +1,96 @@
-"""
-Feature: Hawker Centre Closure Info for TouristApp_BC3413
-Author: Skyla
-Project: Singapore Tourist App BC3413
-Feature Idea: Provide functions to load and filter SG Hawker centre data based on tourist's trip dates.
-"""
-# Nicole: I convert all the functions into a class, so it's easier to import into the main
+from __future__ import annotations
 
 import os
-import pandas as pd
 from datetime import datetime
-from typing import Optional, List, Dict
+from typing import Optional, Set
+
+import pandas as pd
 
 
 class HawkerClosureFeature:
-    # format date to dd/mm/yyyy
     DATE_FORMAT = "%d/%m/%Y"
-    # treat placeholders for those with no dates set as no closure scheduled
-    PLACEHOLDERS = {"tbc", "na", "nil", "n/a", "", "-"}
-
+    PLACEHOLDERS = {"", "nil", "na", "n/a", "nan", "none", "tbc", "-"}
     CLOSURE_PERIODS = [
-        ("q1_cleaningstartdate", "q1_cleaningenddate", "remarks_q1"),
-        ("q2_cleaningstartdate", "q2_cleaningenddate", "remarks_q2"),
-        ("q3_cleaningstartdate", "q3_cleaningenddate", "remarks_q3"),
-        ("q4_cleaningstartdate", "q4_cleaningenddate", "remarks_q4"),
-        ("other_works_startdate", "other_works_enddate", "remarks_other_works"),
+        ("start_date", "end_date", "remarks"),
+        ("startdate", "enddate", "remarks"),
+        ("closure_start_date", "closure_end_date", "remarks"),
+        ("start_date1", "end_date1", "remarks1"),
+        ("start_date2", "end_date2", "remarks2"),
+        ("start_date3", "end_date3", "remarks3"),
     ]
 
-    COLUMNS_TO_KEEP = [
-        "serial_no", "name",
-        "q1_cleaningstartdate", "q1_cleaningenddate", "remarks_q1",
-        "q2_cleaningstartdate", "q2_cleaningenddate", "remarks_q2",
-        "q3_cleaningstartdate", "q3_cleaningenddate", "remarks_q3",
-        "q4_cleaningstartdate", "q4_cleaningenddate", "remarks_q4",
-        "other_works_startdate", "other_works_enddate", "remarks_other_works",
-        "address_myenv", "latitude_hc", "longtitude_hc",
-        "no_of_food_stalls", "description_myenv", "status",
-    ]
-
-    def __init__(self, filepath: str = None, project_root: str = None):
-        if filepath:
-            self.filepath = filepath
-        else:
-            base_dir = project_root or os.path.dirname(os.path.abspath(__file__))
-            self.filepath = os.path.join(base_dir, "dataset", "Hawker Centre Data", "DatesofHawkerCentresClosure.csv")
-
+    def __init__(self, project_root: str = None):
+        self.project_root = project_root or os.path.dirname(os.path.abspath(__file__))
+        self.filepath = os.path.join(self.project_root, "dataset", "Hawker Centre Data", "DatesofHawkerCentresClosure.csv")
         self._closure_df: Optional[pd.DataFrame] = None
-        self._closure_lookup: Optional[Dict[str, pd.Series]] = None
 
     def _parse_date(self, value) -> Optional[datetime]:
         if pd.isna(value):
             return None
-        if str(value).strip().lower() in self.PLACEHOLDERS:
+        text = str(value).strip()
+        if text.lower() in self.PLACEHOLDERS:
             return None
-        try:
-            return datetime.strptime(str(value).strip(), self.DATE_FORMAT)
-        except ValueError:
-            return None
-
-    def _parse_date_columns(self, df: pd.DataFrame) -> pd.DataFrame:
-        date_cols = [col for period in self.CLOSURE_PERIODS for col in period[:2]]
-        df = df.copy()
-        for col in date_cols:
-            if col in date_cols:
-                df[col] =df[col].apply(self._parse_date)
-        return df
-
-    def _get_closure_notes(self, row: pd.Series,
-                            trip_start: datetime,
-                            trip_end: datetime) -> list[str]:
-        notes = []
-        for start_col, end_col, remark_col in self.CLOSURE_PERIODS:
-            c_start = row.get(start_col)
-            c_end = row.get(end_col)
-            #if there is no closure scheduled
-            if c_start is None or c_end is None:
+        for fmt in ["%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y"]:
+            try:
+                return datetime.strptime(text, fmt)
+            except ValueError:
                 continue
-            if c_start <= trip_end and c_end >= trip_start:
-                remark = str(row.get(remark_col, "")).strip()
-                remark_text = (
-                    f" ({remark})" if remark.lower() not in self.PLACEHOLDERS else ""
-                )
-                notes.append(
-                    f"Closed {c_start.strftime('%d %m %Y')} - " #is %b a typo"
-                    f"{c_end.strftime('%d %m %Y')}{remark_text}"
-                )
-        return notes
+        return None
+
+    def _candidate_periods(self, df: pd.DataFrame):
+        cols = set(df.columns)
+        periods = []
+        for start_col, end_col, remark_col in self.CLOSURE_PERIODS:
+            if start_col in cols and end_col in cols:
+                periods.append((start_col, end_col, remark_col if remark_col in cols else None))
+        return periods
 
     def load_hawker_data(self, force_reload: bool = False) -> pd.DataFrame:
         if self._closure_df is not None and not force_reload:
             return self._closure_df
-
         df = pd.read_csv(self.filepath)
-        existing_cols = [c for c in self.COLUMNS_TO_KEEP if c in df.columns]
-        df = df[existing_cols].copy()
-        df = self._parse_date_columns(df)
+        periods = self._candidate_periods(df)
+        for start_col, end_col, _ in periods:
+            df[start_col] = df[start_col].apply(self._parse_date)
+            df[end_col] = df[end_col].apply(self._parse_date)
+        self._closure_df = df
         return df
 
-    def get_open_hawker_centres(self, trip_start_str: str,
-                                 trip_end_str: str) -> pd.DataFrame:
-        trip_start = datetime.strptime(trip_start_str, self.DATE_FORMAT)
-        trip_end = datetime.strptime(trip_end_str, self.DATE_FORMAT) #what is strptime
+    def _is_closed_during(self, row: pd.Series, trip_start: datetime, trip_end: datetime) -> bool:
+        df = self.load_hawker_data()
+        for start_col, end_col, _ in self._candidate_periods(df):
+            c_start = row.get(start_col)
+            c_end = row.get(end_col)
+            if c_start is None or c_end is None:
+                continue
+            if pd.isna(c_start) or pd.isna(c_end):
+                continue
+            if c_start <= trip_end and c_end >= trip_start:
+                return True
+        return False
 
+    def get_open_hawker_centres(self, trip_start_str: str, trip_end_str: str) -> pd.DataFrame:
+        trip_start = datetime.strptime(trip_start_str, self.DATE_FORMAT)
+        trip_end = datetime.strptime(trip_end_str, self.DATE_FORMAT)
         if trip_start > trip_end:
             raise ValueError("trip_start_str must be on or before trip_end_str.")
         df = self.load_hawker_data()
-
         open_rows = []
         for _, row in df.iterrows():
-            if not self._get_closure_notes(row, trip_start, trip_end):
+            if not self._is_closed_during(row, trip_start, trip_end):
                 open_rows.append(row)
-
         return pd.DataFrame(open_rows).reset_index(drop=True)
 
-    def remove_closed_hawkers(self, hawker_df: pd.DataFrame,
-                               trip_start_str: str,
-                               trip_end_str: str) -> pd.DataFrame:
+    def get_closed_hawker_ids(self, trip_start_str: str, trip_end_str: str) -> Set[int]:
         trip_start = datetime.strptime(trip_start_str, self.DATE_FORMAT)
         trip_end = datetime.strptime(trip_end_str, self.DATE_FORMAT)
-
-        if trip_start > trip_end:
-            raise ValueError("trip_start_str must be on or before trip_end_str.")
-
-        closure_df = self.load_hawker_data()
-        closure_lookup = {
-            row["name"]: row for _, row in closure_df.iterrows()
-        }
-
-        open_rows = []
-        for _, row in hawker_df.iterrows():
-            name = row.get("name", "")
-            closure_row = closure_lookup.get(name)
-            # if name not found in dataset, assume open and keep it open
-            if closure_row is None:
-                open_rows.append(row)
-                continue
-
-            notes = self._get_closure_notes(closure_row, trip_start, trip_end)
-            if not notes:
-                open_rows.append(row)
-
-        return pd.DataFrame(open_rows).reset_index(drop=True)
-
-#if __name__ == "__main__":
- #   TEST_START = "01/04/2026"
-  #  TEST_END = "07/04/2026"
-
-   # print(f"Testing filter for trip: {TEST_START} to {TEST_END}\n")
-
-    #open_df = get_open_hawker_centres(TEST_START, TEST_END)
-    #print(f"Open hawker centres : {len(open_df)}")
-
-
+        df = self.load_hawker_data()
+        ids: Set[int] = set()
+        for _, row in df.iterrows():
+            if self._is_closed_during(row, trip_start, trip_end):
+                serial = row.get("serial_no")
+                try:
+                    ids.add(int(serial))
+                except Exception:
+                    pass
+        return ids

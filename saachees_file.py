@@ -1,13 +1,3 @@
-"""
-saachees_file.py
-Simple Tourist App (onboarding) — dietary removed
-
-Changes:
-- Removed dietary prompts entirely (dataset doesn't support reliable dietary filtering).
-- DB still supports legacy columns if present, but we no longer read/write 'dietary'.
-- Migration-safe and uses explicit column list for inserts.
-"""
-
 from __future__ import annotations
 
 import sqlite3
@@ -18,9 +8,6 @@ from typing import List, Optional
 DB_FILE = "tourist_profiles.db"
 
 
-# -----------------------------
-# Model
-# -----------------------------
 @dataclass
 class TouristProfile:
     username: str
@@ -31,11 +18,10 @@ class TouristProfile:
     allergens: List[str]
     preferred_cuisines: List[str]
     created_at: str
+    saved_stalls: List[int] | None = None
+    saved_hawker_center_ids: List[int] | None = None
 
 
-# -----------------------------
-# Database
-# -----------------------------
 class TouristProfileDA:
     REQUIRED_COLUMNS = {
         "username": "TEXT",
@@ -43,10 +29,11 @@ class TouristProfileDA:
         "name": "TEXT",
         "country": "TEXT",
         "spice_level": "INTEGER",
-        # legacy column 'dietary' may exist; we ignore it
         "allergens": "TEXT",
         "preferred_cuisines": "TEXT",
         "created_at": "TEXT",
+        "saved_stalls": "TEXT",
+        "saved_hawker_center_ids": "TEXT",
     }
 
     def __init__(self, db_file: str = DB_FILE):
@@ -59,9 +46,7 @@ class TouristProfileDA:
 
     def _table_exists(self) -> bool:
         with self._connect() as con:
-            row = con.execute(
-                "SELECT name FROM sqlite_master WHERE type='table' AND name='tourist_profiles';"
-            ).fetchone()
+            row = con.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='tourist_profiles';").fetchone()
         return row is not None
 
     def _get_existing_columns(self) -> List[str]:
@@ -72,8 +57,6 @@ class TouristProfileDA:
     def _create_table_if_missing(self) -> None:
         if self._table_exists():
             return
-
-        # Create a schema WITHOUT dietary (but allow older code/table to still work)
         sql = """
         CREATE TABLE IF NOT EXISTS tourist_profiles (
             username TEXT PRIMARY KEY,
@@ -83,7 +66,9 @@ class TouristProfileDA:
             spice_level INTEGER NOT NULL,
             allergens TEXT,
             preferred_cuisines TEXT,
-            created_at TEXT NOT NULL
+            created_at TEXT NOT NULL,
+            saved_stalls TEXT,
+            saved_hawker_center_ids TEXT
         );
         """
         with self._connect() as con:
@@ -93,41 +78,64 @@ class TouristProfileDA:
     def _migrate_table_if_needed(self) -> None:
         if not self._table_exists():
             return
-
         existing = set(self._get_existing_columns())
-        missing = [c for c in self.REQUIRED_COLUMNS.keys() if c not in existing]
-
+        missing = [c for c in self.REQUIRED_COLUMNS if c not in existing]
         if not missing:
             return
-
         with self._connect() as con:
             for col in missing:
                 col_type = self.REQUIRED_COLUMNS[col]
-                if col == "password":
-                    con.execute(f"ALTER TABLE tourist_profiles ADD COLUMN {col} {col_type} DEFAULT '';")
-                elif col == "created_at":
-                    con.execute(f"ALTER TABLE tourist_profiles ADD COLUMN {col} {col_type} DEFAULT '';")
-                else:
-                    con.execute(f"ALTER TABLE tourist_profiles ADD COLUMN {col} {col_type};")
+                default = " DEFAULT ''" if col in {"password", "created_at", "saved_stalls", "saved_hawker_center_ids"} else ""
+                con.execute(f"ALTER TABLE tourist_profiles ADD COLUMN {col} {col_type}{default};")
             con.commit()
 
     @staticmethod
-    def _pack(lst: List[str]) -> str:
-        return "|".join(lst)
+    def _pack_list(lst: List[str]) -> str:
+        return "|".join([str(x).strip() for x in lst if str(x).strip()])
 
     @staticmethod
-    def _unpack(text: Optional[str]) -> List[str]:
+    def _unpack_list(text: Optional[str]) -> List[str]:
         if not text:
             return []
-        return [x for x in text.split("|") if x]
+        return [x for x in str(text).split("|") if x]
+
+    @staticmethod
+    def _pack_ints(values: List[int]) -> str:
+        return "|".join(str(int(v)) for v in values)
+
+    @staticmethod
+    def _unpack_ints(text: Optional[str]) -> List[int]:
+        if not text:
+            return []
+        out: List[int] = []
+        for part in str(text).split("|"):
+            part = part.strip()
+            if not part:
+                continue
+            try:
+                out.append(int(float(part)))
+            except ValueError:
+                pass
+        return out
+
+    @staticmethod
+    def _unique_preserve(seq):
+        seen = set()
+        out = []
+        for item in seq:
+            if item in seen:
+                continue
+            seen.add(item)
+            out.append(item)
+        return out
 
     def insert_profile(self, p: TouristProfile) -> None:
-        # Insert using only columns we manage
         sql = """
         INSERT INTO tourist_profiles (
             username, password, name, country, spice_level,
-            allergens, preferred_cuisines, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+            allergens, preferred_cuisines, created_at,
+            saved_stalls, saved_hawker_center_ids
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
         """
         data = (
             p.username,
@@ -135,43 +143,70 @@ class TouristProfileDA:
             p.name,
             p.country,
             int(p.spice_level),
-            self._pack(p.allergens),
-            self._pack(p.preferred_cuisines),
+            self._pack_list(p.allergens),
+            self._pack_list(p.preferred_cuisines),
             p.created_at,
+            self._pack_ints(p.saved_stalls or []),
+            self._pack_ints(p.saved_hawker_center_ids or []),
         )
         with self._connect() as con:
             con.execute(sql, data)
             con.commit()
 
     def get_profile(self, username: str) -> Optional[TouristProfile]:
-        # Select columns safely even if table has extra legacy columns like dietary
         sql = """
         SELECT username, password, name, country, spice_level,
-               allergens, preferred_cuisines, created_at
+               allergens, preferred_cuisines, created_at,
+               saved_stalls, saved_hawker_center_ids
         FROM tourist_profiles
         WHERE username = ?;
         """
         with self._connect() as con:
             row = con.execute(sql, (username,)).fetchone()
-
         if not row:
             return None
-
         return TouristProfile(
             username=row[0],
             password=row[1] or "",
             name=row[2] or "",
             country=row[3] or "",
             spice_level=int(row[4] or 0),
-            allergens=self._unpack(row[5]),
-            preferred_cuisines=self._unpack(row[6]),
+            allergens=self._unpack_list(row[5]),
+            preferred_cuisines=self._unpack_list(row[6]),
             created_at=row[7] or "",
+            saved_stalls=self._unpack_ints(row[8]),
+            saved_hawker_center_ids=self._unpack_ints(row[9]),
         )
 
+    def _update_int_list_column(self, username: str, column: str, values: List[int]) -> None:
+        packed = self._pack_ints(self._unique_preserve([int(v) for v in values]))
+        with self._connect() as con:
+            con.execute(f"UPDATE tourist_profiles SET {column} = ? WHERE username = ?;", (packed, username))
+            con.commit()
 
-# -----------------------------
-# Helper Functions
-# -----------------------------
+    def get_saved_stalls(self, username: str) -> List[int]:
+        with self._connect() as con:
+            row = con.execute("SELECT saved_stalls FROM tourist_profiles WHERE username = ?;", (username,)).fetchone()
+        return self._unpack_ints(row[0] if row else None)
+
+    def add_saved_stall(self, username: str, stall_id: int, hawker_center_id: int | None = None) -> None:
+        stalls = self.get_saved_stalls(username)
+        stalls.append(int(stall_id))
+        self._update_int_list_column(username, "saved_stalls", stalls)
+        if hawker_center_id is not None:
+            self.add_saved_hawker_centers(username, [int(hawker_center_id)])
+
+    def get_saved_hawker_center_ids(self, username: str) -> List[int]:
+        with self._connect() as con:
+            row = con.execute("SELECT saved_hawker_center_ids FROM tourist_profiles WHERE username = ?;", (username,)).fetchone()
+        return self._unpack_ints(row[0] if row else None)
+
+    def add_saved_hawker_centers(self, username: str, hawker_center_ids: List[int]) -> None:
+        existing = self.get_saved_hawker_center_ids(username)
+        existing.extend([int(x) for x in hawker_center_ids if x is not None])
+        self._update_int_list_column(username, "saved_hawker_center_ids", existing)
+
+
 def now_iso() -> str:
     return datetime.now().isoformat(timespec="seconds")
 
@@ -199,39 +234,24 @@ def input_list(prompt: str) -> List[str]:
     raw = input(prompt).strip()
     if not raw:
         return []
-    items = [x.strip() for x in raw.split(",")]
-    items = [x for x in items if x]
-    seen = set()
-    out: List[str] = []
-    for x in items:
-        if x not in seen:
-            seen.add(x)
-            out.append(x)
-    return out
+    items = [x.strip() for x in raw.split(",") if x.strip()]
+    return TouristProfileDA._unique_preserve(items)
 
 
-# -----------------------------
-# Create Account Flow
-# -----------------------------
 def create_account(da: TouristProfileDA) -> Optional[TouristProfile]:
     print("\n=== Create Account ===")
-
     username = input_nonempty("Username: ")
-
     while True:
         password = input_nonempty("Password: ")
         confirm = input_nonempty("Confirm Password: ")
         if password == confirm:
             break
         print("Passwords do not match. Try again.")
-
-    name = input_nonempty("What is your name? ")
+    name = input_nonempty("\nWhat is your name? ")
     country = input_nonempty("Which country are you from? ")
     spice = input_int("What is your spice tolerance from 0-5? ", 0, 5)
-
     allergens = input_list("Allergens to avoid (comma-separated) [optional]: ")
     cuisines = input_list("Preferred cuisines (comma-separated) [optional]: ")
-
     profile = TouristProfile(
         username=username,
         password=password,
@@ -241,8 +261,9 @@ def create_account(da: TouristProfileDA) -> Optional[TouristProfile]:
         allergens=allergens,
         preferred_cuisines=cuisines,
         created_at=now_iso(),
+        saved_stalls=[],
+        saved_hawker_center_ids=[],
     )
-
     try:
         da.insert_profile(profile)
         print("Account created successfully!")
@@ -252,27 +273,19 @@ def create_account(da: TouristProfileDA) -> Optional[TouristProfile]:
         return None
 
 
-# -----------------------------
-# Login Flow
-# -----------------------------
 def login(da: TouristProfileDA) -> Optional[TouristProfile]:
-    print("\n=== Login ===")
-
+    print("=== Login ===")
     username = input_nonempty("Username: ")
     password = input_nonempty("Password: ")
-
     profile = da.get_profile(username)
     if not profile:
         print("User not found.")
         return None
-
     if not profile.password:
         print("This account was created before passwords were enabled. Please create a new account.")
         return None
-
     if profile.password != password:
         print("Wrong password.")
         return None
-
     print(f"\nWelcome back, {profile.name}!")
     return profile

@@ -1,7 +1,3 @@
-"""
-feature_cuisines.py — stall-first, location-aware, bayes-ranked recommendations (no startup prints)
-"""
-
 from __future__ import annotations
 
 import os
@@ -11,6 +7,8 @@ from dataclasses import dataclass
 from typing import List, Optional, Tuple
 
 import pandas as pd
+
+from features_closure import HawkerClosureFeature
 
 DB_FILE = "tourist_profiles.db"
 Coord = Tuple[float, float]
@@ -40,37 +38,25 @@ def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
 class CuisineFeatureHandler:
     def __init__(self, project_root: str = None):
         self.project_root = project_root or os.path.dirname(os.path.abspath(__file__))
-
         menu_dir = os.path.join(self.project_root, "dataset", "Multiple Stalls Menu and Data")
         hc_dir = os.path.join(self.project_root, "dataset", "Hawker Centre Data")
-
         self.menu_path = os.path.join(menu_dir, "menu_items.csv")
         self.stalls_path = os.path.join(menu_dir, "stalls.csv")
         self.reviews_path = os.path.join(menu_dir, "reviews.csv")
         self.hc_path = os.path.join(hc_dir, "DatesofHawkerCentresClosure.csv")
-
         self.menu_df = pd.read_csv(self.menu_path)
         self.stalls_df = pd.read_csv(self.stalls_path)
         self.hc_df = pd.read_csv(self.hc_path)
-
         df = self.menu_df.merge(self.stalls_df, on="stall_id", how="left")
-
         if "hawker_center_id" in df.columns and "serial_no" in self.hc_df.columns:
-            df = df.merge(
-                self.hc_df[["serial_no", "name", "latitude_hc", "longitude_hc"]],
-                left_on="hawker_center_id",
-                right_on="serial_no",
-                how="left",
-            ).rename(columns={"name": "hawker_name"})
-
+            keep = [c for c in ["serial_no", "name", "latitude_hc", "longitude_hc"] if c in self.hc_df.columns]
+            df = df.merge(self.hc_df[keep], left_on="hawker_center_id", right_on="serial_no", how="left")
+            if "name" in df.columns:
+                df = df.rename(columns={"name": "hawker_name"})
         self.merged_df = df
-
         self._reviews_df: Optional[pd.DataFrame] = None
         self._bayes_scores: Optional[pd.DataFrame] = None
-
-    @staticmethod
-    def _norm(s: str) -> str:
-        return str(s).strip().lower()
+        self.closure = HawkerClosureFeature(project_root=self.project_root)
 
     @staticmethod
     def _split_cell(cell: str) -> List[str]:
@@ -85,201 +71,157 @@ class CuisineFeatureHandler:
     def get_available_cuisines(self) -> List[str]:
         if "cuisine_type" not in self.stalls_df.columns:
             return []
-        vals = self.stalls_df["cuisine_type"].dropna().astype(str).tolist()
         tokens = set()
-        for v in vals:
+        for v in self.stalls_df["cuisine_type"].dropna().astype(str):
             for t in self._split_cell(v):
                 tokens.add(t.title())
         return sorted(tokens)
 
-    def get_available_allergens(self) -> List[str]:
-        all_allergens = set()
-        if "allergens" not in self.menu_df.columns:
-            return []
-        for entry in self.menu_df["allergens"].dropna():
-            if isinstance(entry, str) and entry.strip() and entry.lower() != "none":
-                all_allergens.update(a.strip() for a in entry.split(",") if a.strip())
-        return sorted(all_allergens)
-
     def save_preferences(self, prefs: CuisinePreferences, username: str) -> None:
-        try:
-            with sqlite3.connect(DB_FILE) as con:
-                con.execute(
-                    """
-                    UPDATE tourist_profiles
-                    SET preferred_cuisines = ?,
-                        allergens          = ?
-                    WHERE username = ?;
-                    """,
-                    (
-                        "|".join([str(x).strip() for x in prefs.cuisines if str(x).strip()]),
-                        "|".join([str(x).strip() for x in prefs.allergens_to_avoid if str(x).strip()]),
-                        username,
-                    ),
-                )
-                con.commit()
-            print(f"Preferences updated for '{username}'.")
-        except Exception as e:
-            print(f"Error saving preferences: {e}")
+        with sqlite3.connect(DB_FILE) as con:
+            con.execute(
+                "UPDATE tourist_profiles SET preferred_cuisines = ?, allergens = ? WHERE username = ?;",
+                (
+                    "|".join([str(x).strip() for x in prefs.cuisines if str(x).strip()]),
+                    "|".join([str(x).strip() for x in prefs.allergens_to_avoid if str(x).strip()]),
+                    username,
+                ),
+            )
+            con.commit()
 
     def load_preferences(self, username: str) -> Optional[CuisinePreferences]:
         try:
             with sqlite3.connect(DB_FILE) as con:
                 row = con.execute(
-                    """
-                    SELECT preferred_cuisines, allergens
-                    FROM tourist_profiles
-                    WHERE username = ?;
-                    """,
+                    "SELECT preferred_cuisines, allergens FROM tourist_profiles WHERE username = ?;",
                     (username,),
                 ).fetchone()
-
             if not row:
                 return None
-
             def unpack(s):
                 return [x.strip() for x in str(s).split("|") if x.strip()] if s else []
-
-            return CuisinePreferences(
-                cuisines=unpack(row[0]),
-                allergens_to_avoid=unpack(row[1]),
-            )
-        except Exception as e:
-            print(f"Error loading preferences: {e}")
+            return CuisinePreferences(cuisines=unpack(row[0]), allergens_to_avoid=unpack(row[1]))
+        except Exception:
             return None
 
-    def _filter_items_by_prefs(self, prefs: CuisinePreferences) -> pd.DataFrame:
-        df = self.merged_df.copy()
+    def _get_reviews_df(self) -> pd.DataFrame:
+        if self._reviews_df is None:
+            df = pd.read_csv(self.reviews_path)
+            if "rating" not in df.columns:
+                df["rating"] = 0
+            df["rating"] = pd.to_numeric(df["rating"], errors="coerce").fillna(0.0)
+            self._reviews_df = df
+        return self._reviews_df
 
-        if prefs.cuisines and "cuisine_type" in df.columns:
-            wanted = [self._norm(c) for c in prefs.cuisines if str(c).strip()]
-
-            def match_cell(cell: str) -> bool:
-                tokens = self._split_cell(cell)
-                return any(w in tokens for w in wanted) or any(w in str(cell).lower() for w in wanted)
-
-            df = df[df["cuisine_type"].apply(match_cell)]
-
-        if prefs.allergens_to_avoid and "allergens" in df.columns:
-            for allergen in prefs.allergens_to_avoid:
-                a = str(allergen).strip()
-                if a:
-                    df = df[~df["allergens"].astype(str).str.contains(a, case=False, na=False)]
-
-        return df
-
-    def _apply_location_filter(self, df: pd.DataFrame, coords: Optional[Coord], radius_km: float) -> pd.DataFrame:
-        if coords is None:
-            return df
-        if not {"latitude_hc", "longitude_hc"}.issubset(df.columns):
-            return df
-
-        lat0, lon0 = coords
-        lat = pd.to_numeric(df["latitude_hc"], errors="coerce")
-        lon = pd.to_numeric(df["longitude_hc"], errors="coerce")
-
-        dist = []
-        for a, b in zip(lat.tolist(), lon.tolist()):
-            if a is None or b is None or pd.isna(a) or pd.isna(b):
-                dist.append(float("inf"))
-            else:
-                dist.append(haversine_km(lat0, lon0, float(a), float(b)))
-
-        out = df.copy()
-        out["distance_km"] = dist
-        out = out[out["distance_km"] <= float(radius_km)]
-        return out
-
-    def _load_reviews_if_needed(self) -> None:
-        if self._reviews_df is not None:
-            return
-        self._reviews_df = pd.read_csv(self.reviews_path)
-        if "rating" in self._reviews_df.columns:
-            self._reviews_df["rating"] = pd.to_numeric(self._reviews_df["rating"], errors="coerce").fillna(0.0)
-        else:
-            self._reviews_df["rating"] = 0.0
-
-    def compute_bayes_scores(self, m: float = 20.0) -> pd.DataFrame:
+    def _get_bayes_scores(self, m: float = 20.0) -> pd.DataFrame:
         if self._bayes_scores is not None:
             return self._bayes_scores
-
-        self._load_reviews_if_needed()
-        r = self._reviews_df
-
-        if "stall_id" not in r.columns:
-            self._bayes_scores = pd.DataFrame(columns=["stall_id", "avg_rating", "n_reviews", "bayes_score"])
-            return self._bayes_scores
-
-        C = float(r["rating"].mean()) if len(r) else 0.0
-
-        agg = r.groupby("stall_id", as_index=False).agg(
+        reviews = self._get_reviews_df()
+        global_mean = reviews["rating"].mean() if len(reviews) else 0.0
+        agg = reviews.groupby("stall_id", as_index=False).agg(
             n_reviews=("rating", "count"),
             avg_rating=("rating", "mean"),
         )
-        agg["bayes_score"] = (m * C + agg["n_reviews"] * agg["avg_rating"]) / (m + agg["n_reviews"])
+        agg["bayes_score"] = (m * global_mean + agg["n_reviews"] * agg["avg_rating"]) / (m + agg["n_reviews"])
+        self._bayes_scores = agg
+        return agg
 
-        agg["avg_rating"] = agg["avg_rating"].round(2)
-        agg["bayes_score"] = agg["bayes_score"].round(4)
+    def _apply_pref_filters(self, df: pd.DataFrame, prefs: CuisinePreferences) -> pd.DataFrame:
+        out = df.copy()
+        if prefs.cuisines and "cuisine_type" in out.columns:
+            wanted = [c.lower() for c in prefs.cuisines]
+            out = out[
+                out["cuisine_type"].astype(str).str.lower().apply(
+                    lambda x: any(w in x for w in wanted)
+                )
+            ]
+        if prefs.allergens_to_avoid and "allergens" in out.columns:
+            blocked = [a.lower() for a in prefs.allergens_to_avoid]
+            out = out[
+                ~out["allergens"].astype(str).str.lower().apply(
+                    lambda x: any(b in x for b in blocked)
+                )
+            ]
+        return out
 
-        self._bayes_scores = agg[["stall_id", "avg_rating", "n_reviews", "bayes_score"]]
-        return self._bayes_scores
+    def _apply_trip_filter(self, df: pd.DataFrame, trip_start: str | None, trip_end: str | None) -> pd.DataFrame:
+        if not trip_start or not trip_end or "hawker_center_id" not in df.columns:
+            return df
+        try:
+            closed_ids = self.closure.get_closed_hawker_ids(trip_start, trip_end)
+        except Exception:
+            return df
+        if not closed_ids:
+            return df
+        out = df.copy()
+        out["hawker_center_id"] = pd.to_numeric(out["hawker_center_id"], errors="coerce")
+        return out[~out["hawker_center_id"].isin(closed_ids)].copy()
+
+    def _aggregate_stalls(self, df: pd.DataFrame, coords: Coord | None, radius_km: float, top_n: int, m: float) -> pd.DataFrame:
+        if df.empty:
+            return pd.DataFrame()
+        base = self.stalls_df.copy()
+        if "stall_id" not in base.columns:
+            return pd.DataFrame()
+        if "hawker_center_id" in base.columns and "serial_no" in self.hc_df.columns:
+            keep = [c for c in ["serial_no", "name", "latitude_hc", "longitude_hc"] if c in self.hc_df.columns]
+            base = base.merge(self.hc_df[keep], left_on="hawker_center_id", right_on="serial_no", how="left")
+            if "name" in base.columns:
+                base = base.rename(columns={"name": "hawker_name"})
+        matched_stalls = df[["stall_id"]].drop_duplicates()
+        out = base.merge(matched_stalls, on="stall_id", how="inner")
+        scores = self._get_bayes_scores(m=m)
+        out = out.merge(scores, on="stall_id", how="left")
+        out["n_reviews"] = out["n_reviews"].fillna(0).astype(int)
+        out["avg_rating"] = out["avg_rating"].fillna(0.0)
+        out["bayes_score"] = out["bayes_score"].fillna(0.0)
+        if coords is not None and {"latitude_hc", "longitude_hc"}.issubset(out.columns):
+            out["distance_km"] = out.apply(
+                lambda r: haversine_km(coords[0], coords[1], float(r["latitude_hc"]), float(r["longitude_hc"])),
+                axis=1,
+            )
+            out = out[out["distance_km"] <= float(radius_km)].copy()
+            out = out.sort_values(["distance_km", "bayes_score", "avg_rating"], ascending=[True, False, False])
+        else:
+            out = out.sort_values(["bayes_score", "avg_rating", "n_reviews"], ascending=[False, False, False])
+        return out.head(int(top_n)).reset_index(drop=True)
 
     def get_top_nearby_stalls(
         self,
         prefs: CuisinePreferences,
-        coords: Optional[Coord],
-        radius_km: float,
+        coords: Coord | None,
+        radius_km: float = 2.0,
         top_n: int = 5,
         m: float = 20.0,
+        trip_start: str | None = None,
+        trip_end: str | None = None,
     ) -> pd.DataFrame:
-        items = self._filter_items_by_prefs(prefs)
-        items = self._apply_location_filter(items, coords=coords, radius_km=radius_km)
+        df = self._apply_pref_filters(self.merged_df, prefs)
+        df = self._apply_trip_filter(df, trip_start, trip_end)
+        return self._aggregate_stalls(df, coords, radius_km, top_n, m)
 
-        if items.empty:
+    def get_menu_for_stall(self, stall_id: int, prefs: CuisinePreferences | None = None) -> pd.DataFrame:
+        out = self.menu_df[self.menu_df["stall_id"] == int(stall_id)].copy()
+        if prefs and prefs.allergens_to_avoid and "allergens" in out.columns:
+            blocked = [a.lower() for a in prefs.allergens_to_avoid]
+            out = out[
+                ~out["allergens"].astype(str).str.lower().apply(lambda x: any(b in x for b in blocked))
+            ]
+        if "price" in out.columns:
+            out["price"] = pd.to_numeric(out["price"], errors="coerce")
+            out = out.sort_values(["price", "item_name"], ascending=[True, True])
+        return out.reset_index(drop=True)
+
+    def get_stalls_by_ids(
+        self,
+        stall_ids: List[int],
+        coords: Coord | None,
+        radius_km: float = 3.0,
+        trip_start: str | None = None,
+        trip_end: str | None = None,
+    ) -> pd.DataFrame:
+        if not stall_ids:
             return pd.DataFrame()
-
-        stall_cols = ["stall_id", "stall_name", "hawker_name", "latitude_hc", "longitude_hc"]
-        if "distance_km" in items.columns:
-            stall_cols.append("distance_km")
-
-        stalls = items[stall_cols].drop_duplicates(subset=["stall_id"]).copy()
-        if "distance_km" not in stalls.columns:
-            stalls["distance_km"] = float("nan")
-
-        scores = self.compute_bayes_scores(m=m)
-        stalls["stall_id"] = pd.to_numeric(stalls["stall_id"], errors="coerce")
-        scores["stall_id"] = pd.to_numeric(scores["stall_id"], errors="coerce")
-
-        out = stalls.merge(scores, on="stall_id", how="left")
-        out["n_reviews"] = out["n_reviews"].fillna(0).astype(int)
-        out["avg_rating"] = out["avg_rating"].fillna(0.0)
-        out["bayes_score"] = out["bayes_score"].fillna(0.0)
-
-        out = out.sort_values(
-            ["bayes_score", "avg_rating", "n_reviews", "distance_km"],
-            ascending=[False, False, False, True],
-        )
-
-        return out.head(int(top_n)).reset_index(drop=True)
-
-    def get_menu_for_stall(self, stall_id: int, prefs: CuisinePreferences) -> pd.DataFrame:
-        df = self.merged_df.copy()
-        df["stall_id"] = pd.to_numeric(df["stall_id"], errors="coerce")
-        df = df[df["stall_id"] == int(stall_id)].copy()
-
-        if prefs.allergens_to_avoid and "allergens" in df.columns:
-            for allergen in prefs.allergens_to_avoid:
-                a = str(allergen).strip()
-                if a:
-                    df = df[~df["allergens"].astype(str).str.contains(a, case=False, na=False)]
-
-        keep = [c for c in ["item_name", "price", "stall_name", "hawker_name"] if c in df.columns]
-        df = df[keep].copy()
-
-        if "price" in df.columns:
-            df["price"] = pd.to_numeric(df["price"], errors="coerce")
-            df = df.sort_values(["price", "item_name"], ascending=[True, True])
-        else:
-            df = df.sort_values(["item_name"], ascending=True)
-
-        return df.reset_index(drop=True)
+        df = self.merged_df[self.merged_df["stall_id"].isin([int(x) for x in stall_ids])].copy()
+        df = self._apply_trip_filter(df, trip_start, trip_end)
+        return self._aggregate_stalls(df, coords, radius_km, top_n=max(5, len(stall_ids)), m=20.0)
