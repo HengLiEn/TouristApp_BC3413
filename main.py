@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Optional, Tuple
 
+import pandas as pd
 import saachees_file
 from feature_cuisines import CuisineFeatureHandler, CuisinePreferences
 from feature_pricing import PriceFeatureHandler
@@ -51,10 +53,9 @@ def main_menu() -> str:
 
 def reviews_menu() -> str:
     print("\n=== Reviews ===")
-    print("1) Show top stalls (by bayes score)")
-    print("2) Read reviews for a stall")
+    print("1) Top stalls nearby")
+    print("2) Read reviews")
     print("3) Write a review")
-    print("4) Mark a review helpful")
     print("0) Back")
     return input("Choose: ").strip()
 
@@ -368,52 +369,241 @@ def run_itinerary_flow(
     if hawker_ids:
         da.add_saved_hawker_centers(username, hawker_ids)
 
+def choose_index(max_n: int, prompt: str = "Choose number (0 to go back): ") -> Optional[int]:
+    while True:
+        raw = input(prompt).strip()
+        if not raw.isdigit():
+            print("Please enter a number.")
+            continue
+        value = int(raw)
+        if value == 0:
+            return None
+        if 1 <= value <= max_n:
+            return value - 1
+        print("Invalid choice.")
+def save_reviews_csv(reviews: ReviewFeature) -> None:
+    reviews.reviews_df.to_csv(reviews.reviews_path, index=False)
 
-def run_reviews_flow(reviews: ReviewFeature, username: str) -> None:
+
+def nearby_top_stalls_for_reviews(
+    reviews: ReviewFeature,
+    pricing: PriceFeatureHandler,
+    coords: Coord | None,
+    radius_km: float,
+    trip_start: str | None,
+    trip_end: str | None,
+) -> None:
+    try:
+        min_rating = float(input("Minimum rating (0-5): ").strip() or "0")
+    except ValueError:
+        min_rating = 0.0
+
+    top = pricing.get_top_price_recommendations(
+        min_price=0,
+        max_price=9999,
+        preference="B",
+        coords=coords,
+        radius_km=radius_km,
+        top_n=50,
+        trip_start=trip_start,
+        trip_end=trip_end,
+    )
+
+    if top.empty:
+        print("No stalls found nearby.")
+        return
+
+    top = top[top["avg_rating"] >= min_rating].sort_values(
+        ["avg_rating", "n_reviews", "distance_km"],
+        ascending=[False, False, True],
+    ).head(5).reset_index(drop=True)
+
+    if top.empty:
+        print("No stalls matched that rating.")
+        return
+
+    print("\nTop stalls nearby:")
+    for i, row in top.iterrows():
+        stall = row.get("stall_name", "Unknown stall")
+        hawker = row.get("hawker_name", "Unknown hawker centre")
+        dist = row.get("distance_km")
+        avg = float(row.get("avg_rating", 0.0) or 0.0)
+        n = int(row.get("n_reviews", 0) or 0)
+        dist_txt = f"{float(dist):.2f} km" if dist is not None and str(dist) != "nan" else "N/A"
+        print(f"[{i + 1}] {stall}  @  {hawker}")
+        print(f"     Distance: {dist_txt} | Average Rating: {avg:.2f} | No. of Reviews: {n}\n")
+
+
+def read_reviews_flow(reviews: ReviewFeature) -> None:
+    keyword = input("Enter stall name (exact or close): ").strip()
+    if not keyword:
+        return
+
+    matches = reviews.stalls_df[
+        reviews.stalls_df["stall_name"].astype(str).str.contains(keyword, case=False, na=False)
+    ].copy()
+
+    if matches.empty:
+        print("No stalls matched that name.")
+        return
+
+    matches = matches[[c for c in ["stall_id", "stall_name"] if c in matches.columns]].drop_duplicates().head(15).reset_index(drop=True)
+
+    print("\nMatching stalls:")
+    for i, row in matches.iterrows():
+        print(f"[{i + 1}] {row['stall_name']}")
+
+    idx = choose_index(len(matches), "Choose stall (0 to go back): ")
+    if idx is None:
+        return
+
+    chosen = matches.loc[idx]
+    confirm = input(f"Read reviews for '{chosen['stall_name']}'? (Y/N): ").strip().lower()
+    if confirm not in {"y", "yes"}:
+        return
+
+    try:
+        how_many = min(15, max(1, int(input("How many reviews would you like to see? (max 15): ").strip() or "5")))
+    except ValueError:
+        how_many = 5
+
+    df = reviews.reviews_df[reviews.reviews_df["stall_id"] == int(chosen["stall_id"])].copy()
+    if df.empty:
+        print("No reviews found for this stall.")
+        return
+
+    if "review_date" in df.columns:
+        df["review_date"] = pd.to_datetime(df["review_date"], errors="coerce")
+        df = df.sort_values("review_date", ascending=False)
+
+    df = df.head(how_many).reset_index(drop=True)
+
+    print("")
+    for i, row in df.iterrows():
+        reviewer = row.get("user_name", "Anonymous")
+        review_text = row.get("review_text", "")
+        rating = float(row.get("rating", 0.0) or 0.0)
+        helpful = int(row.get("helpful_count", 0) or 0)
+        verified = "Yes" if str(row.get("is_verified_purchase", False)).lower() in {"true", "1", "yes", "y"} or row.get("is_verified_purchase") is True else "No"
+        dt = pd.to_datetime(row.get("review_date"), errors="coerce")
+        date_only = dt.strftime("%Y-%m-%d") if pd.notna(dt) else "N/A"
+
+        print(f"[{i + 1}] Reviewer: {reviewer}")
+        print(f"    Review: {review_text}")
+        print(f"    Rating: {rating:.1f} | Helpful Count: {helpful} | Verified Purchase: {verified} | Date: {date_only}")
+        print()
+
+    mark = input("Mark a review as helpful? (Y/N): ").strip().lower()
+    if mark not in {"y", "yes"}:
+        return
+
+    r_idx = choose_index(len(df), "Which review? (0 to cancel): ")
+    if r_idx is None:
+        return
+
+    chosen_review = df.loc[r_idx]
+    confirm = input("Confirm mark this review as helpful? (Y/N): ").strip().lower()
+    if confirm not in {"y", "yes"}:
+        return
+
+    base_mask = reviews.reviews_df.index == chosen_review.name
+    if "review_id" in reviews.reviews_df.columns and pd.notna(chosen_review.get("review_id")):
+        base_mask = reviews.reviews_df["review_id"] == chosen_review.get("review_id")
+
+    reviews.reviews_df.loc[base_mask, "helpful_count"] = (
+        pd.to_numeric(reviews.reviews_df.loc[base_mask, "helpful_count"], errors="coerce").fillna(0).astype(int) + 1
+    )
+    save_reviews_csv(reviews)
+    print("Helpful count updated.")
+
+
+def write_review_flow(reviews: ReviewFeature, username: str) -> None:
+    keyword = input("Enter stall name (exact or close): ").strip()
+    if not keyword:
+        return
+
+    matches = reviews.stalls_df[
+        reviews.stalls_df["stall_name"].astype(str).str.contains(keyword, case=False, na=False)
+    ].copy()
+
+    if matches.empty:
+        print("No stalls matched that name.")
+        return
+
+    matches = matches[[c for c in ["stall_id", "stall_name"] if c in matches.columns]].drop_duplicates().head(15).reset_index(drop=True)
+
+    print("\nMatching stalls:")
+    for i, row in matches.iterrows():
+        print(f"[{i + 1}] {row['stall_name']}")
+
+    idx = choose_index(len(matches), "Choose stall (0 to go back): ")
+    if idx is None:
+        return
+
+    chosen = matches.loc[idx]
+    confirm = input(f"Write a review for '{chosen['stall_name']}'? (Y/N): ").strip().lower()
+    if confirm not in {"y", "yes"}:
+        return
+
+    try:
+        rating = float(input("Rating (0-5): ").strip())
+    except ValueError:
+        print("Invalid rating.")
+        return
+
+    if not 0 <= rating <= 5:
+        print("Rating must be between 0 and 5.")
+        return
+
+    review_text = input("Write your review: ").strip()
+    confirm = input("Submit this review? (Y/N): ").strip().lower()
+    if confirm not in {"y", "yes"}:
+        return
+
+    row = {
+        "stall_id": int(chosen["stall_id"]),
+        "user_name": username,
+        "rating": float(rating),
+        "review_text": review_text,
+        "review_date": datetime.now(timezone.utc).date().isoformat(),
+        "helpful_count": 0,
+        "is_verified_purchase": False,
+    }
+
+    if "review_id" in reviews.reviews_df.columns:
+        current = pd.to_numeric(reviews.reviews_df["review_id"], errors="coerce").dropna()
+        row["review_id"] = int(current.max()) + 1 if not current.empty else 1
+
+    reviews.reviews_df = pd.concat([reviews.reviews_df, pd.DataFrame([row])], ignore_index=True)
+    save_reviews_csv(reviews)
+    print("Review added.")
+
+
+def run_reviews_flow(
+    reviews: ReviewFeature,
+    pricing: PriceFeatureHandler,
+    username: str,
+    session: SessionContext,
+) -> None:
     while True:
         c = reviews_menu()
         if c == "0":
             return
         if c == "1":
-            try:
-                n = int(input("How many top stalls to show? (e.g. 10): ").strip() or "10")
-            except ValueError:
-                n = 10
-            top_df = reviews.get_top_stalls(n=n)
-            if top_df.empty:
-                print("No stall data found.")
-            else:
-                print(top_df.to_string(index=False))
+            nearby_top_stalls_for_reviews(
+                reviews,
+                pricing,
+                session.coords,
+                session.radius_km,
+                session.trip_start,
+                session.trip_end,
+            )
         elif c == "2":
-            stall = input("Enter stall name (exact or close): ").strip()
-            if not stall:
-                continue
-            df = reviews.find_reviews_by_stall_name(stall)
-            if df.empty:
-                print("No reviews found for that stall name.")
-            else:
-                print(df[["review_id", "user_name", "rating", "review_date", "helpful_count", "review_text"]].to_string(index=False))
+            read_reviews_flow(reviews)
         elif c == "3":
-            stall = input("Stall name: ").strip()
-            rating = input("Rating (0-5): ").strip()
-            text = input("Your review: ").strip()
-            if not stall or not text:
-                print("Please enter both the stall name and review text.")
-                continue
-            try:
-                review_id = reviews.add_review(stall_name=stall, rating=float(rating), review_text=text, user_name=username)
-                print(f"Review submitted! (review_id={review_id})")
-            except Exception as e:
-                print(f"Could not add review: {e}")
-        elif c == "4":
-            rid = input("Enter review_id to mark helpful: ").strip()
-            try:
-                reviews.mark_review_helpful(int(rid))
-            except Exception as e:
-                print(f"Could not mark helpful: {e}")
+            write_review_flow(reviews, username)
         else:
             print("Invalid choice.")
-
 
 def _print_stall_cards(df, show_price: bool = False) -> None:
     print("\nTop Recommended Stalls:")
@@ -474,7 +664,7 @@ def main() -> None:
         elif choice == "3":
             run_itinerary_flow(cuisine_handler, da, location_planner, current_user.username, session)
         elif choice == "4":
-            run_reviews_flow(reviews_feature, current_user.username)
+            run_reviews_flow(reviews_feature, pricing_handler, current_user.username, session)
         elif choice == "5":
             update_trip_context(location_planner, session)
         elif choice == "0":
