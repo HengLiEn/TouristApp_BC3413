@@ -68,9 +68,7 @@ class PriceFeatureHandler:
 
     def get_top_price_recommendations(
         self,
-        min_price: float,
         max_price: float,
-        preference: str,
         coords: Coord | None,
         radius_km: float = 2.0,
         top_n: int = 5,
@@ -81,16 +79,7 @@ class PriceFeatureHandler:
         if "price" not in df.columns:
             return pd.DataFrame()
         df["price"] = pd.to_numeric(df["price"], errors="coerce")
-        df = df[(df["price"] >= float(min_price)) & (df["price"] <= float(max_price))].copy()
-
-        pref = (preference or "B").strip().upper()
-        if "category_id" in df.columns and pref in {"F", "D", "B"}:
-            if pref == "F":
-                df = df[df["category_id"] == 1]
-            elif pref == "D":
-                df = df[df["category_id"] == 2]
-            else:
-                df = df[df["category_id"].isin([1, 2])]
+        df = df[df["price"] <= float(max_price)].copy()
 
         if df.empty:
             return pd.DataFrame()
@@ -102,7 +91,7 @@ class PriceFeatureHandler:
         out = stall_agg.merge(self.stalls_df, on="stall_id", how="left")
 
         if self.hawker_id_col and "hawker_center_id" in out.columns:
-            keep = [c for c in [self.hawker_id_col, self.hawker_name_col, self.lat_col, self.lng_col] if c]
+            keep = [c for c in [self.hawker_id_col, self.hawker_name_col, self.lat_col, self.lng_col, "address_myenv", "google_3d_view", "photourl"] if c]
             hc = self.hc_df[keep].copy()
             out = out.merge(hc, left_on="hawker_center_id", right_on=self.hawker_id_col, how="left")
             if self.hawker_name_col and self.hawker_name_col in out.columns:

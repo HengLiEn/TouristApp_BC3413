@@ -43,10 +43,9 @@ def auth_menu() -> str:
 def main_menu() -> str:
     print("\n=== Main Menu ===")
     print("1) Browse Menu & Get Recommendations")
-    print("2) Price Filter Recommendations")
-    print("3) Itinerary Planner")
-    print("4) Reviews")
-    print("5) Update Location / Trip Dates")
+    print("2) Itinerary Planner")
+    print("3) Reviews")
+    print("4) Update Location / Trip Dates")
     print("0) Logout")
     return input("Choose: ").strip()
 
@@ -148,44 +147,98 @@ def update_trip_context(planner: LocationPlanner, session: SessionContext) -> No
         else:
             print("Please enter both dates together. Keeping previous trip dates.")
 
-
-def run_cuisine_flow(
-    handler: CuisineFeatureHandler,
-    da: saachees_file.TouristProfileDA,
-    username: str,
-    session: SessionContext,
+def run_cuisine_price_flow(
+        cuisine_handler: CuisineFeatureHandler,
+        price_handler: PriceFeatureHandler,
+        da: saachees_file.TouristProfileDA,
+        username: str,
+        session: SessionContext,
 ) -> None:
-    prefs = handler.load_preferences(username) or CuisinePreferences()
 
+    # Price Preferences
     print("\n=== Browse Menu & Get Recommendations ===")
-    print("Enter your cuisine preferences again for this search.")
-    available = handler.get_available_cuisines()
-    if available:
-        preview = ", ".join(available[:20])
-        if len(available) > 20:
-            preview += " ..."
-        print(f"Available cuisines: {preview}")
+    try:
+        max_price  = float(input("Enter maximum price: ").strip())
+    except ValueError:
+        print("Please enter valid numeric prices.")
+        return
 
-    raw_c = input("Cuisine preferences (comma-separated): ").strip()
-    if raw_c:
-        prefs.cuisines = [x.strip() for x in raw_c.split(",") if x.strip()]
-        handler.save_preferences(prefs, username)
-
-    top = handler.get_top_nearby_stalls(
-        prefs,
-        coords=session.coords,
-        radius_km=session.radius_km,
-        top_n=5,
-        m=20.0,
-        trip_start=session.trip_start,
-        trip_end=session.trip_end,
+    top = price_handler.get_top_price_recommendations(
+        max_price = max_price,
+        coords = session.coords,
+        radius_km = session.radius_km,
+        top_n = 5,
+        trip_start = session.trip_start,
+        trip_end = session.trip_end,
     )
 
     if top.empty:
-        print("\nNo stalls matched your preferences.")
+        print("\nNo stalls matched your price preference.")
         return
 
-    _print_stall_cards(top)
+    # Cuisine Preference
+    prefs = cuisine_handler.load_preferences(username) or CuisinePreferences()
+    available = cuisine_handler.get_available_cuisines()
+    if available:
+        preview = ", ".join(available[:20])
+        if len(available) > 20:
+            preview += " "
+        print(f"Available cuisines: {preview}")
+
+    raw_c = input("Enter your cuisine preferences (comma-separated): ").strip()
+    if raw_c:
+        prefs.cuisines = [x.strip() for x in raw_c.split(",") if x.strip()]
+        cuisine_handler.save_preferences(prefs,username)
+
+    filtered_rows = []
+
+    for _, row in top.iterrows():
+        stall_id = int(row["stall_id"])
+        menu = cuisine_handler.get_menu_for_stall(stall_id, prefs)
+
+        if menu.empty:
+            continue
+
+        if "price" in menu.columns:
+            menu = menu.copy()
+            menu["price"] = pd.to_numeric(menu["price"], errors = "coerce")
+            menu = menu[menu["price"] <= float(max_price)].copy()
+
+        if menu.empty:
+            continue
+
+        new_row = row.copy()
+        new_row["matching_avg_price"] = menu["price"].mean() if "price" in menu.columns else 0.0
+        new_row["matcihng_items"] = len(menu)
+        filtered_rows.append(new_row)
+
+    if not filtered_rows:
+        print("No stalls matched both your price and cuisine preferences.")
+        return
+
+    top = pd.DataFrame(filtered_rows)
+    sort_cols = []
+    ascending = []
+
+    if "matching_avg_price" in top.columns:
+        sort_cols.append("matching_avg_price")
+        ascending.append(True)
+    if "distance_km" in top.columns:
+        sort_cols.append("distance_km")
+        ascending.append(True)
+    if "avg_rating" in top.columns:
+        sort_cols.append("avg_rating")
+        ascending.append(False)
+    if "n_reviews" in top.columns:
+        sort_cols.append("n_reviews")
+        ascending.append(False)
+
+    if sort_cols:
+        top = top.sort_values(sort_cols, ascending=ascending)
+
+    top = top.head(5).reset_index(drop=True)
+
+    _print_stall_cards(top, show_price=True)
 
     while True:
         choice = input("Enter stall number to view menu (or 0 to go back): ").strip()
@@ -206,7 +259,7 @@ def run_cuisine_flow(
         hawker_name = row.get("hawker_name", "Unknown hawker centre")
         hawker_id = row.get("hawker_center_id")
 
-        menu = handler.get_menu_for_stall(stall_id, prefs)
+        menu = cuisine_handler.get_menu_for_stall(stall_id, prefs)
         print("\n" + "=" * 70)
         print(f"Menu for: {stall_name}")
         print("=" * 70)
@@ -226,78 +279,6 @@ def run_cuisine_flow(
             da.add_saved_stall(username, stall_id, hawker_id)
             print(f"Saved: {stall_name} @ {hawker_name}")
         print()
-
-
-def run_pricing_flow(
-    handler: PriceFeatureHandler,
-    da: saachees_file.TouristProfileDA,
-    username: str,
-    session: SessionContext,
-) -> None:
-    print("\n=== Price Filter Recommendations ===")
-    try:
-        min_price = float(input("Enter minimum price: ").strip())
-        max_price = float(input("Enter maximum price: ").strip())
-    except ValueError:
-        print("Please enter valid numeric prices.")
-        return
-
-    pref = input("Food (F), Drinks (D), or Both (B)? ").strip().upper()
-    if pref not in {"F", "D", "B"}:
-        print("Invalid preference.")
-        return
-
-    top = handler.get_top_price_recommendations(
-        min_price=min_price,
-        max_price=max_price,
-        preference=pref,
-        coords=session.coords,
-        radius_km=session.radius_km,
-        top_n=5,
-        trip_start=session.trip_start,
-        trip_end=session.trip_end,
-    )
-
-    if top.empty:
-        print("\nNo stalls matched that price range.")
-        return
-
-    _print_stall_cards(top, show_price=True)
-
-    while True:
-        choice = input("Enter stall number to view menu (or 0 to go back): ").strip()
-        if choice == "0":
-            return
-        if not choice.isdigit():
-            print("Please enter a number.")
-            continue
-        idx = int(choice) - 1
-        if idx < 0 or idx >= len(top):
-            print("Invalid stall number.")
-            continue
-
-        row = top.iloc[idx]
-        stall_id = int(row["stall_id"])
-        stall_name = row.get("stall_name", "Unknown stall")
-        hawker_name = row.get("hawker_name", "Unknown hawker centre")
-        hawker_id = row.get("hawker_center_id")
-        menu = handler.get_menu_for_stall(stall_id)
-
-        print("\n" + "=" * 70)
-        print(f"Menu for: {stall_name}")
-        print("=" * 70)
-        if menu.empty:
-            print("No menu items found.")
-        else:
-            cols = [c for c in ["item_name", "price"] if c in menu.columns]
-            print(menu[cols].to_string(index=False))
-
-        add = input(f"\nAdd '{stall_name}' to your itinerary? (Y/N): ").strip().lower()
-        if add in ("y", "yes"):
-            da.add_saved_stall(username, stall_id, hawker_id)
-            print(f"Saved: {stall_name} @ {hawker_name}")
-        print()
-
 
 def run_itinerary_flow(
     cuisine_handler: CuisineFeatureHandler,
@@ -356,6 +337,8 @@ def run_itinerary_flow(
         leg = "STARTING POINT" if i == 1 else f"Walk: {stop['leg_dist_km']:.2f} km (~{round(stop['leg_time_mins'])} mins)"
         print(f"\nSTOP {i}: {stop.get('stall_name', 'Unknown stall')}")
         print(f"   Hawker centre: {stop.get('hawker_name', 'Unknown hawker centre')}")
+        print(f"   Address: {stop.get('address_myenv', 'N/A')}")
+        print(f"   Maps: {stop.get('google_3d_view', 'N/A')}")
         print(f"   {leg}")
         if 'avg_rating' in stop:
             print(f"   Rating: {float(stop.get('avg_rating', 0.0)):.2f} | Reviews: {int(stop.get('n_reviews', 0) or 0)}")
@@ -381,9 +364,9 @@ def choose_index(max_n: int, prompt: str = "Choose number (0 to go back): ") -> 
         if 1 <= value <= max_n:
             return value - 1
         print("Invalid choice.")
+
 def save_reviews_csv(reviews: ReviewFeature) -> None:
     reviews.reviews_df.to_csv(reviews.reviews_path, index=False)
-
 
 def nearby_top_stalls_for_reviews(
     reviews: ReviewFeature,
@@ -658,14 +641,12 @@ def main() -> None:
 
         choice = main_menu()
         if choice == "1":
-            run_cuisine_flow(cuisine_handler, da, current_user.username, session)
+            run_cuisine_price_flow(cuisine_handler, pricing_handler, da, current_user.username, session)
         elif choice == "2":
-            run_pricing_flow(pricing_handler, da, current_user.username, session)
-        elif choice == "3":
             run_itinerary_flow(cuisine_handler, da, location_planner, current_user.username, session)
-        elif choice == "4":
+        elif choice == "3":
             run_reviews_flow(reviews_feature, pricing_handler, current_user.username, session)
-        elif choice == "5":
+        elif choice == "4":
             update_trip_context(location_planner, session)
         elif choice == "0":
             print("Logged out.")

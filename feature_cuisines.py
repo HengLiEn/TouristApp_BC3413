@@ -64,7 +64,7 @@ class CuisineFeatureHandler:
     def _build_merged_df(self) -> None:
         df = self.menu_df.merge(self.stalls_df, on="stall_id", how="left")
         if self.hawker_id_col and "hawker_center_id" in df.columns:
-            keep = [c for c in [self.hawker_id_col, self.hawker_name_col, self.lat_col, self.lng_col] if c]
+            keep = [c for c in [self.hawker_id_col, self.hawker_name_col, self.lat_col, self.lng_col, "address_myenv", "google_3d_view", "photourl"] if c]
             hc = self.hc_df[keep].copy()
             df = df.merge(hc, left_on="hawker_center_id", right_on=self.hawker_id_col, how="left")
             if self.hawker_name_col and self.hawker_name_col in df.columns:
@@ -163,7 +163,7 @@ class CuisineFeatureHandler:
     def _stall_base(self) -> pd.DataFrame:
         base = self.stalls_df.copy()
         if self.hawker_id_col and "hawker_center_id" in base.columns:
-            keep = [c for c in [self.hawker_id_col, self.hawker_name_col, self.lat_col, self.lng_col] if c]
+            keep = [c for c in [self.hawker_id_col, self.hawker_name_col, self.lat_col, self.lng_col, "address_myenv", "google_3d_view", "photourl"] if c]
             hc = self.hc_df[keep].copy()
             base = base.merge(hc, left_on="hawker_center_id", right_on=self.hawker_id_col, how="left")
             if self.hawker_name_col and self.hawker_name_col in base.columns:
