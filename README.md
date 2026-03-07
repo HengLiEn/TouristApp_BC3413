@@ -3,7 +3,7 @@ This is a README file
 ## Project Structure
 
 1. main.py                  # Entry point — orchestrates all features
-2. saachees_file.py         # User authentication and profile data access
+2. feature_onboarding.py     # User authentication and profile data access
 3. feature_cuisines.py      # Cuisine preferences and allergen filtering
 4. feature_pricing.py       # Price-based food recommendations
 5. features_closure.py      # Hawker centre closure date filtering

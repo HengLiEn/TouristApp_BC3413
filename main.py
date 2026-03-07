@@ -150,7 +150,7 @@ def update_trip_context(planner: LocationPlanner, session: SessionContext) -> No
 def run_cuisine_price_flow(
         cuisine_handler: CuisineFeatureHandler,
         price_handler: PriceFeatureHandler,
-        da: saachees_file.TouristProfileDA,
+        da: feature_onboarding.TouristProfileDA,
         username: str,
         session: SessionContext,
 ) -> None:
@@ -282,7 +282,7 @@ def run_cuisine_price_flow(
 
 def run_itinerary_flow(
     cuisine_handler: CuisineFeatureHandler,
-    da: saachees_file.TouristProfileDA,
+    da: feature_onboarding.TouristProfileDA,
     planner: LocationPlanner,
     username: str,
     session: SessionContext,
@@ -608,28 +608,28 @@ def _print_stall_cards(df, show_price: bool = False) -> None:
 def main() -> None:
     print_banner()
 
-    da = saachees_file.TouristProfileDA()
+    da = feature_onboarding.TouristProfileDA()
     cuisine_handler = CuisineFeatureHandler()
     pricing_handler = PriceFeatureHandler()
     location_planner = LocationPlanner()
     reviews_feature = ReviewFeature()
 
-    current_user: Optional[saachees_file.TouristProfile] = None
+    current_user: Optional[feature_onboarding.TouristProfile] = None
     session = SessionContext()
 
     while True:
         if current_user is None:
             c = auth_menu()
             if c == "1":
-                created = saachees_file.create_account(da)
+                created = feature_onboarding.create_account(da)
                 if created:
                     auto = input("\nLogin now? (Y/N): ").strip().lower()
                     if auto in ("y", "yes"):
-                        current_user = saachees_file.login(da)
+                        current_user = feature_onboarding.login(da)
                         if current_user:
                             setup_trip_context(location_planner, session)
             elif c == "2":
-                current_user = saachees_file.login(da)
+                current_user = feature_onboarding.login(da)
                 if current_user:
                     setup_trip_context(location_planner, session)
             elif c == "0":
