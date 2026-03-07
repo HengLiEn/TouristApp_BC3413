@@ -2,21 +2,22 @@ This is a README file
 
 ## Project Structure
 
-├── main.py                  # Entry point — orchestrates all features
-├── saachees_file.py         # User authentication and profile data access
-├── feature_cuisines.py      # Cuisine preferences and allergen filtering
-├── feature_pricing.py       # Price-based food recommendations
-├── features_closure.py      # Hawker centre closure date filtering
-├── features_location.py     # Geolocation, routing, and itinerary building
-├── features_reviews.py      # Reading and writing stall reviews
-├── tourist_profiles.db      # SQLite database for user profiles
-└── dataset/
-    ├── Multiple Stalls Menu and Data/
-    │   ├── menu_items.csv
-    │   ├── stalls.csv
-    │   └── reviews.csv
-    └── Hawker Centre Data/
-        └── DatesofHawkerCentresClosure.csv
+1. main.py                  # Entry point — orchestrates all features
+2. saachees_file.py         # User authentication and profile data access
+3. feature_cuisines.py      # Cuisine preferences and allergen filtering
+4. feature_pricing.py       # Price-based food recommendations
+5. features_closure.py      # Hawker centre closure date filtering
+6. features_location.py     # Geolocation, routing, and itinerary building
+7. features_reviews.py      # Reading and writing stall reviews
+8. tourist_profiles.db      # SQLite database for user profiles
+9. dataset/
+    1. Multiple Stalls Menu and Data/
+      i.   menu_items.csv
+      ii.  stalls.csv
+      iii. reviews.csv
+
+    2. Hawker Centre Data/
+      i. DatesofHawkerCentresClosure.csv
 
 ## Features
 
