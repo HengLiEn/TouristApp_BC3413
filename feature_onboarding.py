@@ -7,7 +7,6 @@ from typing import List, Optional
 
 DB_FILE = "tourist_profiles.db"
 
-
 @dataclass
 class TouristProfile:
     username: str
@@ -20,7 +19,11 @@ class TouristProfile:
     created_at: str
     saved_stalls: List[int] | None = None
     saved_hawker_center_ids: List[int] | None = None
-
+    location_lat: Optional[float] = None
+    location_lng: Optional[float] = None
+    radius_km: float = 2.0
+    trip_start: Optional[str] = None
+    trip_end: Optional[str] = None
 
 class TouristProfileDA:
     REQUIRED_COLUMNS = {
@@ -34,6 +37,11 @@ class TouristProfileDA:
         "created_at": "TEXT",
         "saved_stalls": "TEXT",
         "saved_hawker_center_ids": "TEXT",
+        "location_lat": "REAL",
+        "location_lng": "REAL",
+        "radius_km": "REAL",
+        "trip_start": "TEXT",
+        "trip_end": "TEXT",
     }
 
     def __init__(self, db_file: str = DB_FILE):
@@ -58,7 +66,7 @@ class TouristProfileDA:
         if self._table_exists():
             return
         sql = """
-        CREATE TABLE IF NOT EXISTS tourist_profiles (
+        CREATE TABLE IF NOT EXISTS tourist_profiles(
             username TEXT PRIMARY KEY,
             password TEXT NOT NULL,
             name TEXT NOT NULL,
@@ -68,7 +76,12 @@ class TouristProfileDA:
             preferred_cuisines TEXT,
             created_at TEXT NOT NULL,
             saved_stalls TEXT,
-            saved_hawker_center_ids TEXT
+            saved_hawker_center_ids TEXT,
+            location_lat REAL,
+            location_lng REAL,
+            radius_km REAL DEFAULT 2.0,
+            trip_start TEXT,
+            trip_end TEXT
         );
         """
         with self._connect() as con:
@@ -82,10 +95,23 @@ class TouristProfileDA:
         missing = [c for c in self.REQUIRED_COLUMNS if c not in existing]
         if not missing:
             return
+
+        defaults = {
+            "password": " DEFAULT ''",
+            "created_at": " DEFAULT ''",
+            "saved_stalls": " DEFAULT ''",
+            "saved_hawker_center_ids": " DEFAULT ''",
+            "radius_km": " DEFAULT 2.0",
+            "trip_start": " DEFAULT NULL",
+            "trip_end": " DEFAULT NULL",
+            "location_lat": " DEFAULT NULL",
+            "location_lng": " DEFAULT NULL",
+        }
+
         with self._connect() as con:
             for col in missing:
                 col_type = self.REQUIRED_COLUMNS[col]
-                default = " DEFAULT ''" if col in {"password", "created_at", "saved_stalls", "saved_hawker_center_ids"} else ""
+                default = defaults.get(col, "")
                 con.execute(f"ALTER TABLE tourist_profiles ADD COLUMN {col} {col_type}{default};")
             con.commit()
 
@@ -131,11 +157,8 @@ class TouristProfileDA:
 
     def insert_profile(self, p: TouristProfile) -> None:
         sql = """
-        INSERT INTO tourist_profiles (
-            username, password, name, country, spice_level,
-            allergens, preferred_cuisines, created_at,
-            saved_stalls, saved_hawker_center_ids
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+        INSERT INTO tourist_profiles (username, password, name, country, spice_level, allergens, preferred_cuisines, created_at, saved_stalls, saved_hawker_center_ids, location_lat, location_lng, radius_km, trip_start, trip_end
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
         """
         data = (
             p.username,
@@ -148,6 +171,11 @@ class TouristProfileDA:
             p.created_at,
             self._pack_ints(p.saved_stalls or []),
             self._pack_ints(p.saved_hawker_center_ids or []),
+            p.location_lat,
+            p.location_lng,
+            float(p.radius_km if p.radius_km is not None else 2.0),
+            p.trip_start,
+            p.trip_end,
         )
         with self._connect() as con:
             con.execute(sql, data)
@@ -155,9 +183,7 @@ class TouristProfileDA:
 
     def get_profile(self, username: str) -> Optional[TouristProfile]:
         sql = """
-        SELECT username, password, name, country, spice_level,
-               allergens, preferred_cuisines, created_at,
-               saved_stalls, saved_hawker_center_ids
+        SELECT username, password, name, country, spice_level, allergens, preferred_cuisines, created_at, saved_stalls, saved_hawker_center_ids, location_lat, location_lng, radius_km, trip_start, trip_end
         FROM tourist_profiles
         WHERE username = ?;
         """
@@ -165,6 +191,7 @@ class TouristProfileDA:
             row = con.execute(sql, (username,)).fetchone()
         if not row:
             return None
+
         return TouristProfile(
             username=row[0],
             password=row[1] or "",
@@ -176,6 +203,11 @@ class TouristProfileDA:
             created_at=row[7] or "",
             saved_stalls=self._unpack_ints(row[8]),
             saved_hawker_center_ids=self._unpack_ints(row[9]),
+            location_lat=float(row[10]) if row[10] is not None else None,
+            location_lng=float(row[11]) if row[11] is not None else None,
+            radius_km=float(row[12]) if row[12] is not None else 2.0,
+            trip_start=row[13] if row[13] else None,
+            trip_end=row[14] if row[14] else None,
         )
 
     def _update_int_list_column(self, username: str, column: str, values: List[int]) -> None:
@@ -206,6 +238,32 @@ class TouristProfileDA:
         existing.extend([int(x) for x in hawker_center_ids if x is not None])
         self._update_int_list_column(username, "saved_hawker_center_ids", existing)
 
+    def update_trip_context(
+        self,
+        username: str,
+        coords: Optional[tuple[float, float]],
+        radius_km: float,
+        trip_start: Optional[str],
+        trip_end: Optional[str],
+    ) -> None:
+        lat = float(coords[0]) if coords is not None else None
+        lng = float(coords[1]) if coords is not None else None
+
+        with self._connect() as con:
+            con.execute(
+                """
+                UPDATE tourist_profiles
+                SET location_lat = ?,
+                    location_lng = ?,
+                    radius_km = ?,
+                    trip_start = ?,
+                    trip_end = ?
+                WHERE username = ?;
+                """,
+                (lat, lng, float(radius_km), trip_start, trip_end, username),
+            )
+            con.commit()
+
 
 def now_iso() -> str:
     return datetime.now().isoformat(timespec="seconds")
@@ -235,8 +293,7 @@ def input_list(prompt: str) -> List[str]:
     if not raw:
         return []
     items = [x.strip() for x in raw.split(",") if x.strip()]
-    return TouristProfileDA._unique_preserve(items)
-
+    return TouristProfile._unique_preserve(items)
 
 def create_account(da: TouristProfileDA) -> Optional[TouristProfile]:
     print("\n=== Create Account ===")
@@ -271,7 +328,6 @@ def create_account(da: TouristProfileDA) -> Optional[TouristProfile]:
     except sqlite3.IntegrityError:
         print("Username already exists.")
         return None
-
 
 def login(da: TouristProfileDA) -> Optional[TouristProfile]:
     print("=== Login ===")

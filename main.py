@@ -21,6 +21,33 @@ class SessionContext:
     trip_start: Optional[str] = None   # dd/mm/yyyy
     trip_end: Optional[str] = None     # dd/mm/yyyy
 
+def load_session_from_profile(
+    session: SessionContext,
+    profile: feature_onboarding.TouristProfile,
+) -> None:
+    if profile.location_lat is not None and profile.location_lng is not None:
+        session.coords = (float(profile.location_lat), float(profile.location_lng))
+    else:
+        session.coords = None
+
+    session.radius_km = float(profile.radius_km if profile.radius_km is not None else 2.0)
+    session.trip_start = profile.trip_start
+    session.trip_end = profile.trip_end
+
+
+def save_session_to_profile(
+    da: feature_onboarding.TouristProfileDA,
+    username: str,
+    session: SessionContext,
+) -> None:
+    da.update_trip_context(
+        username=username,
+        coords=session.coords,
+        radius_km=session.radius_km,
+        trip_start=session.trip_start,
+        trip_end=session.trip_end,
+    )
+
 
 # -----------------------------
 # UI helpers
@@ -64,7 +91,7 @@ def _fmt_date_range(session: SessionContext) -> str:
     return "Not set"
 
 
-def setup_trip_context(planner: LocationPlanner, session: SessionContext) -> None:
+def setup_trip_context(planner: LocationPlanner, session: SessionContext, da: feature_onboarding.TouristProfileDA, username: str,) -> None:
     print("\n=== Trip Setup ===")
     print("Please set your location before using the features.")
 
@@ -99,8 +126,9 @@ def setup_trip_context(planner: LocationPlanner, session: SessionContext) -> Non
         session.trip_end = None
         print("Trip dates skipped. Closed hawker centres will not be excluded.")
 
+    save_session_to_profile(da, username, session)
 
-def update_trip_context(planner: LocationPlanner, session: SessionContext) -> None:
+def update_trip_context(planner: LocationPlanner, session: SessionContext, da: feature_onboarding.TouristProfileDA, username: str,) -> None:
     print("\n=== Update Location / Trip Dates ===")
     print(f"Current location: {session.coords if session.coords else 'Not set'}")
     print(f"Current nearby radius: {session.radius_km:g} km")
@@ -145,6 +173,7 @@ def update_trip_context(planner: LocationPlanner, session: SessionContext) -> No
             print("Trip dates cleared.")
         else:
             print("Please enter both dates together. Keeping previous trip dates.")
+    save_session_to_profile(da, username, session)
 
 def run_cuisine_price_flow(
         cuisine_handler: CuisineFeatureHandler,
@@ -208,7 +237,7 @@ def run_cuisine_price_flow(
 
         new_row = row.copy()
         new_row["matching_avg_price"] = menu["price"].mean() if "price" in menu.columns else 0.0
-        new_row["matcihng_items"] = len(menu)
+        new_row["matching_items"] = len(menu)
         filtered_rows.append(new_row)
 
     if not filtered_rows:
@@ -383,7 +412,6 @@ def nearby_top_stalls_for_reviews(
     top = pricing.get_top_price_recommendations(
         min_price=0,
         max_price=9999,
-        preference="B",
         coords=coords,
         radius_km=radius_km,
         top_n=50,
@@ -626,11 +654,15 @@ def main() -> None:
                     if auto in ("y", "yes"):
                         current_user = feature_onboarding.login(da)
                         if current_user:
-                            setup_trip_context(location_planner, session)
+                            load_session_from_profile(session, current_user)
+                            if session.coords is None and not (session.trip_start and session.trip_end):
+                                setup_trip_context(location_planner, session, da, current_user.username)
             elif c == "2":
                 current_user = feature_onboarding.login(da)
                 if current_user:
-                    setup_trip_context(location_planner, session)
+                    load_session_from_profile(session, current_user)
+                    if session.coords is None and not (session.trip_start and session.trip_end):
+                        setup_trip_context(location_planner, session, da, current_user.username)
             elif c == "0":
                 print("Bye!")
                 return
@@ -646,7 +678,7 @@ def main() -> None:
         elif choice == "3":
             run_reviews_flow(reviews_feature, pricing_handler, current_user.username, session)
         elif choice == "4":
-            update_trip_context(location_planner, session)
+            update_trip_context(location_planner, session, da, current_user.username)
         elif choice == "0":
             print("Logged out.")
             current_user = None
