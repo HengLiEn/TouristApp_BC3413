@@ -115,10 +115,3 @@ class PriceFeatureHandler:
             ascending=[True, True, False, False],
         )
         return out.head(int(top_n)).reset_index(drop=True)
-
-    def get_menu_for_stall(self, stall_id: int) -> pd.DataFrame:
-        out = self.menu_df[self.menu_df["stall_id"] == int(stall_id)].copy()
-        if "price" in out.columns:
-            out["price"] = pd.to_numeric(out["price"], errors="coerce")
-            out = out.sort_values(["price", "item_name"], ascending=[True, True])
-        return out.reset_index(drop=True)

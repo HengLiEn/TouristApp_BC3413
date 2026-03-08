@@ -163,12 +163,12 @@ def run_cuisine_price_flow(
         return
 
     top = price_handler.get_top_price_recommendations(
-        max_price = max_price,
-        coords = session.coords,
-        radius_km = session.radius_km,
-        top_n = 5,
-        trip_start = session.trip_start,
-        trip_end = session.trip_end,
+        coords=session.coords,
+        radius_km=session.radius_km,
+        top_n=200,
+        trip_start=session.trip_start,
+        trip_end=session.trip_end,
+        max_price=max_price
     )
 
     if top.empty:
@@ -219,9 +219,6 @@ def run_cuisine_price_flow(
     sort_cols = []
     ascending = []
 
-    if "matching_avg_price" in top.columns:
-        sort_cols.append("matching_avg_price")
-        ascending.append(True)
     if "distance_km" in top.columns:
         sort_cols.append("distance_km")
         ascending.append(True)
@@ -231,6 +228,9 @@ def run_cuisine_price_flow(
     if "n_reviews" in top.columns:
         sort_cols.append("n_reviews")
         ascending.append(False)
+    if "matching_avg_price" in top.columns:
+        sort_cols.append("matching_avg_price")
+        ascending.append(True)
 
     if sort_cols:
         top = top.sort_values(sort_cols, ascending=ascending)

@@ -196,13 +196,20 @@ class CuisineFeatureHandler:
         return self._aggregate_stalls(df, coords, radius_km, top_n, m)
 
     def get_menu_for_stall(self, stall_id: int, prefs: CuisinePreferences | None = None) -> pd.DataFrame:
-        out = self.menu_df[self.menu_df["stall_id"] == int(stall_id)].copy()
+        out = self.merged_df[self.merged_df["stall_id"] == int(stall_id)].copy()
+
+        if prefs and prefs.cuisines and "cuisine_type" in out.columns:
+            wanted = [c.lower() for c in prefs.cuisines]
+            out = out[out["cuisine_type"].astype(str).str.lower().apply(lambda x: any(w in x for w in wanted))]
+
         if prefs and prefs.allergens_to_avoid and "allergens" in out.columns:
             blocked = [a.lower() for a in prefs.allergens_to_avoid]
             out = out[~out["allergens"].astype(str).str.lower().apply(lambda x: any(b in x for b in blocked))]
+
         if "price" in out.columns:
             out["price"] = pd.to_numeric(out["price"], errors="coerce")
             out = out.sort_values(["price", "item_name"], ascending=[True, True])
+
         return out.reset_index(drop=True)
 
     def get_stalls_by_ids(
