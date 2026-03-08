@@ -67,6 +67,8 @@ class CuisineFeatureHandler:
         parts = re.split(r"[,;/|]+", str(cell).strip().lower())
         return [p.strip() for p in parts if p.strip()]
 
+    EXCLUDE_CUISINES = {"Hardware"}
+
     def get_available_cuisines(self) -> List[str]:
         if "cuisine_type" not in self.stalls_df.columns:
             return []
@@ -74,7 +76,8 @@ class CuisineFeatureHandler:
         for value in self.stalls_df["cuisine_type"].dropna().astype(str):
             for token in self._split_cell(value):
                 tokens.add(token.title())
-        return sorted(tokens)
+        return sorted(tokens - self.EXCLUDE_CUISINES)
+
 
     def save_preferences(self, prefs: CuisinePreferences, username: str) -> None:
         with sqlite3.connect(DB_FILE) as con:
