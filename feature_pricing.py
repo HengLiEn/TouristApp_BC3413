@@ -5,10 +5,8 @@ from typing import Tuple
 
 import pandas as pd
 
-from feature_cuisines import haversine_km
 
-Coord = Tuple[float, float]
-
+from features_location import haversine_km, Coord
 
 class PriceFeatureHandler:
     def __init__(self, project_root: str | None = None):

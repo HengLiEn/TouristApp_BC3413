@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Optional, Tuple
+from typing import Optional
 
 import pandas as pd
 import feature_onboarding
@@ -11,8 +11,7 @@ from feature_pricing import PriceFeatureHandler
 from features_closure import HawkerClosureFeature
 from features_location import LocationPlanner
 from features_reviews import ReviewFeature
-
-Coord = Tuple[float, float]
+from features_location import Coord
 
 
 @dataclass

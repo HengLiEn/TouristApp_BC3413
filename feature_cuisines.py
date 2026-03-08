@@ -4,13 +4,13 @@ import os
 import re
 import sqlite3
 from dataclasses import dataclass
-from typing import List, Optional, Tuple
+# removing tuple
+from typing import List, Optional
 
 import pandas as pd
 
-DB_FILE = "tourist_profiles.db"
-Coord = Tuple[float, float]
-
+from feature_onboarding import DB_FILE
+from features_location import Coord, haversine_km
 
 @dataclass
 class CuisinePreferences:
@@ -20,17 +20,6 @@ class CuisinePreferences:
     def __post_init__(self):
         self.cuisines = self.cuisines or []
         self.allergens_to_avoid = self.allergens_to_avoid or []
-
-
-def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-    import math
-    r = 6371.0
-    p1 = math.radians(lat1)
-    p2 = math.radians(lat2)
-    dlat = math.radians(lat2 - lat1)
-    dlon = math.radians(lon2 - lon1)
-    a = math.sin(dlat / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dlon / 2) ** 2
-    return 2 * r * math.asin(math.sqrt(a))
 
 
 class CuisineFeatureHandler:
