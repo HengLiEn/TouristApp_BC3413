@@ -293,7 +293,7 @@ def input_list(prompt: str) -> List[str]:
     if not raw:
         return []
     items = [x.strip() for x in raw.split(",") if x.strip()]
-    return TouristProfile._unique_preserve(items)
+    return TouristProfileDA._unique_preserve(items)
 
 def create_account(da: TouristProfileDA) -> Optional[TouristProfile]:
     print("\n=== Create Account ===")

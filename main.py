@@ -222,7 +222,7 @@ def run_cuisine_price_flow(
 
     for _, row in top.iterrows():
         stall_id = int(row["stall_id"])
-        menu = cuisine_handler.get_menu_for_stall(stall_id, prefs)
+        menu = cuisine_handler.get_menu_for_stall(stall_id, CuisinePreferences(cuisines=prefs.cuisines))
 
         if menu.empty:
             continue
