@@ -27,4 +27,4 @@ This is a README file
 - **Itinerary planner** — builds a walkable route from your saved or recommended stalls
 - **Reviews** — read, write, and mark reviews as helpful
 - **Trip date filtering** — automatically excludes hawker centres closed during your trip
-- **Location-aware** — uses Singapore OneMap API to resolve postal codes and addresses
+- **Location-Aware** — uses Singapore OneMap API to resolve postal codes and addresses
