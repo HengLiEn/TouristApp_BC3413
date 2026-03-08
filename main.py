@@ -410,7 +410,6 @@ def nearby_top_stalls_for_reviews(
         min_rating = 0.0
 
     top = pricing.get_top_price_recommendations(
-        min_price=0,
         max_price=9999,
         coords=coords,
         radius_km=radius_km,
