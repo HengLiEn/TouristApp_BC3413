@@ -2,15 +2,16 @@ This is a README file
 
 ## Project Structure
 
-1. main.py                  # Entry point — orchestrates all features
-2. feature_onboarding.py     # User authentication and profile data access
-3. feature_cuisines.py      # Cuisine preferences and allergen filtering
-4. feature_pricing.py       # Price-based food recommendations
-5. features_closure.py      # Hawker centre closure date filtering
-6. features_location.py     # Geolocation, routing, and itinerary building
-7. features_reviews.py      # Reading and writing stall reviews
+1. main.py                  # Entry point — orchestrates all features - worked by Saachee
+2. feature_onboarding.py     # User authentication and profile data access - worked by Saachee
+3. feature_cuisines.py      # Cuisine preferences and allergen filtering - worked by Li En
+4. feature_pricing.py       # Price-based food recommendations - worked by Felicia
+5. features_closure.py      # Hawker centre closure date filtering  - - worked by Skyla
+6. features_location.py     # Geolocation, routing, and itinerary building - worked by Zi Xing
+7. features_reviews.py      # Reading and writing stall reviews - - worked by Nicole
 8. tourist_profiles.db      # SQLite database for user profiles
-9. dataset/
+9. Edits & Compilation, Fixed Bugs - Nicole, Saachee, Li En
+10. dataset/
     1. Multiple Stalls Menu and Data/
       i.   menu_items.csv
       ii.  stalls.csv
