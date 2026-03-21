@@ -83,7 +83,7 @@ class PriceFeatureHandler:
             return pd.DataFrame()
 
         stall_agg = df.groupby("stall_id", as_index=False).agg(
-            matching_avg_price=("price", "mean"),
+            matching_max_price=("price", "max"),
             matching_items=("stall_id", "count"),
         )
         out = stall_agg.merge(self.stalls_df, on="stall_id", how="left")
@@ -111,7 +111,7 @@ class PriceFeatureHandler:
             out["distance_km"] = float("inf")
 
         out = out.sort_values(
-            ["matching_avg_price", "distance_km", "avg_rating", "n_reviews"],
+            ["matching_max_price", "distance_km", "avg_rating", "n_reviews"],
             ascending=[True, True, False, False],
         )
         return out.head(int(top_n)).reset_index(drop=True)
