@@ -228,6 +228,14 @@ class TouristProfileDA:
         if hawker_center_id is not None:
             self.add_saved_hawker_centers(username, [int(hawker_center_id)])
 
+    def clear_saved_stalls(self, username: str) -> None:
+        with self._connect() as con:
+            con.execute(
+                "UPDATE tourist_profiles SET saved_stalls = '', saved_hawker_center_ids = '' WHERE username = ?;",
+                (username,),
+            )
+            con.commit()
+
     def get_saved_hawker_center_ids(self, username: str) -> List[int]:
         with self._connect() as con:
             row = con.execute("SELECT saved_hawker_center_ids FROM tourist_profiles WHERE username = ?;", (username,)).fetchone()
