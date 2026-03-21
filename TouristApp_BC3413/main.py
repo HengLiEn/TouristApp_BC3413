@@ -236,7 +236,7 @@ def run_cuisine_price_flow(
             continue
 
         new_row = row.copy()
-        new_row["matching_avg_price"] = menu["price"].mean() if "price" in menu.columns else 0.0
+        new_row["matching_max_price"] = menu["price"].max() if "price" in menu.columns else 0.0
         new_row["matching_items"] = len(menu)
         filtered_rows.append(new_row)
 
@@ -257,8 +257,8 @@ def run_cuisine_price_flow(
     if "n_reviews" in top.columns:
         sort_cols.append("n_reviews")
         ascending.append(False)
-    if "matching_avg_price" in top.columns:
-        sort_cols.append("matching_avg_price")
+    if "matching_max_price" in top.columns:
+        sort_cols.append("matching_max_price")
         ascending.append(True)
 
     if sort_cols:
@@ -306,6 +306,63 @@ def run_cuisine_price_flow(
         if add in ("y", "yes"):
             da.add_saved_stall(username, stall_id, hawker_id)
             print(f"Saved: {stall_name} @ {hawker_name}")
+
+            # Show current itinerary and offer to delete stalls
+            current_stalls = da.get_saved_stalls(username)
+            stalls_df = cuisine_handler.get_stalls_by_ids(
+                current_stalls,
+                coords=session.coords,
+                radius_km=max(session.radius_km, 3.0),
+                trip_start=session.trip_start,
+                trip_end=session.trip_end,
+            )
+            id_to_name = {}
+            if not stalls_df.empty and "stall_id" in stalls_df.columns and "stall_name" in stalls_df.columns:
+                for _, row in stalls_df.iterrows():
+                    id_to_name[int(row["stall_id"])] = row.get("stall_name", "Unknown stall")
+
+            print("\nYour current itinerary:")
+            for i, sid in enumerate(current_stalls, 1):
+                print(f"  [{i}] {id_to_name.get(sid, f'Stall ID {sid}')}")
+
+            print("\n1) Continue")
+            print("2) Delete stall(s) from itinerary")
+            while True:
+                mgmt = input("Choose: ").strip()
+                if mgmt == "1":
+                    break
+                elif mgmt == "2":
+                    print("Enter numbers to delete (e.g. 1,3,4), or type 'All' to remove everything.")
+                    while True:
+                        raw = input("Your choice: ").strip()
+                        if raw.lower() == "all":
+                            da.clear_saved_stalls(username)
+                            print("All stalls removed from your itinerary.")
+                            break
+                        parts = [p.strip() for p in raw.split(",") if p.strip()]
+                        if not parts:
+                            print("Please enter at least one number, or type 'All'.")
+                            continue
+                        valid = True
+                        delete_indices = []
+                        for p in parts:
+                            if p.isdigit() and 1 <= int(p) <= len(current_stalls):
+                                delete_indices.append(int(p) - 1)
+                            else:
+                                print(f"'{p}' is not a valid number. Please enter numbers between 1 and {len(current_stalls)}.")
+                                valid = False
+                                break
+                        if not valid:
+                            continue
+                        kept_stalls = [current_stalls[i] for i in range(len(current_stalls)) if i not in delete_indices]
+                        da.clear_saved_stalls(username)
+                        for sid in kept_stalls:
+                            da.add_saved_stall(username, sid)
+                        print(f"Removed {len(delete_indices)} stall(s). {len(kept_stalls)} stall(s) remaining in your itinerary.")
+                        break
+                    break
+                else:
+                    print("Please enter 1 or 2.")
         print()
 
 def run_itinerary_flow(
@@ -626,9 +683,90 @@ def _print_stall_cards(df, show_price: bool = False) -> None:
         dist_txt = f"{float(dist):.2f} km" if dist is not None and str(dist) != "nan" else "N/A"
         print(f"[{i}] {stall}  @  {hawker}")
         extras = f"     Distance: {dist_txt} | Average Rating: {avg:.2f} | No. of Reviews: {n}"
-        if show_price and "matching_avg_price" in row:
-            extras += f" | Avg Matching Price: ${float(row['matching_avg_price']):.2f}"
+        if show_price and "matching_max_price" in row:
+            extras += f" | Max Matching Price: ${float(row['matching_max_price']):.2f}"
         print(extras + "\n")
+
+
+def prompt_saved_stalls_on_login(
+    da: feature_onboarding.TouristProfileDA,
+    username: str,
+    cuisine_handler: CuisineFeatureHandler,
+    session: SessionContext,
+) -> None:
+    """
+    After login, check if the tourist has previously saved stalls.
+    If yes, ask whether to continue with them or start fresh.
+    If they choose to continue, let them pick which stalls to keep.
+    """
+    saved_stalls = da.get_saved_stalls(username)
+    count = len(saved_stalls)
+
+    if count == 0:
+        return  # No saved stalls — nothing to prompt
+
+    print(f"\nYou have previously saved {count} stall(s).")
+    print("1) Continue with these stalls")
+    print("2) Start fresh (delete all saved stalls)")
+    while True:
+        choice = input("Choose: ").strip()
+        if choice == "1":
+            # Look up stall names for the saved IDs
+            stalls_df = cuisine_handler.get_stalls_by_ids(
+                saved_stalls,
+                coords=session.coords,
+                radius_km=max(session.radius_km, 3.0),
+                trip_start=session.trip_start,
+                trip_end=session.trip_end,
+            )
+            id_to_name = {}
+            if not stalls_df.empty and "stall_id" in stalls_df.columns and "stall_name" in stalls_df.columns:
+                for _, row in stalls_df.iterrows():
+                    id_to_name[int(row["stall_id"])] = row.get("stall_name", "Unknown stall")
+
+            print("\nYour previously saved stalls:")
+            for i, stall_id in enumerate(saved_stalls, 1):
+                name = id_to_name.get(stall_id, f"Stall ID {stall_id}")
+                print(f"  [{i}] {name}")
+
+            print(f"\nWhich stalls do you want to continue with?")
+            print(f"Enter numbers separated by commas (e.g. 1,3,4), or type 'All' to keep all.")
+            while True:
+                raw = input("Your choice: ").strip()
+                if raw.lower() == "all":
+                    print(f"Continuing with all {count} previously saved stall(s).")
+                    break
+                parts = [p.strip() for p in raw.split(",") if p.strip()]
+                if not parts:
+                    print("Please enter at least one number, or type 'All'.")
+                    continue
+                valid = True
+                chosen_indices = []
+                for p in parts:
+                    if p.isdigit() and 1 <= int(p) <= count:
+                        chosen_indices.append(int(p) - 1)
+                    else:
+                        print(f"'{p}' is not a valid number. Please enter numbers between 1 and {count}.")
+                        valid = False
+                        break
+                if not valid:
+                    continue
+                kept_stalls = [saved_stalls[i] for i in chosen_indices]
+                da.clear_saved_stalls(username)
+                for stall_id in kept_stalls:
+                    da.add_saved_stall(username, stall_id)
+                kept_names = [id_to_name.get(sid, f"Stall ID {sid}") for sid in kept_stalls]
+                print(f"\nContinuing with {len(kept_stalls)} stall(s):")
+                for name in kept_names:
+                    print(f"  - {name}")
+                break
+            break
+        elif choice == "2":
+            da.clear_saved_stalls(username)
+            print("All previously saved stalls have been cleared. Starting fresh!")
+            break
+        else:
+            print("Please enter 1 or 2.")
 
 
 def main() -> None:
@@ -654,12 +792,14 @@ def main() -> None:
                         current_user = feature_onboarding.login(da)
                         if current_user:
                             load_session_from_profile(session, current_user)
+                            prompt_saved_stalls_on_login(da, current_user.username, cuisine_handler, session)
                             if session.coords is None and not (session.trip_start and session.trip_end):
                                 setup_trip_context(location_planner, session, da, current_user.username)
             elif c == "2":
                 current_user = feature_onboarding.login(da)
                 if current_user:
                     load_session_from_profile(session, current_user)
+                    prompt_saved_stalls_on_login(da, current_user.username, cuisine_handler, session)
                     if session.coords is None and not (session.trip_start and session.trip_end):
                         setup_trip_context(location_planner, session, da, current_user.username)
             elif c == "0":
