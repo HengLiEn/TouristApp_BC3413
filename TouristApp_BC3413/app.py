@@ -52,36 +52,66 @@ app.secret_key = "bc3413-secret"
 #     return render_template("dashboard.html", username=session["username"])
 
 # ── Cuisines (ACTIVE) ─────────────────────────────────────────────────────────
-@app.route("/cuisines")
+@app.route('/cuisines')
 def cuisines():
+    selected_cuisine = request.args.get('cuisine', None)
+    selected_stars   = request.args.get('stars', None)
+    selected_sort    = request.args.get('sort', 'score')
+
     handler = CuisineFeatureHandler()
+
+    # Use the correct method
     prefs = CuisinePreferences()
-    available_cuisines = handler.get_available_cuisines()
-    top_stalls = handler.get_top_nearby_stalls(prefs=prefs, coords=None)
-    stalls_list = top_stalls.to_dict(orient="records")
-    return render_template("feature_cuisines.html",
-                           cuisines=available_cuisines,
-                           stalls=stalls_list)
+    stalls_df = handler.get_top_nearby_stalls(prefs=prefs, coords=None, top_n=50)
+    stalls_list = stalls_df.to_dict(orient='records')
 
-# @app.route("/pricing")
-# def pricing():
-#     return render_template("pricing.html")
+    # Get cuisines using the correct method
+    cuisines = handler.get_available_cuisines()
 
-# @app.route("/location")
-# def location():
-#     return render_template("location.html")
+    # Filter by cuisine
+    if selected_cuisine:
+        stalls_list = [s for s in stalls_list if s.get('cuisine_type','').lower() == selected_cuisine]
 
-# @app.route("/closure")
-# def closure():
-#     return render_template("closure.html")
+    # Filter by stars
+    if selected_stars:
+        stalls_list = [s for s in stalls_list if s.get('avg_rating', 0) >= float(selected_stars)]
 
-# @app.route("/reviews")
-# def reviews():
-#     return render_template("reviews.html")
+    # Sort
+    if selected_sort == 'rating':
+        stalls_list.sort(key=lambda x: x.get('avg_rating', 0), reverse=True)
+    elif selected_sort == 'reviews':
+        stalls_list.sort(key=lambda x: x.get('n_reviews', 0), reverse=True)
+    elif selected_sort == 'distance':
+        stalls_list.sort(key=lambda x: x.get('distance_km', 999))
+    else:
+        stalls_list.sort(key=lambda x: x.get('bayes_score', 0), reverse=True)
 
-# @app.route("/onboarding")
-# def onboarding():
-#     return render_template("onboarding.html")
+    return render_template('feature_cuisines.html',
+        stalls=stalls_list,
+        cuisines=cuisines,
+        selected_cuisine=selected_cuisine,
+        selected_stars=selected_stars,
+        selected_sort=selected_sort
+    )
+@app.route("/pricing")
+def pricing():
+    return render_template("pricing.html")
+
+@app.route("/location")
+def location():
+    return render_template('feature_onboarding.html', active_page='location')
+
+@app.route("/closure")
+def closure():
+    return render_template('feature_onboarding.html', active_page='closure')
+
+@app.route("/reviews")
+def reviews():
+    return render_template('feature_onboarding.html', active_page='reviews')
+
+@app.route('/onboarding')
+def onboarding():
+    return render_template('feature_onboarding.html', active_page='onboarding')
 
 # ── Run ───────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":

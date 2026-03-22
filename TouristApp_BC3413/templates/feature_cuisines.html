@@ -1,542 +1,129 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Hawker Hunt — Cuisines</title>
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=DM+Mono:wght@300;400;500&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
-  <style>
-    :root {
-      --chili: #D63B1F;
-      --soy: #1A1109;
-      --cream: #F5EFE0;
-      --turmeric: #E8A020;
-      --pandan: #3A6B4A;
-      --smoke: #8B7355;
-      --bone: #EDE3CC;
-      --wok: #2C1A0E;
-      --surface: #FAF5EB;
-    }
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html { scroll-behavior: smooth; }
-    body {
-      background-color: var(--surface);
-      color: var(--soy);
-      font-family: 'Instrument Sans', sans-serif;
-      min-height: 100vh;
-      overflow-x: hidden;
-    }
-    body::before {
-      content: '';
-      position: fixed;
-      inset: 0;
-      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
-      pointer-events: none;
-      z-index: 1000;
-      opacity: 0.6;
-    }
+{% extends "feature_onboarding.html" %}
+{% set active_page = "cuisines" %}
 
-    /* HEADER */
-    header {
-      background-color: var(--chili);
-      color: var(--cream);
-      padding: 0 2.5rem;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      height: 72px;
-      position: sticky;
-      top: 0;
-      z-index: 100;
-      border-bottom: 3px solid var(--wok);
-    }
-    .logo {
-      font-family: 'Playfair Display', serif;
-      font-weight: 900;
-      font-size: 1.5rem;
-      letter-spacing: -0.5px;
-      display: flex;
-      align-items: center;
-      gap: 0.6rem;
-    }
-    .logo-sub {
-      font-family: 'DM Mono', monospace;
-      font-size: 0.6rem;
-      font-weight: 300;
-      letter-spacing: 3px;
-      text-transform: uppercase;
-      opacity: 0.7;
-      display: block;
-      margin-top: 2px;
-    }
-    nav { display: flex; gap: 2rem; }
-    nav a {
-      font-family: 'DM Mono', monospace;
-      font-size: 0.7rem;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      color: var(--cream);
-      text-decoration: none;
-      opacity: 0.75;
-      transition: opacity 0.2s;
-    }
-    nav a:hover { opacity: 1; }
-    nav a.active { opacity: 1; border-bottom: 1.5px solid var(--cream); padding-bottom: 2px; }
+{% block title %}Cuisines — Hawker Hunt{% endblock %}
 
-    /* HERO */
-    .hero {
-      background-color: var(--soy);
-      padding: 4rem 2.5rem 3rem;
-      position: relative;
-      overflow: hidden;
-    }
-    .hero-inner { max-width: 1200px; margin: 0 auto; }
-    .hero-eyebrow {
-      font-family: 'DM Mono', monospace;
-      font-size: 0.65rem;
-      letter-spacing: 4px;
-      text-transform: uppercase;
-      color: var(--turmeric);
-      margin-bottom: 1rem;
-    }
-    .hero-title {
-      font-family: 'Playfair Display', serif;
-      font-weight: 900;
-      font-size: clamp(2.5rem, 5vw, 4rem);
-      line-height: 0.95;
-      color: var(--cream);
-      margin-bottom: 1rem;
-    }
-    .hero-title em { font-style: italic; color: var(--turmeric); }
-    .hero-desc { color: var(--smoke); font-size: 0.9rem; line-height: 1.7; max-width: 500px; }
-    .hero-deco {
-      position: absolute; right: -60px; bottom: -60px;
-      width: 320px; height: 320px; border-radius: 50%;
-      background: radial-gradient(circle, rgba(216,58,31,0.12) 0%, transparent 70%);
-      pointer-events: none;
-    }
+{% block content %}
 
-    /* LAYOUT */
-    .main-wrapper {
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 3rem 2.5rem;
-      display: grid;
-      grid-template-columns: 280px 1fr;
-      gap: 2.5rem;
-      align-items: start;
-    }
+<section class="hero">
+  <div class="hero-inner">
+    <p class="hero-eyebrow">// Hawker Discovery Platform</p>
+    <h1 class="hero-title">Find Your <em>Perfect</em><br/>Hawker Stall</h1>
+    <p class="hero-desc">Browse top-rated stalls filtered by cuisine. Click any stall to expand its details.</p>
+  </div>
+  <div class="hero-deco"></div>
+</section>
 
-    /* SIDEBAR */
-    .sidebar { position: sticky; top: 90px; }
-    .panel {
-      background-color: var(--cream);
-      border: 2px solid var(--bone);
-      border-radius: 2px;
-      overflow: hidden;
-      margin-bottom: 1.5rem;
-    }
-    .panel-header {
-      background-color: var(--soy);
-      color: var(--cream);
-      padding: 1rem 1.25rem;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-    .panel-title {
-      font-family: 'DM Mono', monospace;
-      font-size: 0.65rem;
-      letter-spacing: 3px;
-      text-transform: uppercase;
-    }
-    .panel-body { padding: 1.25rem; }
-    .chips-grid { display: flex; flex-wrap: wrap; gap: 0.5rem; }
-    .chip {
-      border: 1.5px solid var(--bone);
-      background: white;
-      padding: 0.35rem 0.8rem;
-      border-radius: 100px;
-      font-size: 0.75rem;
-      cursor: pointer;
-      transition: all 0.15s;
-      color: var(--smoke);
-      font-weight: 500;
-      user-select: none;
-    }
-    .chip:hover { border-color: var(--chili); color: var(--chili); }
-    .chip.active { background-color: var(--chili); border-color: var(--chili); color: white; }
-    .apply-btn {
-      width: 100%;
-      background-color: var(--soy);
-      color: var(--cream);
-      border: none;
-      padding: 1rem;
-      font-family: 'DM Mono', monospace;
-      font-size: 0.7rem;
-      letter-spacing: 3px;
-      text-transform: uppercase;
-      cursor: pointer;
-      transition: background 0.2s;
-      margin-top: 0.5rem;
-      display: block;
-    }
-    .apply-btn:hover { background-color: var(--chili); }
-    .clear-btn {
-      width: 100%;
-      background: transparent;
-      color: var(--smoke);
-      border: 1.5px solid var(--bone);
-      padding: 0.75rem;
-      font-family: 'DM Mono', monospace;
-      font-size: 0.7rem;
-      letter-spacing: 3px;
-      text-transform: uppercase;
-      cursor: pointer;
-      transition: all 0.2s;
-      margin-top: 0.5rem;
-      display: block;
-    }
-    .clear-btn:hover { border-color: var(--chili); color: var(--chili); }
+<div class="main-wrapper">
 
-    /* RESULTS */
-    .section-header {
-      display: flex;
-      align-items: baseline;
-      justify-content: space-between;
-      margin-bottom: 1.5rem;
-      padding-bottom: 0.75rem;
-      border-bottom: 2px solid var(--soy);
-    }
-    .section-title { font-family: 'Playfair Display', serif; font-size: 1.8rem; font-weight: 700; }
-    .section-count {
-      font-family: 'DM Mono', monospace;
-      font-size: 0.65rem;
-      letter-spacing: 2px;
-      color: var(--smoke);
-      text-transform: uppercase;
-    }
-    .sort-bar { display: flex; gap: 0.5rem; margin-bottom: 1.25rem; flex-wrap: wrap; }
-    .sort-btn {
-      background: white;
-      border: 1.5px solid var(--bone);
-      padding: 0.35rem 0.9rem;
-      font-family: 'DM Mono', monospace;
-      font-size: 0.6rem;
-      letter-spacing: 1.5px;
-      text-transform: uppercase;
-      cursor: pointer;
-      color: var(--smoke);
-      border-radius: 1px;
-      transition: all 0.15s;
-    }
-    .sort-btn:hover { border-color: var(--soy); color: var(--soy); }
-    .sort-btn.active { background: var(--soy); color: var(--cream); border-color: var(--soy); }
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <form method="GET" action="/cuisines">
 
-    /* STALL CARDS */
-    .stalls-list { display: flex; flex-direction: column; }
-    .stall-card {
-      background: white;
-      border: 2px solid var(--bone);
-      border-bottom: none;
-      display: grid;
-      grid-template-columns: 60px 1fr auto;
-      align-items: stretch;
-      cursor: pointer;
-      transition: border-color 0.2s, transform 0.15s;
-      position: relative;
-      animation: slideIn 0.4s ease both;
-    }
-    .stall-card:last-child { border-bottom: 2px solid var(--bone); }
-    @keyframes slideIn {
-      from { opacity: 0; transform: translateY(12px); }
-      to   { opacity: 1; transform: translateY(0); }
-    }
-    .stall-card:hover { border-color: var(--chili); z-index: 2; transform: translateX(4px); }
-    .stall-card.expanded { border-color: var(--chili); }
-    .stall-rank {
-      background-color: var(--soy);
-      color: var(--cream);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-family: 'Playfair Display', serif;
-      font-size: 1.4rem;
-      font-weight: 700;
-    }
-    .stall-rank.top { background-color: var(--chili); }
-    .stall-body { padding: 1.25rem 1.5rem; }
-    .stall-cuisine-badge {
-      display: inline-block;
-      background-color: var(--bone);
-      color: var(--smoke);
-      font-family: 'DM Mono', monospace;
-      font-size: 0.6rem;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      padding: 0.2rem 0.5rem;
-      border-radius: 1px;
-      margin-bottom: 0.5rem;
-    }
-    .stall-name { font-family: 'Playfair Display', serif; font-size: 1.1rem; font-weight: 700; margin-bottom: 0.25rem; }
-    .stall-location { font-size: 0.78rem; color: var(--smoke); }
-    .stall-meta {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-direction: column;
-      padding: 1.25rem 1.5rem;
-      gap: 0.4rem;
-      border-left: 1px solid var(--bone);
-      min-width: 110px;
-    }
-    .rating-val { font-family: 'Playfair Display', serif; font-size: 1.5rem; font-weight: 700; line-height: 1; }
-    .stars { display: flex; gap: 2px; font-size: 0.7rem; }
-    .star { color: var(--turmeric); }
-    .star-empty { color: var(--bone); }
-    .reviews-count { font-family: 'DM Mono', monospace; font-size: 0.6rem; color: var(--smoke); letter-spacing: 1px; }
-    .dist-badge {
-      background-color: var(--pandan);
-      color: white;
-      font-family: 'DM Mono', monospace;
-      font-size: 0.65rem;
-      letter-spacing: 1px;
-      padding: 0.25rem 0.6rem;
-      border-radius: 100px;
-    }
-
-    /* EXPANDED MENU */
-    .stall-menu {
-      display: none;
-      grid-column: 1 / -1;
-      border-top: 2px solid var(--bone);
-      padding: 1.5rem;
-      background-color: var(--cream);
-    }
-    .stall-card.expanded .stall-menu { display: block; }
-    .menu-title {
-      font-family: 'DM Mono', monospace;
-      font-size: 0.65rem;
-      letter-spacing: 3px;
-      text-transform: uppercase;
-      color: var(--smoke);
-      margin-bottom: 1rem;
-    }
-    .menu-note { color: var(--smoke); font-size: 0.82rem; font-style: italic; }
-
-    /* EMPTY STATE */
-    .empty-state { text-align: center; padding: 4rem 2rem; color: var(--smoke); }
-    .empty-state h3 { font-family: 'Playfair Display', serif; font-size: 1.4rem; color: var(--soy); margin-bottom: 0.5rem; }
-    .empty-state p { font-size: 0.85rem; line-height: 1.6; }
-
-    /* TOAST */
-    .toast {
-      position: fixed;
-      bottom: 2rem; left: 50%;
-      transform: translateX(-50%) translateY(80px);
-      background-color: var(--soy); color: var(--cream);
-      padding: 0.75rem 1.5rem;
-      font-family: 'DM Mono', monospace;
-      font-size: 0.7rem;
-      letter-spacing: 1.5px;
-      text-transform: uppercase;
-      border-left: 4px solid var(--turmeric);
-      z-index: 999;
-      transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1);
-    }
-    .toast.visible { transform: translateX(-50%) translateY(0); }
-
-    footer {
-      background-color: var(--soy); color: var(--smoke);
-      text-align: center; padding: 2rem;
-      font-family: 'DM Mono', monospace;
-      font-size: 0.65rem; letter-spacing: 2px; text-transform: uppercase; margin-top: 4rem;
-    }
-    footer span { color: var(--chili); }
-
-    @media (max-width: 900px) {
-      .main-wrapper { grid-template-columns: 1fr; }
-      .sidebar { position: static; }
-    }
-    @media (max-width: 600px) {
-      header { padding: 0 1rem; }
-      .main-wrapper { padding: 2rem 1rem; }
-      nav { display: none; }
-    }
-  </style>
-</head>
-<body>
-
-  <header>
-    <div class="logo">
-      <span>🍜</span>
-      <div>Hawker Hunt<span class="logo-sub">Singapore Food Discovery</span></div>
-    </div>
-    <nav>
-      <a href="/">Dashboard</a>
-      <a href="/cuisines" class="active">Cuisines</a>
-      <a href="/location">Location</a>
-      <a href="/reviews">Reviews</a>
-    </nav>
-  </header>
-
-  <section class="hero">
-    <div class="hero-inner">
-      <p class="hero-eyebrow">// Hawker Discovery Platform</p>
-      <h1 class="hero-title">Find Your <em>Perfect</em><br/>Hawker Stall</h1>
-      <p class="hero-desc">Browse top-rated stalls filtered by cuisine. Click any stall to expand its details.</p>
-    </div>
-    <div class="hero-deco"></div>
-  </section>
-
-  <div class="main-wrapper">
-
-    <!-- SIDEBAR -->
-    <aside class="sidebar">
       <div class="panel">
         <div class="panel-header">
           <span class="panel-title">Filter by Cuisine</span>
           <span>🍽</span>
         </div>
         <div class="panel-body">
-          <div class="chips-grid" id="cuisineChips">
+          <div class="chips-grid">
             {% for c in cuisines %}
-            <div class="chip" onclick="toggleCuisine('{{ c|lower }}', this)">{{ c }}</div>
+            <button type="submit" name="cuisine" value="{{ c|lower }}"
+              class="chip {{ 'active' if selected_cuisine == c|lower }}">
+              {{ c }}
+            </button>
             {% endfor %}
           </div>
         </div>
       </div>
-      <button class="apply-btn" onclick="applyFilter()">→ Apply Filter</button>
-      <button class="clear-btn" onclick="clearFilter()">✕ Clear Filter</button>
-    </aside>
 
-    <!-- RESULTS -->
-    <main>
-      <div class="section-header">
-        <h2 class="section-title">Top Stalls</h2>
-        <span class="section-count" id="resultCount">Showing {{ stalls|length }} results</span>
-      </div>
-
-      <div class="sort-bar">
-        <button class="sort-btn active" onclick="sortBy('score', this)">Best Match</button>
-        <button class="sort-btn" onclick="sortBy('rating', this)">Top Rated</button>
-        <button class="sort-btn" onclick="sortBy('reviews', this)">Most Reviewed</button>
-        <button class="sort-btn" onclick="sortBy('distance', this)">Nearest</button>
-      </div>
-
-      <div class="stalls-list" id="stallsList">
-        {% if stalls %}
-          {% for stall in stalls %}
-          <div class="stall-card"
-               id="card-{{ loop.index }}"
-               data-cuisine="{{ stall.cuisine_type | default('') | lower }}"
-               data-rating="{{ stall.avg_rating | default(0) }}"
-               data-reviews="{{ stall.n_reviews | default(0) }}"
-               data-score="{{ stall.bayes_score | default(0) }}"
-               data-distance="{{ stall.distance_km | default(999) }}"
-               onclick="toggleCard('{{ loop.index }}', event)"
-               style="animation-delay: {{ loop.index0 * 0.06 }}s">
-
-            <div class="stall-rank {{ 'top' if loop.first else '' }}">{{ loop.index }}</div>
-
-            <div class="stall-body">
-              <span class="stall-cuisine-badge">{{ stall.cuisine_type | default('—') }}</span>
-              <div class="stall-name">{{ stall.stall_name | default('Unknown Stall') }}</div>
-              <div class="stall-location">📍 {{ stall.hawker_name | default('Unknown Centre') }}</div>
-            </div>
-
-            <div class="stall-meta">
-              <div class="rating-val">{{ "%.1f"|format(stall.avg_rating | default(0)) }}</div>
-              <div class="stars">
-                {% set r = (stall.avg_rating | default(0)) | round | int %}
-                {% for i in range(1, 6) %}
-                  <span class="{{ 'star' if i <= r else 'star-empty' }}">★</span>
-                {% endfor %}
-              </div>
-              <div class="reviews-count">{{ stall.n_reviews | default(0) }} reviews</div>
-              {% if stall.distance_km is defined and stall.distance_km != None %}
-                <div class="dist-badge">{{ "%.1f"|format(stall.distance_km) }} km</div>
-              {% endif %}
-            </div>
-
-            <div class="stall-menu">
-              <div class="menu-title">// Stall Details</div>
-              {% if stall.address_myenv is defined and stall.address_myenv %}
-                <p style="font-size:0.85rem;color:var(--smoke);margin-bottom:0.5rem;">🏠 {{ stall.address_myenv }}</p>
-              {% endif %}
-              <p class="menu-note">More menu details coming soon.</p>
-            </div>
-
+      <!-- STAR FILTER -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Filter by Stars</span>
+          <span>⭐</span>
+        </div>
+        <div class="panel-body">
+          <div class="chips-grid">
+            <button type="submit" name="stars" value="5" class="chip {{ 'active' if selected_stars == '5' }}">★★★★★ 5</button>
+            <button type="submit" name="stars" value="4" class="chip {{ 'active' if selected_stars == '4' }}">★★★★☆ 4+</button>
+            <button type="submit" name="stars" value="3" class="chip {{ 'active' if selected_stars == '3' }}">★★★☆☆ 3+</button>
+            <button type="submit" name="stars" value="2" class="chip {{ 'active' if selected_stars == '2' }}">★★☆☆☆ 2+</button>
           </div>
-          {% endfor %}
-        {% else %}
-          <div class="empty-state">
-            <span style="font-size:3rem;display:block;margin-bottom:1rem;">🍽️</span>
-            <h3>No stalls found</h3>
-            <p>Check that your dataset files are loaded correctly.</p>
-          </div>
-        {% endif %}
+        </div>
       </div>
-    </main>
-  </div>
 
-  <footer>Built with <span>♥</span> for Singapore Hawker Culture — BC3413 Tourist App</footer>
-  <div class="toast" id="toast"></div>
+      <a href="/cuisines" class="clear-btn" style="text-align:center;text-decoration:none;display:block;">✕ Clear Filter</a>
 
-  <script>
-    let activeFilter = null;
+    </form>
+  </aside>
 
-    function toggleCuisine(cuisine, el) {
-      document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
-      activeFilter = (activeFilter === cuisine) ? null : cuisine;
-      if (activeFilter) el.classList.add('active');
-    }
+  <!-- RESULTS -->
+  <main>
+    <div class="section-header">
+      <h2 class="section-title">Top Stalls</h2>
+      <span class="section-count">Showing {{ stalls|length }} results</span>
+    </div>
 
-    function applyFilter() {
-      let shown = 0;
-      document.querySelectorAll('.stall-card').forEach(card => {
-        const match = !activeFilter || card.dataset.cuisine.includes(activeFilter);
-        card.style.display = match ? '' : 'none';
-        if (match) shown++;
-      });
-      document.getElementById('resultCount').textContent = `Showing ${shown} results`;
-      showToast(activeFilter ? `Filtered: ${activeFilter}` : 'Showing all stalls');
-    }
+    <div class="sort-bar">
+      <a href="/cuisines?cuisine={{ selected_cuisine or '' }}&stars={{ selected_stars or '' }}&sort=score"
+         class="sort-btn {{ 'active' if selected_sort == 'score' or not selected_sort }}">Best Match</a>
+      <a href="/cuisines?cuisine={{ selected_cuisine or '' }}&stars={{ selected_stars or '' }}&sort=rating"
+         class="sort-btn {{ 'active' if selected_sort == 'rating' }}">Top Rated</a>
+      <a href="/cuisines?cuisine={{ selected_cuisine or '' }}&stars={{ selected_stars or '' }}&sort=reviews"
+         class="sort-btn {{ 'active' if selected_sort == 'reviews' }}">Most Reviewed</a>
+      <a href="/cuisines?cuisine={{ selected_cuisine or '' }}&stars={{ selected_stars or '' }}&sort=distance"
+         class="sort-btn {{ 'active' if selected_sort == 'distance' }}">Nearest</a>
+    </div>
 
-    function clearFilter() {
-      activeFilter = null;
-      document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
-      document.querySelectorAll('.stall-card').forEach(c => c.style.display = '');
-      const total = document.querySelectorAll('.stall-card').length;
-      document.getElementById('resultCount').textContent = `Showing ${total} results`;
-      showToast('Filter cleared');
-    }
+    <div class="stalls-list">
+      {% if stalls %}
+        {% for stall in stalls %}
+        <div class="stall-card"
+             id="card-{{ loop.index }}"
+             style="animation-delay: {{ loop.index0 * 0.06 }}s">
 
-    function sortBy(key, btn) {
-      document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      const list = document.getElementById('stallsList');
-      const cards = [...list.querySelectorAll('.stall-card')];
-      cards.sort((a, b) => {
-        if (key === 'rating')   return +b.dataset.rating   - +a.dataset.rating;
-        if (key === 'reviews')  return +b.dataset.reviews  - +a.dataset.reviews;
-        if (key === 'score')    return +b.dataset.score     - +a.dataset.score;
-        if (key === 'distance') return +a.dataset.distance  - +b.dataset.distance;
-      });
-      cards.forEach(c => list.appendChild(c));
-    }
+          <div class="stall-rank {{ 'top' if loop.first else '' }}">{{ loop.index }}</div>
 
-    function toggleCard(id, e) {
-      if (e.target.closest('.stall-menu')) return;
-      document.getElementById('card-' + id).classList.toggle('expanded');
-    }
+          <div class="stall-body">
+            <span class="stall-cuisine-badge">{{ stall.cuisine_type | default('—') }}</span>
+            <div class="stall-name">{{ stall.stall_name | default('Unknown Stall') }}</div>
+            <div class="stall-location">📍 {{ stall.hawker_name | default('Unknown Centre') }}</div>
+          </div>
 
-    function showToast(msg) {
-      const t = document.getElementById('toast');
-      t.textContent = msg;
-      t.classList.add('visible');
-      setTimeout(() => t.classList.remove('visible'), 2500);
-    }
-  </script>
-</body>
-</html>
+          <div class="stall-meta">
+            <div class="rating-val">{{ "%.1f"|format(stall.avg_rating | default(0)) }}</div>
+            <div class="stars">
+              {% set r = (stall.avg_rating | default(0)) | round | int %}
+              {% for i in range(1, 6) %}
+                <span class="{{ 'star' if i <= r else 'star-empty' }}">★</span>
+              {% endfor %}
+            </div>
+            <div class="reviews-count">{{ stall.n_reviews | default(0) }} reviews</div>
+            {% if stall.distance_km is defined and stall.distance_km != None %}
+              <div class="dist-badge">{{ "%.1f"|format(stall.distance_km) }} km</div>
+            {% endif %}
+          </div>
+
+          <div class="stall-menu">
+            <div class="menu-title">// Stall Details</div>
+            {% if stall.address_myenv is defined and stall.address_myenv %}
+              <p style="font-size:0.85rem;color:var(--smoke);margin-bottom:0.5rem;">🏠 {{ stall.address_myenv }}</p>
+            {% endif %}
+            <p class="menu-note">More menu details coming soon.</p>
+          </div>
+
+        </div>
+        {% endfor %}
+      {% else %}
+        <div class="empty-state">
+          <span style="font-size:3rem;display:block;margin-bottom:1rem;">🍽️</span>
+          <h3>No stalls found</h3>
+          <p>Try clearing your filters.</p>
+        </div>
+      {% endif %}
+    </div>
+  </main>
+</div>
+
+{% endblock %}
