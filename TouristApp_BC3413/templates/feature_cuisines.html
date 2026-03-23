@@ -1,9 +1,10 @@
-{% extends "feature_onboarding.html" %}
+{% extends "feature_onboarding.html" %} <!--purpose of extending from the css such that each has nav and footer.-->
 {% set active_page = "cuisines" %}
 
 {% block title %}Cuisines — Hawker Hunt{% endblock %}
 
 {% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='feature_cuisines.css') }}">
 
 <section class="hero">
   <div class="hero-inner">
@@ -18,7 +19,11 @@
 
   <!-- SIDEBAR -->
   <aside class="sidebar">
-    <form method="GET" action="/cuisines">
+    <form method="GET" action="/cuisines" id="filter-form"> <!-- submit filter as URL query string-->
+
+      <!-- Carry search + sort state through filter submits -->
+      {% if search_query %}<input type="hidden" name="q"    value="{{ search_query }}">{% endif %}  <!-- search query is wtv i type in the filter-->
+      <input type="hidden" name="sort" value="{{ selected_sort | default('') }}">   <!-- sort based on what selected like best match, most reviews,etc -->
 
       <div class="panel">
         <div class="panel-header">
@@ -29,7 +34,7 @@
           <div class="chips-grid">
             {% for c in cuisines %}
             <button type="submit" name="cuisine" value="{{ c|lower }}"
-              class="chip {{ 'active' if selected_cuisine == c|lower }}">
+              class="chip {{ 'active' if selected_cuisine == c|lower }}"> <!-- this js highlights the button-->
               {{ c }}
             </button>
             {% endfor %}
@@ -53,31 +58,119 @@
         </div>
       </div>
 
-      <a href="/cuisines" class="clear-btn" style="text-align:center;text-decoration:none;display:block;">✕ Clear Filter</a>
+      <!-- ALLERGEN FILTER -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Exclude Allergens</span>
+          <span>⚠️</span>
+        </div>
+        <div class="panel-body">
+          <p class="allergen-note">Hide stalls that contain these allergens.</p>
+          <div class="allergen-grid">
+            {% set allergen_options = [
+              ('gluten',    '🌾', 'Gluten'),
+              ('dairy',     '🥛', 'Dairy'),
+              ('eggs',      '🥚', 'Eggs'),
+              ('nuts',      '🥜', 'Nuts'),
+              ('shellfish', '🦐', 'Shellfish'),
+              ('seafood',   '🐟', 'Seafood'),
+              ('soy',       '🫘', 'Soy'),
+              ('pork',      '🐷', 'Pork'),
+            ] %}
+            {% for key, icon, label in allergen_options %}
+            <label class="allergen-chip {{ 'active' if key in (selected_allergens | default([])) }}">
+              <input
+                type="checkbox"
+                name="allergens"
+                value="{{ key }}"
+                {{ 'checked' if key in (selected_allergens | default([])) }}
+                onchange="this.closest('form').submit()"
+              >
+              <span class="allergen-icon">{{ icon }}</span>
+              <span class="allergen-label">{{ label }}</span>
+            </label>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+
+      <a href="/cuisines" class="clear-btn" style="text-align:center;text-decoration:none;display:block;">✕ Clear Filters</a>
 
     </form>
   </aside>
 
   <!-- RESULTS -->
   <main>
+
+    <!-- SECTION HEADER + INLINE SEARCH -->
     <div class="section-header">
-      <h2 class="section-title">Top Stalls</h2>
-      <span class="section-count">Showing {{ stalls|length }} results</span>
+      <div class="section-header-left">
+        <h2 class="section-title">Top Stalls</h2>
+        <span class="section-count">Showing {{ stalls|length }} result{{ 's' if stalls|length != 1 }}</span>
+      </div>
+
+      <!-- SEARCH BAR -->
+      <form method="GET" action="/cuisines" id="search-form" class="inline-search-form"> <!-- if I type chinese, 4 stars and sort by best match while searching store will work-->
+        {% if selected_cuisine %}<input type="hidden" name="cuisine" value="{{ selected_cuisine }}">{% endif %}
+        {% if selected_stars   %}<input type="hidden" name="stars"   value="{{ selected_stars }}">{% endif %}
+        {% if selected_sort    %}<input type="hidden" name="sort"     value="{{ selected_sort }}">{% endif %}
+        {% for a in selected_allergens %}
+          <input type="hidden" name="allergens" value="{{ a }}">
+        {% endfor %}
+
+        <div class="search-bar">
+          <span class="search-icon">🔍</span>
+          <input
+            type="text"
+            name="q"
+            class="search-input"
+            placeholder="Search stalls or centres…"
+            value="{{ search_query | default('') }}"
+            autocomplete="off"
+          />
+          <button type="submit" class="search-submit" title="Search">Search</button>
+          {% if search_query %}
+            <a href="/cuisines?cuisine={{ selected_cuisine or '' }}&stars={{ selected_stars or '' }}&sort={{ selected_sort or '' }}{% for a in selected_allergens %}&allergens={{ a }}{% endfor %}"
+               class="search-clear-link" title="Clear search">✕</a>
+          {% endif %}
+        </div>
+      </form>
     </div>
 
+    <!-- Active filter summary -->
+    {% if search_query or selected_allergens %}
+    <div class="allergen-active-bar">
+      {% if search_query %}
+        <span class="allergen-active-label">🔍 "{{ search_query }}"</span>
+      {% endif %}
+      {% if selected_allergens %}
+        <span class="allergen-active-label">⚠️ Excluding:</span>
+        {% for key, icon, label in [
+          ('gluten','🌾','Gluten'),('dairy','🥛','Dairy'),('eggs','🥚','Eggs'),
+          ('nuts','🥜','Nuts'),('shellfish','🦐','Shellfish'),('seafood','🐟','Seafood'),
+          ('soy','🫘','Soy'),('pork','🐷','Pork')
+        ] %}
+          {% if key in selected_allergens %}
+            <span class="allergen-tag">{{ icon }} {{ label }}</span>
+          {% endif %}
+        {% endfor %}
+      {% endif %}
+    </div>
+    {% endif %}
+
     <div class="sort-bar">
-      <a href="/cuisines?cuisine={{ selected_cuisine or '' }}&stars={{ selected_stars or '' }}&sort=score"
+      <a href="/cuisines?cuisine={{ selected_cuisine or '' }}&stars={{ selected_stars or '' }}&q={{ search_query or '' }}{% for a in selected_allergens %}&allergens={{ a }}{% endfor %}&sort=score"
          class="sort-btn {{ 'active' if selected_sort == 'score' or not selected_sort }}">Best Match</a>
-      <a href="/cuisines?cuisine={{ selected_cuisine or '' }}&stars={{ selected_stars or '' }}&sort=rating"
+      <a href="/cuisines?cuisine={{ selected_cuisine or '' }}&stars={{ selected_stars or '' }}&q={{ search_query or '' }}{% for a in selected_allergens %}&allergens={{ a }}{% endfor %}&sort=rating"
          class="sort-btn {{ 'active' if selected_sort == 'rating' }}">Top Rated</a>
-      <a href="/cuisines?cuisine={{ selected_cuisine or '' }}&stars={{ selected_stars or '' }}&sort=reviews"
+      <a href="/cuisines?cuisine={{ selected_cuisine or '' }}&stars={{ selected_stars or '' }}&q={{ search_query or '' }}{% for a in selected_allergens %}&allergens={{ a }}{% endfor %}&sort=reviews"
          class="sort-btn {{ 'active' if selected_sort == 'reviews' }}">Most Reviewed</a>
-      <a href="/cuisines?cuisine={{ selected_cuisine or '' }}&stars={{ selected_stars or '' }}&sort=distance"
+      <a href="/cuisines?cuisine={{ selected_cuisine or '' }}&stars={{ selected_stars or '' }}&q={{ search_query or '' }}{% for a in selected_allergens %}&allergens={{ a }}{% endfor %}&sort=distance"
          class="sort-btn {{ 'active' if selected_sort == 'distance' }}">Nearest</a>
     </div>
 
     <div class="stalls-list">
-      {% if stalls %}
+      {% if stalls %} <!-- check that store list is not empty-->
         {% for stall in stalls %}
         <div class="stall-card"
              id="card-{{ loop.index }}"
@@ -110,20 +203,31 @@
             {% if stall.address_myenv is defined and stall.address_myenv %}
               <p style="font-size:0.85rem;color:var(--smoke);margin-bottom:0.5rem;">🏠 {{ stall.address_myenv }}</p>
             {% endif %}
+
+            {% if stall.allergens is defined and stall.allergens %}
+            <div class="stall-allergens">
+              <span class="stall-allergen-label">Contains:</span>
+              {% for a in stall.allergens %}
+                <span class="stall-allergen-tag">{{ a }}</span>
+              {% endfor %}
+            </div>
+            {% endif %}
+
             <p class="menu-note">More menu details coming soon.</p>
           </div>
 
         </div>
         {% endfor %}
-      {% else %}
+      {% else %} <!--if no stalls match the filters/search, then show empty-->
         <div class="empty-state">
           <span style="font-size:3rem;display:block;margin-bottom:1rem;">🍽️</span>
           <h3>No stalls found</h3>
-          <p>Try clearing your filters.</p>
+          <p>Try adjusting your search or filters.</p>
         </div>
       {% endif %}
     </div>
   </main>
 </div>
+
 
 {% endblock %}

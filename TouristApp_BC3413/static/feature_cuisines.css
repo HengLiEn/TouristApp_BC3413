@@ -1,0 +1,187 @@
+/* =============================================================
+   feature_cuisines.css  —  Hawker Hunt · Cuisines Feature
+   Place in: static/css/feature_cuisines.css
+   - Li En
+   ============================================================= */
+
+
+.hero {
+  margin-bottom: 0 !important;
+  border-bottom: none !important;
+  padding-bottom: 0 !important;
+  padding-top: 2.5rem !important;
+}
+.main-wrapper {
+  margin-top: 0 !important;
+  padding-top: 1.5rem;
+}
+
+.hero-inner {
+  padding-top: 2.5rem !important;
+  margin-bottom: 1.5rem;
+}
+/* ── Section header row (Top Stalls + search) ──────────────── */
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+  border-bottom: 2px solid var(--border, #2e2e4a);
+  padding-bottom: 0.75rem;
+}
+.section-header-left {
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+  flex-shrink: 0;
+}
+.section-title {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: black;
+  margin: 0;
+}
+.section-count {
+  font-size: 0.8rem;
+  color: var(--smoke, #888);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  white-space: nowrap;
+}
+
+/* ── Inline search bar ─────────────────────────────────────── */
+/* Scoped under .inline-search-form to beat base template specificity */
+.inline-search-form {
+  flex: 1;
+  min-width: 220px;
+  max-width: 560px;
+}
+.inline-search-form .search-bar {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.6rem !important;
+  background: #1a1a28 !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border-radius: 12px !important;
+  padding: 0.5rem 0.9rem !important;
+  transition: border-color 0.2s, background 0.2s;
+  backdrop-filter: none !important;
+}
+.inline-search-form .search-bar:focus-within {
+  background: #1e1e30 !important;
+  border-color: var(--accent, #e63946) !important;
+}
+.inline-search-form .search-icon {
+  font-size: 1rem;
+  opacity: 0.5;
+  flex-shrink: 0;
+}
+.inline-search-form .search-input {
+  flex: 1;
+  background: transparent !important;
+  border: none !important;
+  outline: none;
+  color: #fff !important;
+  font-size: 0.9rem;
+  font-family: inherit;
+  min-width: 0;
+}
+.inline-search-form .search-input::placeholder {
+  color: rgba(255, 255, 255, 0.35) !important;
+}
+.inline-search-form .search-submit {
+  background: var(--accent, #e63946) !important;
+  color: #fff !important;
+  border: none !important;
+  border-radius: 8px;
+  padding: 0.35rem 0.9rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity 0.15s;
+  flex-shrink: 0;
+}
+.inline-search-form .search-submit:hover { opacity: 0.85; }
+.inline-search-form .search-clear-link {
+  color: rgba(255, 255, 255, 0.4);
+  text-decoration: none;
+  font-size: 0.85rem;
+  padding: 0 0.2rem;
+  transition: color 0.15s;
+  flex-shrink: 0;
+}
+.inline-search-form .search-clear-link:hover { color: var(--accent, #e63946); }
+
+/* ── Allergen filter panel ──────────────────────────────────── */
+.allergen-note { font-size: 0.78rem; color: var(--smoke, #888); margin-bottom: 0.75rem; }
+.allergen-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.45rem; }
+.allergen-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.6rem;
+  border-radius: 8px;
+  border: 1px solid var(--border, #2e2e4a);
+  background: var(--surface-alt, #12121f);
+  cursor: pointer;
+  font-size: 0.8rem;
+  color: var(--smoke, #aaa);
+  transition: all 0.18s;
+  user-select: none;
+}
+.allergen-chip input[type="checkbox"] { display: none; }
+.allergen-chip:hover { border-color: var(--accent, #e63946); color: var(--text, #fff); }
+.allergen-chip.active {
+  border-color: var(--accent, #e63946);
+  background: rgba(230, 57, 70, 0.12);
+  color: var(--accent, #e63946);
+}
+.allergen-icon { font-size: 1rem; }
+.allergen-label { font-weight: 500; }
+
+/* ── Active filter summary bar ──────────────────────────────── */
+.allergen-active-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.9rem;
+  padding: 0.55rem 0.8rem;
+  background: rgba(230, 57, 70, 0.07);
+  border: 1px solid rgba(230, 57, 70, 0.25);
+  border-radius: 10px;
+  font-size: 0.82rem;
+}
+.allergen-active-label { color: var(--smoke, #aaa); }
+.allergen-tag {
+  padding: 0.2rem 0.55rem;
+  border-radius: 20px;
+  background: rgba(230, 57, 70, 0.18);
+  color: var(--accent, #e63946);
+  font-weight: 600;
+  font-size: 0.78rem;
+}
+
+/* ── Per-stall allergen tags ────────────────────────────────── */
+.stall-allergens { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; margin-bottom: 0.6rem; }
+.stall-allergen-label { font-size: 0.75rem; color: var(--smoke, #888); }
+.stall-allergen-tag {
+  font-size: 0.72rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 20px;
+  background: rgba(255, 180, 50, 0.12);
+  border: 1px solid rgba(255, 180, 50, 0.35);
+  color: #f4a426;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+/* ── Responsive ─────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .section-header { flex-direction: column; align-items: flex-start; }
+  .inline-search-form { max-width: 100%; width: 100%; }
+  .allergen-grid { grid-template-columns: 1fr; }
+}

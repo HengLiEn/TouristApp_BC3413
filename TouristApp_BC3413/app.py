@@ -54,27 +54,51 @@ app.secret_key = "bc3413-secret"
 # ── Cuisines (ACTIVE) ─────────────────────────────────────────────────────────
 @app.route('/cuisines')
 def cuisines():
-    selected_cuisine = request.args.get('cuisine', None)
-    selected_stars   = request.args.get('stars', None)
-    selected_sort    = request.args.get('sort', 'score')
+    selected_cuisine  = request.args.get('cuisine', None)
+    selected_stars    = request.args.get('stars', None)
+    selected_sort     = request.args.get('sort', 'score')
+    search_query      = request.args.get('q', '').strip().lower()
+    selected_allergens = request.args.getlist('allergens')  # e.g. ['gluten', 'dairy']
 
     handler = CuisineFeatureHandler()
 
-    # Use the correct method
     prefs = CuisinePreferences()
     stalls_df = handler.get_top_nearby_stalls(prefs=prefs, coords=None, top_n=50)
     stalls_list = stalls_df.to_dict(orient='records')
 
-    # Get cuisines using the correct method
     cuisines = handler.get_available_cuisines()
 
     # Filter by cuisine
     if selected_cuisine:
-        stalls_list = [s for s in stalls_list if s.get('cuisine_type','').lower() == selected_cuisine]
+        stalls_list = [
+            s for s in stalls_list
+            if s.get('cuisine_type', '').lower() == selected_cuisine
+        ]
 
     # Filter by stars
     if selected_stars:
-        stalls_list = [s for s in stalls_list if s.get('avg_rating', 0) >= float(selected_stars)]
+        stalls_list = [
+            s for s in stalls_list
+            if s.get('avg_rating', 0) >= float(selected_stars)
+        ]
+
+    # Filter by search query (stall name or hawker centre name)
+    if search_query:
+        stalls_list = [
+            s for s in stalls_list
+            if search_query in s.get('stall_name', '').lower()
+            or search_query in s.get('hawker_name', '').lower()
+        ]
+
+    # Filter by allergens — exclude stalls that contain any selected allergen
+    # Expects each stall record to have an 'allergens' field: a list of strings
+    # e.g. ['gluten', 'shellfish']
+    if selected_allergens:
+        def stall_is_safe(stall):
+            stall_allergens = [a.lower() for a in stall.get('allergens', [])]
+            return not any(a in stall_allergens for a in selected_allergens)
+
+        stalls_list = [s for s in stalls_list if stall_is_safe(s)]
 
     # Sort
     if selected_sort == 'rating':
@@ -91,7 +115,9 @@ def cuisines():
         cuisines=cuisines,
         selected_cuisine=selected_cuisine,
         selected_stars=selected_stars,
-        selected_sort=selected_sort
+        selected_sort=selected_sort,
+        search_query=search_query,
+        selected_allergens=selected_allergens,
     )
 @app.route("/pricing")
 def pricing():
