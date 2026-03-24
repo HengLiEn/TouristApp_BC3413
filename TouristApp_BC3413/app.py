@@ -127,15 +127,6 @@ def cuisines():
 def pricing():
     return render_template("pricing.html")
 
-# ── Add these imports at the top of app.py (if not already there) ─────────────
-# from flask import Flask, render_template, request, redirect, url_for, session, flash
-# from feature_onboarding import TouristProfileDA
-# from features_location import LocationPlanner
-# from hawker_filter import get_open_hawker_centres
-# from datetime import datetime
-
-# ── Add these routes to app.py ────────────────────────────────────────────────
-
 da = TouristProfileDA()           # one shared instance
 planner = LocationPlanner()       # one shared instance
 
