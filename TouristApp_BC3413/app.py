@@ -1,5 +1,9 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash
+from typing import Optional
 from feature_cuisines import CuisineFeatureHandler, CuisinePreferences
+from feature_onboarding import TouristProfileDA
+from features_location import LocationPlanner
+from datetime import datetime
 # from functools import wraps
 import os
 # import sqlite3
@@ -123,9 +127,184 @@ def cuisines():
 def pricing():
     return render_template("pricing.html")
 
+# ── Add these imports at the top of app.py (if not already there) ─────────────
+# from flask import Flask, render_template, request, redirect, url_for, session, flash
+# from feature_onboarding import TouristProfileDA
+# from features_location import LocationPlanner
+# from hawker_filter import get_open_hawker_centres
+# from datetime import datetime
+
+# ── Add these routes to app.py ────────────────────────────────────────────────
+
+da = TouristProfileDA()           # one shared instance
+planner = LocationPlanner()       # one shared instance
+
+"""
+    Renders the Update Location & Dates page.
+    Reads the current saved values from the DB (via Flask session username)
+    and passes them to the template so the status bar and form fields are
+    pre-filled.
+    """
 @app.route("/location")
 def location():
-    return render_template('feature_onboarding.html', active_page='location')
+    # TEMPORARY — remove this block once Saachee's login is ready
+    session["username"] = "test_user"
+
+    # TEMPORARY — create a dummy profile if it doesn't exist
+    if not da.get_profile("test_user"):
+        from feature_onboarding import TouristProfile
+        da.insert_profile(TouristProfile(
+            username="test_user", password="test",
+            name="Test", country="SG", spice_level=2,
+            allergens=[], preferred_cuisines=[],
+            created_at=datetime.now().isoformat()
+        ))
+
+    # if "username" not in session:
+    #     flash("Please log in first.", "error")
+    #     return redirect(url_for("login"))
+
+    profile = da.get_profile(session["username"])
+
+    # Coordinates — tuple or None
+    current_coords = None
+    if profile and profile.location_lat is not None and profile.location_lng is not None:
+        current_coords = (float(profile.location_lat), float(profile.location_lng))
+
+    # Trip dates stored as dd/mm/yyyy in DB — convert to ISO (yyyy-mm-dd) for
+    # the HTML date input's value attribute
+    trip_start_iso = _ddmmyyyy_to_iso(profile.trip_start) if profile else None
+    trip_end_iso   = _ddmmyyyy_to_iso(profile.trip_end)   if profile else None
+
+    return render_template(
+        "feature_location.html",
+        active_page      = "location",
+        current_coords   = current_coords,
+        current_address  = session.get("last_address"),   # remembered across request
+        current_radius   = float(profile.radius_km) if profile and profile.radius_km else 2.0,
+        current_trip_start = profile.trip_start if profile else None,
+        current_trip_end   = profile.trip_end   if profile else None,
+        trip_start_iso   = trip_start_iso,
+        trip_end_iso     = trip_end_iso,
+    )
+
+
+@app.route("/location/update-location", methods=["POST"])
+def update_location():
+    """
+    Handles the Update Location form submission.
+    - Calls OneMap via LocationPlanner.get_coords() to resolve address → coords
+    - Saves updated coords + radius to the DB
+    - Redirects back to /location
+    """
+    if "username" not in session:
+        flash("Please log in first.", "error")
+        return redirect(url_for("login"))
+
+    address   = request.form.get("address", "").strip()
+    radius_km = float(request.form.get("radius_km", 2.0))
+
+    if not address:
+        flash("Please enter a postal code or address.", "error")
+        return redirect(url_for("location"))
+
+    coords = planner.get_coords(address)
+
+    if not coords:
+        flash(f"Could not find '{address}' on OneMap. Please try a different address or postal code.", "error")
+        return redirect(url_for("location"))
+
+    # Remember the address text so the input stays filled after redirect
+    session["last_address"] = address
+
+    # Load existing trip dates so we don't overwrite them
+    profile = da.get_profile(session["username"])
+    trip_start = profile.trip_start if profile else None
+    trip_end   = profile.trip_end   if profile else None
+
+    da.update_trip_context(
+        username  = session["username"],
+        coords    = coords,
+        radius_km = radius_km,
+        trip_start = trip_start,
+        trip_end   = trip_end,
+    )
+
+    flash(f"Location updated to ({coords[0]:.5f}, {coords[1]:.5f}).", "success")
+    return redirect(url_for("location"))
+
+
+@app.route("/location/update-dates", methods=["POST"])
+def update_trip_dates():
+    """
+    Handles the Update Trip Dates form submission.
+    - HTML date inputs give yyyy-mm-dd; we convert to dd/mm/yyyy to match the
+      format used everywhere else in the project (hawker_filter, main.py, etc.)
+    - Saves updated dates to the DB without touching coords/radius
+    """
+    if "username" not in session:
+        flash("Please log in first.", "error")
+        return redirect(url_for("login"))
+
+    start_iso = request.form.get("trip_start", "").strip()
+    end_iso   = request.form.get("trip_end",   "").strip()
+
+    # Both must be provided together
+    if not start_iso or not end_iso:
+        flash("Please enter both a start and end date.", "error")
+        return redirect(url_for("location"))
+
+    # Convert yyyy-mm-dd → dd/mm/yyyy
+    try:
+        trip_start = _iso_to_ddmmyyyy(start_iso)
+        trip_end   = _iso_to_ddmmyyyy(end_iso)
+    except ValueError:
+        flash("Invalid date format. Please use the date picker.", "error")
+        return redirect(url_for("location"))
+
+    # Validate start is not after end
+    start_dt = datetime.strptime(trip_start, "%d/%m/%Y")
+    end_dt   = datetime.strptime(trip_end,   "%d/%m/%Y")
+    if start_dt > end_dt:
+        flash("Start date must be before or on the same day as end date.", "error")
+        return redirect(url_for("location"))
+
+    # Load existing coords so we don't overwrite them
+    profile = da.get_profile(session["username"])
+    coords = None
+    if profile and profile.location_lat is not None and profile.location_lng is not None:
+        coords = (float(profile.location_lat), float(profile.location_lng))
+    radius_km = float(profile.radius_km) if profile and profile.radius_km else 2.0
+
+    da.update_trip_context(
+        username   = session["username"],
+        coords     = coords,
+        radius_km  = radius_km,
+        trip_start = trip_start,
+        trip_end   = trip_end,
+    )
+
+    flash(f"Trip dates saved: {trip_start} → {trip_end}", "success")
+    return redirect(url_for("location"))
+
+
+# ── Private date-conversion helpers ──────────────────────────────────────────
+
+def _iso_to_ddmmyyyy(iso_str: str) -> str:
+    """Converts '2026-04-01' → '01/04/2026'"""
+    dt = datetime.strptime(iso_str, "%Y-%m-%d")
+    return dt.strftime("%d/%m/%Y")
+
+
+def _ddmmyyyy_to_iso(ddmmyyyy_str) -> Optional[str]:
+    """Converts '01/04/2026' → '2026-04-01'. Returns None for blank/invalid."""
+    if not ddmmyyyy_str:
+        return None
+    try:
+        dt = datetime.strptime(ddmmyyyy_str, "%d/%m/%Y")
+        return dt.strftime("%Y-%m-%d")
+    except ValueError:
+        return None
 
 @app.route("/closure")
 def closure():

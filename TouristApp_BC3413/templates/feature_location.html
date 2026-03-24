@@ -1,8 +1,580 @@
 {% extends "feature_onboarding.html" %}
-{% set active_page = "dashboard" %}
+{% set active_page = "location" %}
 
-{% block title %}Dashboard — Hawker Hunt{% endblock %}
+{% block title %}Update Location & Dates — Hawker Hunt{% endblock %}
 
 {% block content %}
-  <!-- your content here -->
+<style>
+  /* ── Page-level overrides ── */
+  .loc-hero {
+    background-color: var(--soy);
+    padding: 3rem 2.5rem 2.5rem;
+    position: relative;
+    overflow: hidden;
+  }
+  .loc-hero-inner { max-width: 1200px; margin: 0 auto; }
+  .loc-eyebrow {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    color: var(--turmeric);
+    margin-bottom: 0.75rem;
+  }
+  .loc-title {
+    font-family: 'Playfair Display', serif;
+    font-weight: 900;
+    font-size: clamp(2rem, 4vw, 3rem);
+    color: var(--cream);
+    line-height: 1;
+    margin-bottom: 0.6rem;
+  }
+  .loc-title em { font-style: italic; color: var(--turmeric); }
+  .loc-desc { color: var(--smoke); font-size: 0.85rem; line-height: 1.7; max-width: 480px; }
+  .loc-deco {
+    position: absolute; right: -40px; top: -40px;
+    width: 260px; height: 260px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(232,160,32,0.1) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  /* ── Status bar ── */
+  .status-bar {
+    background-color: var(--bone);
+    border-bottom: 2px solid var(--soy);
+    padding: 0.75rem 2.5rem;
+  }
+  .status-bar-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: flex;
+    gap: 2.5rem;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .status-item {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+  }
+  .status-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.6rem;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--smoke);
+  }
+  .status-value {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--soy);
+    font-weight: 500;
+  }
+  .status-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background-color: var(--smoke);
+    flex-shrink: 0;
+  }
+  .status-dot.set { background-color: var(--pandan); }
+  .status-dot.unset { background-color: var(--smoke); opacity: 0.4; }
+
+  /* ── Main layout ── */
+  .loc-wrapper {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2.5rem 2.5rem;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+    align-items: start;
+  }
+
+  /* ── Cards ── */
+  .loc-card {
+    background: var(--cream);
+    border: 2px solid var(--bone);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .loc-card-header {
+    background-color: var(--soy);
+    color: var(--cream);
+    padding: 1rem 1.4rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  .loc-card-icon { font-size: 1.1rem; }
+  .loc-card-title {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+  }
+  .loc-card-body { padding: 1.5rem; }
+
+  /* ── Form elements ── */
+  .field-group { margin-bottom: 1.25rem; }
+  .field-label {
+    display: block;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.6rem;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    color: var(--smoke);
+    margin-bottom: 0.4rem;
+  }
+  .field-input {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border: 1.5px solid var(--bone);
+    background: white;
+    font-family: 'Instrument Sans', sans-serif;
+    font-size: 0.85rem;
+    color: var(--soy);
+    border-radius: 1px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .field-input:focus { border-color: var(--chili); }
+  .field-hint {
+    font-size: 0.72rem;
+    color: var(--smoke);
+    margin-top: 0.3rem;
+    font-style: italic;
+  }
+  .field-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+  }
+
+  /* ── Submit button ── */
+  .loc-submit {
+    width: 100%;
+    background-color: var(--chili);
+    color: var(--cream);
+    border: none;
+    padding: 1rem;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+    margin-top: 0.25rem;
+    display: block;
+    border-radius: 1px;
+  }
+  .loc-submit:hover { background-color: var(--soy); }
+  .loc-submit:active { transform: scale(0.99); }
+
+  /* ── Map panel ── */
+  .map-panel {
+    grid-column: 1 / -1;
+    background: var(--cream);
+    border: 2px solid var(--bone);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .map-panel-header {
+    background-color: var(--pandan);
+    color: var(--cream);
+    padding: 1rem 1.4rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .map-panel-title {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+  }
+  .map-placeholder {
+    height: 380px;
+    background-color: #e8e0d0;
+    position: relative;
+    overflow: hidden;
+  }
+  #onemap-iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+    display: block;
+  }
+  .map-coords-overlay {
+    position: absolute;
+    bottom: 1rem;
+    left: 1rem;
+    background: rgba(26,17,9,0.85);
+    color: var(--cream);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 1px;
+    padding: 0.5rem 0.9rem;
+    border-left: 3px solid var(--turmeric);
+    pointer-events: none;
+  }
+
+  /* ── Flash messages ── */
+  .flash-list { list-style: none; padding: 0; margin-bottom: 1rem; }
+  .flash-msg {
+    padding: 0.75rem 1.1rem;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 1.5px;
+    border-left: 4px solid var(--turmeric);
+    background-color: var(--bone);
+    color: var(--soy);
+    margin-bottom: 0.5rem;
+  }
+  .flash-msg.error { border-color: var(--chili); background-color: #fdf0ee; }
+  .flash-msg.success { border-color: var(--pandan); background-color: #eef4f0; }
+
+  /* ── Radius slider ── */
+  .radius-row { display: flex; align-items: center; gap: 1rem; }
+  .radius-slider {
+    flex: 1;
+    accent-color: var(--chili);
+    cursor: pointer;
+  }
+  .radius-display {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.85rem;
+    color: var(--chili);
+    font-weight: 500;
+    min-width: 50px;
+    text-align: right;
+  }
+
+  /* ── Divider ── */
+  .loc-divider {
+    border: none;
+    border-top: 1.5px solid var(--bone);
+    margin: 1.25rem 0;
+  }
+
+  /* ── GPS button ── */
+  .gps-btn {
+    width: 100%;
+    background: transparent;
+    color: var(--pandan);
+    border: 1.5px solid var(--pandan);
+    padding: 0.75rem 1rem;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.2s;
+    border-radius: 1px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+  }
+  .gps-btn:hover { background-color: var(--pandan); color: white; }
+  .gps-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+  .gps-btn .gps-spinner {
+    display: none;
+    width: 12px; height: 12px;
+    border: 2px solid currentColor;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+  }
+  .gps-btn.loading .gps-spinner { display: inline-block; }
+  .gps-btn.loading .gps-icon { display: none; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .gps-status {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 1px;
+    color: var(--smoke);
+    text-align: center;
+    margin-bottom: 0.75rem;
+    min-height: 1rem;
+    transition: color 0.2s;
+  }
+  .gps-status.ok  { color: var(--pandan); }
+  .gps-status.err { color: var(--chili); }
+
+  @media (max-width: 900px) {
+    .loc-wrapper { grid-template-columns: 1fr; }
+    .map-panel { grid-column: 1; }
+    .field-row { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 600px) {
+    .loc-wrapper { padding: 1.5rem 1rem; }
+    .status-bar { padding: 0.75rem 1rem; }
+  }
+</style>
+
+<!-- Hero -->
+<div class="loc-hero">
+  <div class="loc-hero-inner">
+    <p class="loc-eyebrow">Trip Setup</p>
+    <h1 class="loc-title">Update <em>Location</em><br>&amp; Dates</h1>
+    <p class="loc-desc">Set your base location and trip window so we can show you only hawker centres that are open during your visit.</p>
+  </div>
+  <div class="loc-deco"></div>
+</div>
+
+<!-- Status bar -->
+<div class="status-bar">
+  <div class="status-bar-inner">
+    <div class="status-item">
+      <span class="status-dot {{ 'set' if current_coords else 'unset' }}"></span>
+      <span class="status-label">Location</span>
+      <span class="status-value">
+        {% if current_coords %}
+          {{ "%.4f"|format(current_coords[0]) }}, {{ "%.4f"|format(current_coords[1]) }}
+          {% if current_address %} — {{ current_address }}{% endif %}
+        {% else %}
+          Not set
+        {% endif %}
+      </span>
+    </div>
+    <div class="status-item">
+      <span class="status-dot {{ 'set' if current_trip_start and current_trip_end else 'unset' }}"></span>
+      <span class="status-label">Trip Dates</span>
+      <span class="status-value">
+        {% if current_trip_start and current_trip_end %}
+          {{ current_trip_start }} → {{ current_trip_end }}
+        {% else %}
+          Not set
+        {% endif %}
+      </span>
+    </div>
+    <div class="status-item">
+      <span class="status-dot {{ 'set' if current_radius else 'unset' }}"></span>
+      <span class="status-label">Radius</span>
+      <span class="status-value">{{ current_radius or 2.0 }} km</span>
+    </div>
+  </div>
+</div>
+
+<!-- Main content -->
+<div class="loc-wrapper">
+
+  <!-- Flash messages -->
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <ul class="flash-list" style="grid-column: 1 / -1;">
+        {% for category, message in messages %}
+          <li class="flash-msg {{ category }}">{{ message }}</li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+  {% endwith %}
+
+  <!-- Location Card -->
+  <div class="loc-card">
+    <div class="loc-card-header">
+      <span class="loc-card-icon">📍</span>
+      <span class="loc-card-title">Update Location</span>
+    </div>
+    <div class="loc-card-body">
+      <form method="POST" action="{{ url_for('update_location') }}">
+        <!-- GPS auto-locate -->
+        <button type="button" class="gps-btn" id="gps-btn" onclick="useMyLocation()">
+          <span class="gps-icon">📡</span>
+          <span class="gps-spinner"></span>
+          Use My Current Location
+        </button>
+        <p class="gps-status" id="gps-status"></p>
+
+        <div class="field-group">
+          <label class="field-label" for="address">Postal Code or Address</label>
+          <input
+            class="field-input"
+            type="text"
+            id="address"
+            name="address"
+            placeholder="e.g. 049483 or 1 Raffles Place"
+            value="{{ current_address or '' }}"
+            autocomplete="off"
+          />
+          <p class="field-hint">We'll use OneMap to find your coordinates, or click above to auto-detect.</p>
+        </div>
+
+        <div class="field-group">
+          <label class="field-label" for="radius">Nearby Radius</label>
+          <div class="radius-row">
+            <input
+              class="radius-slider"
+              type="range"
+              id="radius"
+              name="radius_km"
+              min="0.5"
+              max="10"
+              step="0.5"
+              value="{{ current_radius or 2.0 }}"
+              oninput="document.getElementById('radius-val').textContent = this.value + ' km'"
+            />
+            <span class="radius-display" id="radius-val">{{ current_radius or 2.0 }} km</span>
+          </div>
+          <p class="field-hint">How far from your location to search for hawker centres.</p>
+        </div>
+
+        <button type="submit" class="loc-submit">Update Location →</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Trip Dates Card -->
+  <div class="loc-card">
+    <div class="loc-card-header">
+      <span class="loc-card-icon">📅</span>
+      <span class="loc-card-title">Update Trip Dates</span>
+    </div>
+    <div class="loc-card-body">
+      <form method="POST" action="{{ url_for('update_trip_dates') }}">
+        <div class="field-row">
+          <div class="field-group">
+            <label class="field-label" for="trip_start">Start Date</label>
+            <input
+              class="field-input"
+              type="date"
+              id="trip_start"
+              name="trip_start"
+              value="{{ trip_start_iso or '' }}"
+            />
+          </div>
+          <div class="field-group">
+            <label class="field-label" for="trip_end">End Date</label>
+            <input
+              class="field-input"
+              type="date"
+              id="trip_end"
+              name="trip_end"
+              value="{{ trip_end_iso or '' }}"
+            />
+          </div>
+        </div>
+        <p class="field-hint" style="margin-top: -0.75rem; margin-bottom: 1.25rem;">
+          Hawker centres closed during your trip will be automatically excluded from all recommendations.
+        </p>
+
+        <hr class="loc-divider"/>
+
+        <p class="field-label" style="margin-bottom: 0.75rem;">Quick select</p>
+        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1.25rem;">
+          <button type="button" class="chip" onclick="setDateRange(3)">3 days</button>
+          <button type="button" class="chip" onclick="setDateRange(5)">5 days</button>
+          <button type="button" class="chip" onclick="setDateRange(7)">1 week</button>
+          <button type="button" class="chip" onclick="setDateRange(14)">2 weeks</button>
+        </div>
+
+        <button type="submit" class="loc-submit">Save Trip Dates →</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- OneMap Panel -->
+  <div class="map-panel">
+    <div class="map-panel-header">
+      <span class="map-panel-title">📡 OneMap — Singapore</span>
+      {% if current_coords %}
+        <span style="font-family:'DM Mono',monospace; font-size:0.6rem; opacity:0.8; letter-spacing:1px;">
+          PINNED: {{ "%.5f"|format(current_coords[0]) }}, {{ "%.5f"|format(current_coords[1]) }}
+        </span>
+      {% endif %}
+    </div>
+    <div class="map-placeholder">
+      {% if current_coords %}
+        <iframe
+          id="onemap-iframe"
+          src="https://www.onemap.gov.sg/minimap/minimap.html?mapStyle=Default&zoomLevel=16&latLng={{ current_coords[0] }},{{ current_coords[1] }}&popupWidth=200&popupHeight=100&popupHeader=Your+Location&popupMessage=You+are+here&showPopup=true"
+          allowfullscreen
+        ></iframe>
+        <div class="map-coords-overlay">
+          {{ "%.5f"|format(current_coords[0]) }}, {{ "%.5f"|format(current_coords[1]) }}
+        </div>
+      {% else %}
+        <iframe
+          id="onemap-iframe"
+          src="https://www.onemap.gov.sg/minimap/minimap.html?mapStyle=Default&zoomLevel=12&latLng=1.3521,103.8198&showPopup=false"
+          allowfullscreen
+        ></iframe>
+        <div class="map-coords-overlay">Enter an address above to pin your location</div>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // ── Quick date range setter ───────────────────────────────────────────────
+  function setDateRange(days) {
+    const today = new Date();
+    const end   = new Date(today);
+    end.setDate(today.getDate() + days - 1);
+    const fmt = d => d.toISOString().split('T')[0];
+    document.getElementById('trip_start').value = fmt(today);
+    document.getElementById('trip_end').value   = fmt(end);
+  }
+
+  // ── GPS auto-locate ───────────────────────────────────────────────────────
+  function useMyLocation() {
+    const btn    = document.getElementById('gps-btn');
+    const status = document.getElementById('gps-status');
+    const iframe = document.getElementById('onemap-iframe');
+
+    // Check browser support
+    if (!navigator.geolocation) {
+      setGpsStatus('Your browser does not support geolocation.', 'err');
+      return;
+    }
+
+    // Show loading state
+    btn.disabled = true;
+    btn.classList.add('loading');
+    setGpsStatus('Detecting your location…', '');
+
+    navigator.geolocation.getCurrentPosition(
+      function(pos) {
+        const lat = pos.coords.latitude.toFixed(6);
+        const lng = pos.coords.longitude.toFixed(6);
+
+        // Fill address field with coordinates so form submission saves them
+        document.getElementById('address').value = lat + ', ' + lng;
+
+        // Update the map iframe immediately without a page reload
+        iframe.src =
+          'https://www.onemap.gov.sg/minimap/minimap.html?mapStyle=Default' +
+          '&zoomLevel=16&latLng=' + lat + ',' + lng +
+          '&popupWidth=200&popupHeight=100' +
+          '&popupHeader=Your+Location&popupMessage=You+are+here&showPopup=true';
+
+        setGpsStatus('📍 Located: ' + lat + ', ' + lng, 'ok');
+        btn.disabled = false;
+        btn.classList.remove('loading');
+      },
+      function(err) {
+        // Map browser error codes to friendly messages
+        const messages = {
+          1: 'Location access denied. Please allow location in your browser settings.',
+          2: 'Location unavailable. Try entering your address manually.',
+          3: 'Location request timed out. Please try again.',
+        };
+        setGpsStatus(messages[err.code] || 'Could not get location.', 'err');
+        btn.disabled = false;
+        btn.classList.remove('loading');
+      },
+      { timeout: 10000, maximumAge: 60000 }  // 10s timeout, cache for 1 min
+    );
+  }
+
+  function setGpsStatus(msg, type) {
+    const el = document.getElementById('gps-status');
+    el.textContent = msg;
+    el.className = 'gps-status' + (type ? ' ' + type : '');
+  }
+</script>
 {% endblock %}
