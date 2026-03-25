@@ -1,4 +1,4 @@
-{% extends "feature_onboarding.html" %} <!--purpose of extending from the css such that each has nav and footer.-->
+{% extends "feature_onboarding.html" %}
 {% set active_page = "cuisines" %}
 
 {% block title %}Cuisines — Hawker Hunt{% endblock %}
@@ -10,7 +10,7 @@
   <div class="hero-inner">
     <p class="hero-eyebrow">// Hawker Discovery Platform</p>
     <h1 class="hero-title">Find Your <em>Perfect</em><br/>Hawker Stall</h1>
-    <p class="hero-desc">Browse top-rated stalls filtered by cuisine. Click any stall to expand its details.</p>
+    <p class="hero-desc">Browse top-rated stalls filtered by cuisine.<br>Click any stall to expand its details.</p>
   </div>
   <div class="hero-deco"></div>
 </section>
@@ -19,11 +19,18 @@
 
   <!-- SIDEBAR -->
   <aside class="sidebar">
-    <form method="GET" action="/cuisines" id="filter-form"> <!-- submit filter as URL query string-->
 
-      <!-- Carry search + sort state through filter submits -->
-      {% if search_query %}<input type="hidden" name="q"    value="{{ search_query }}">{% endif %}  <!-- search query is wtv i type in the filter-->
-      <input type="hidden" name="sort" value="{{ selected_sort | default('') }}">   <!-- sort based on what selected like best match, most reviews,etc -->
+    <!-- ── FORM 1: CUISINE FILTER ─────────────────────────────────────────
+         Carries: sort, stars, allergens, search query, max_price
+         Does NOT carry: cuisine (comes from whichever chip is clicked)      -->
+    <form method="GET" action="/cuisines" id="cuisine-form">
+      {% if search_query %}<input type="hidden" name="q" value="{{ search_query }}">{% endif %}
+      <input type="hidden" name="sort" value="{{ selected_sort | default('') }}">
+      {% if selected_stars %}<input type="hidden" name="stars" value="{{ selected_stars }}">{% endif %}
+      {% for a in selected_allergens %}
+        <input type="hidden" name="allergens" value="{{ a }}">
+      {% endfor %}
+      <input type="hidden" name="max_price" value="{{ max_price | default(15) }}">
 
       <div class="panel">
         <div class="panel-header">
@@ -34,15 +41,27 @@
           <div class="chips-grid">
             {% for c in cuisines %}
             <button type="submit" name="cuisine" value="{{ c|lower }}"
-              class="chip {{ 'active' if selected_cuisine == c|lower }}"> <!-- this js highlights the button-->
+              class="chip {{ 'active' if selected_cuisine == c|lower }}">
               {{ c }}
             </button>
             {% endfor %}
           </div>
         </div>
       </div>
+    </form>
 
-      <!-- STAR FILTER -->
+    <!-- ── FORM 2: STAR FILTER ────────────────────────────────────────────
+         Carries: sort, cuisine, allergens, search query, max_price
+         Does NOT carry: stars (comes from whichever chip is clicked)        -->
+    <form method="GET" action="/cuisines" id="stars-form">
+      {% if search_query %}<input type="hidden" name="q" value="{{ search_query }}">{% endif %}
+      <input type="hidden" name="sort" value="{{ selected_sort | default('') }}">
+      {% if selected_cuisine %}<input type="hidden" name="cuisine" value="{{ selected_cuisine }}">{% endif %}
+      {% for a in selected_allergens %}
+        <input type="hidden" name="allergens" value="{{ a }}">
+      {% endfor %}
+      <input type="hidden" name="max_price" value="{{ max_price | default(15) }}">
+
       <div class="panel">
         <div class="panel-header">
           <span class="panel-title">Filter by Stars</span>
@@ -57,8 +76,18 @@
           </div>
         </div>
       </div>
+    </form>
 
-      <!-- ALLERGEN FILTER -->
+    <!-- ── FORM 3: ALLERGEN FILTER ────────────────────────────────────────
+         Carries: sort, cuisine, stars, search query, max_price
+         Allergen checkboxes auto-submit on change                           -->
+    <form method="GET" action="/cuisines" id="allergen-form">
+      {% if search_query %}<input type="hidden" name="q" value="{{ search_query }}">{% endif %}
+      <input type="hidden" name="sort" value="{{ selected_sort | default('') }}">
+      {% if selected_cuisine %}<input type="hidden" name="cuisine" value="{{ selected_cuisine }}">{% endif %}
+      {% if selected_stars   %}<input type="hidden" name="stars"   value="{{ selected_stars }}">{% endif %}
+      <input type="hidden" name="max_price" value="{{ max_price | default(15) }}">
+
       <div class="panel">
         <div class="panel-header">
           <span class="panel-title">Exclude Allergens</span>
@@ -93,10 +122,57 @@
           </div>
         </div>
       </div>
-
-      <a href="/cuisines" class="clear-btn" style="text-align:center;text-decoration:none;display:block;">✕ Clear Filters</a>
-
     </form>
+
+    <!-- ── FORM 4: MAX PRICE SLIDER ───────────────────────────────────────
+         Carries: sort, cuisine, stars, allergens, search query
+         Auto-submits on slider release                                      -->
+    <form method="GET" action="/cuisines" id="price-form">
+      {% if search_query %}<input type="hidden" name="q" value="{{ search_query }}">{% endif %}
+      <input type="hidden" name="sort" value="{{ selected_sort | default('') }}">
+      {% if selected_cuisine %}<input type="hidden" name="cuisine" value="{{ selected_cuisine }}">{% endif %}
+      {% if selected_stars   %}<input type="hidden" name="stars"   value="{{ selected_stars }}">{% endif %}
+      {% for a in selected_allergens %}
+        <input type="hidden" name="allergens" value="{{ a }}">
+      {% endfor %}
+
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Max Price</span>
+          <span>💰</span>
+        </div>
+        <div class="panel-body">
+          <div class="price-filter">
+            <div class="price-label-row">
+              <span class="price-label-text">Up to</span>
+              <span class="price-display">$<span id="price-value">{{ max_price | default(15) | int }}</span></span>
+            </div>
+
+            <div class="slider-track-wrapper">
+              <input
+                type="range"
+                id="max_price"
+                name="max_price"
+                min="1"
+                max="15"
+                step="1"
+                value="{{ max_price | default(15) | int }}"
+                class="price-slider"
+              >
+              <div class="slider-ticks" aria-hidden="true">
+                <span>$1</span>
+                <span>$5</span>
+                <span>$10</span>
+                <span>$15</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </form>
+
+    <a href="/cuisines" class="clear-btn" style="text-align:center;text-decoration:none;display:block;">✕ Clear Filters</a>
+
   </aside>
 
   <!-- RESULTS -->
@@ -109,14 +185,15 @@
         <span class="section-count">Showing {{ stalls|length }} result{{ 's' if stalls|length != 1 }}</span>
       </div>
 
-      <!-- SEARCH BAR -->
-      <form method="GET" action="/cuisines" id="search-form" class="inline-search-form"> <!-- if I type chinese, 4 stars and sort by best match while searching store will work-->
+      <!-- SEARCH BAR: carries cuisine, stars, sort, allergens, max_price -->
+      <form method="GET" action="/cuisines" id="search-form" class="inline-search-form">
         {% if selected_cuisine %}<input type="hidden" name="cuisine" value="{{ selected_cuisine }}">{% endif %}
         {% if selected_stars   %}<input type="hidden" name="stars"   value="{{ selected_stars }}">{% endif %}
         {% if selected_sort    %}<input type="hidden" name="sort"     value="{{ selected_sort }}">{% endif %}
         {% for a in selected_allergens %}
           <input type="hidden" name="allergens" value="{{ a }}">
         {% endfor %}
+        <input type="hidden" name="max_price" value="{{ max_price | default(15) }}">
 
         <div class="search-bar">
           <span class="search-icon">🔍</span>
@@ -130,7 +207,7 @@
           />
           <button type="submit" class="search-submit" title="Search">Search</button>
           {% if search_query %}
-            <a href="/cuisines?cuisine={{ selected_cuisine or '' }}&stars={{ selected_stars or '' }}&sort={{ selected_sort or '' }}{% for a in selected_allergens %}&allergens={{ a }}{% endfor %}"
+            <a href="/cuisines?cuisine={{ selected_cuisine or '' }}&stars={{ selected_stars or '' }}&sort={{ selected_sort or '' }}&max_price={{ max_price | default(15) }}{% for a in selected_allergens %}&allergens={{ a }}{% endfor %}"
                class="search-clear-link" title="Clear search">✕</a>
           {% endif %}
         </div>
@@ -138,10 +215,13 @@
     </div>
 
     <!-- Active filter summary -->
-    {% if search_query or selected_allergens %}
+    {% if search_query or selected_allergens or (max_price is defined and max_price < 15) %}
     <div class="allergen-active-bar">
       {% if search_query %}
         <span class="allergen-active-label">🔍 "{{ search_query }}"</span>
+      {% endif %}
+      {% if max_price is defined and max_price < 15 %}
+        <span class="allergen-active-label">💰 Max ${{ max_price | int }}</span>
       {% endif %}
       {% if selected_allergens %}
         <span class="allergen-active-label">⚠️ Excluding:</span>
@@ -159,19 +239,21 @@
     {% endif %}
 
     <div class="sort-bar">
-      <a href="/cuisines?cuisine={{ selected_cuisine or '' }}&stars={{ selected_stars or '' }}&q={{ search_query or '' }}{% for a in selected_allergens %}&allergens={{ a }}{% endfor %}&sort=score"
+      <a href="/cuisines?cuisine={{ selected_cuisine or '' }}&stars={{ selected_stars or '' }}&q={{ search_query or '' }}&max_price={{ max_price | default(15) }}{% for a in selected_allergens %}&allergens={{ a }}{% endfor %}&sort=score"
          class="sort-btn {{ 'active' if selected_sort == 'score' or not selected_sort }}">Best Match</a>
-      <a href="/cuisines?cuisine={{ selected_cuisine or '' }}&stars={{ selected_stars or '' }}&q={{ search_query or '' }}{% for a in selected_allergens %}&allergens={{ a }}{% endfor %}&sort=rating"
+      <a href="/cuisines?cuisine={{ selected_cuisine or '' }}&stars={{ selected_stars or '' }}&q={{ search_query or '' }}&max_price={{ max_price | default(15) }}{% for a in selected_allergens %}&allergens={{ a }}{% endfor %}&sort=rating"
          class="sort-btn {{ 'active' if selected_sort == 'rating' }}">Top Rated</a>
-      <a href="/cuisines?cuisine={{ selected_cuisine or '' }}&stars={{ selected_stars or '' }}&q={{ search_query or '' }}{% for a in selected_allergens %}&allergens={{ a }}{% endfor %}&sort=reviews"
+      <a href="/cuisines?cuisine={{ selected_cuisine or '' }}&stars={{ selected_stars or '' }}&q={{ search_query or '' }}&max_price={{ max_price | default(15) }}{% for a in selected_allergens %}&allergens={{ a }}{% endfor %}&sort=reviews"
          class="sort-btn {{ 'active' if selected_sort == 'reviews' }}">Most Reviewed</a>
-      <a href="/cuisines?cuisine={{ selected_cuisine or '' }}&stars={{ selected_stars or '' }}&q={{ search_query or '' }}{% for a in selected_allergens %}&allergens={{ a }}{% endfor %}&sort=distance"
+      <a href="/cuisines?cuisine={{ selected_cuisine or '' }}&stars={{ selected_stars or '' }}&q={{ search_query or '' }}&max_price={{ max_price | default(15) }}{% for a in selected_allergens %}&allergens={{ a }}{% endfor %}&sort=distance"
          class="sort-btn {{ 'active' if selected_sort == 'distance' }}">Nearest</a>
     </div>
 
     <div class="stalls-list">
-      {% if stalls %} <!-- check that store list is not empty-->
+      {% if stalls %}
         {% for stall in stalls %}
+        <a href="/pricing?stall_id={{ stall.stall_id }}&cuisine={{ selected_cuisine or '' }}&stars={{ selected_stars or '' }}&sort={{ selected_sort or '' }}&q={{ search_query or '' }}&max_price={{ max_price | default(15) }}{% for a in selected_allergens %}&allergens={{ a }}{% endfor %}"
+           class="stall-card-link">
         <div class="stall-card"
              id="card-{{ loop.index }}"
              style="animation-delay: {{ loop.index0 * 0.06 }}s">
@@ -217,8 +299,9 @@
           </div>
 
         </div>
+        </a>
         {% endfor %}
-      {% else %} <!--if no stalls match the filters/search, then show empty-->
+      {% else %}
         <div class="empty-state">
           <span style="font-size:3rem;display:block;margin-bottom:1rem;">🍽️</span>
           <h3>No stalls found</h3>
@@ -229,5 +312,130 @@
   </main>
 </div>
 
+<!-- ── Price Slider Styles ──────────────────────────────────────────────────── -->
+<style>
+.price-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.price-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.price-label-text {
+  font-size: 0.85rem;
+  color: var(--smoke, #888);
+}
+
+.price-display {
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: var(--accent, #e05c2a);
+}
+
+.slider-track-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.price-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  outline: none;
+  cursor: pointer;
+  background: linear-gradient(
+    to right,
+    var(--accent, #e05c2a) 0%,
+    var(--accent, #e05c2a) calc(var(--pct, 100%) * 1%),
+    #ddd                   calc(var(--pct, 100%) * 1%),
+    #ddd                   100%
+  );
+}
+
+.price-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--accent, #e05c2a);
+  border: 2px solid #fff;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+  cursor: grab;
+  transition: transform 0.1s;
+}
+
+.price-slider::-webkit-slider-thumb:active {
+  cursor: grabbing;
+  transform: scale(1.15);
+}
+
+.price-slider::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--accent, #e05c2a);
+  border: 2px solid #fff;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+  cursor: grab;
+}
+
+.slider-ticks {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.72rem;
+  color: #aaa;
+  padding: 0 2px;
+}
+
+.stall-card-link {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+}
+.stall-card-link:hover .stall-card,
+.stall-card-link:focus .stall-card {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 24px rgba(0,0,0,0.13);
+  cursor: pointer;
+}
+</style>
+
+<!-- ── Price Slider Script ──────────────────────────────────────────────────── -->
+<script>
+(function () {
+  const slider  = document.getElementById('max_price');
+  const display = document.getElementById('price-value');
+  if (!slider) return;
+
+  function updateSlider() {
+    const min = Number(slider.min);
+    const max = Number(slider.max);
+    const val = Number(slider.value);
+    display.textContent = val;
+    const pct = ((val - min) / (max - min)) * 100;
+    slider.style.setProperty('--pct', pct.toFixed(1));
+  }
+
+  // Live label while dragging
+  slider.addEventListener('input', updateSlider);
+
+  // Auto-submit when thumb is released
+  slider.addEventListener('change', function () {
+    this.closest('form').submit();
+  });
+
+  // Initialise fill on page load
+  updateSlider();
+})();
+</script>
 
 {% endblock %}
