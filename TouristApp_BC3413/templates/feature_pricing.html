@@ -1,9 +1,358 @@
 {% extends "feature_onboarding.html" %}
-{% set active_page = "dashboard" %}
+{% set active_page = "cuisines" %}
 
-{% block title %}Dashboard — Hawker Hunt{% endblock %}
-
-{% block content %}
-  <!-- your content here -->
+{% block title %}
+  {{ stall.stall_name if stall else 'Stall Detail' }} — Hawker Hunt
 {% endblock %}
 
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='feature_cuisines.css') }}">
+
+<style>
+/* ── Page layout ── */
+.detail-wrapper {
+  max-width: 860px;
+  margin: 2.5rem auto;
+  padding: 0 1.25rem 4rem;
+}
+
+/* ── Back link ── */
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--accent, #e05c2a);
+  text-decoration: none;
+  margin-bottom: 1.75rem;
+  letter-spacing: 0.02em;
+  transition: opacity 0.15s;
+}
+.back-link:hover { opacity: 0.75; }
+
+/* ── Stall header card ── */
+.stall-header-card {
+  background: var(--card-bg, #1a1a1a);
+  border: 1px solid var(--border, #2a2a2a);
+  border-radius: 14px;
+  padding: 1.75rem 2rem;
+  margin-bottom: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.stall-header-badge {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: var(--accent, #e05c2a);
+  color: #fff;
+  border-radius: 4px;
+  padding: 3px 8px;
+  width: fit-content;
+}
+
+.stall-header-name {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: var(--text-primary, #f0f0f0);
+  line-height: 1.2;
+}
+
+.stall-header-location {
+  font-size: 0.9rem;
+  color: var(--smoke, #888);
+}
+
+.stall-header-address {
+  font-size: 0.85rem;
+  color: var(--smoke, #888);
+}
+
+.stall-header-meta {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.stall-header-rating {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.rating-num {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: var(--accent, #e05c2a);
+}
+
+.stars-row span { font-size: 1rem; }
+.star  { color: #f5a623; }
+.star-empty { color: #444; }
+
+.review-count {
+  font-size: 0.82rem;
+  color: var(--smoke, #888);
+}
+
+/* ── Section heading ── */
+.section-heading {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent, #e05c2a);
+  margin-bottom: 1rem;
+}
+
+/* ── Menu table ── */
+.menu-table-wrapper {
+  background: var(--card-bg, #1a1a1a);
+  border: 1px solid var(--border, #2a2a2a);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.menu-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.menu-table thead tr {
+  background: rgba(255,255,255,0.04);
+  border-bottom: 1px solid var(--border, #2a2a2a);
+}
+
+.menu-table th {
+  padding: 0.85rem 1.25rem;
+  text-align: left;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--smoke, #888);
+}
+
+.menu-table td {
+  padding: 0.9rem 1.25rem;
+  color: var(--text-primary, #f0f0f0);
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  vertical-align: middle;
+}
+
+.menu-table tbody tr:last-child td { border-bottom: none; }
+
+.menu-table tbody tr:hover td {
+  background: rgba(255,255,255,0.03);
+}
+
+.item-name {
+  font-weight: 600;
+}
+
+.item-desc {
+  font-size: 0.78rem;
+  color: var(--smoke, #888);
+  margin-top: 3px;
+}
+
+.price-cell {
+  font-weight: 700;
+  color: var(--accent, #e05c2a);
+  white-space: nowrap;
+}
+
+.price-na {
+  color: var(--smoke, #888);
+  font-size: 0.8rem;
+}
+
+/* ── Allergen tags ── */
+.allergen-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.a-tag {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: rgba(224, 92, 42, 0.15);
+  color: var(--accent, #e05c2a);
+  border: 1px solid rgba(224, 92, 42, 0.3);
+  text-transform: capitalize;
+}
+
+.no-allergens {
+  font-size: 0.78rem;
+  color: #4caf50;
+}
+
+.allergen-notice {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  background: rgba(224, 92, 42, 0.08);
+  border: 1px solid rgba(224, 92, 42, 0.25);
+  border-radius: 8px;
+  padding: 0.65rem 1rem;
+  margin-bottom: 1rem;
+  font-size: 0.82rem;
+  color: var(--smoke, #888);
+}
+
+/* ── Empty / error state ─── */
+.empty-state {
+  text-align: center;
+  padding: 4rem 2rem;
+  color: var(--smoke, #888);
+}
+</style>
+
+<!-- ── Hero (reuse existing hero style) ─── -->
+<section class="hero">
+  <div class="hero-inner">
+    <p class="hero-eyebrow">// Stall Detail</p>
+    <h1 class="hero-title">Menu &amp; <em>Details</em></h1>
+    <p class="hero-desc">Full menu, pricing and allergen information for this stall.</p>
+  </div>
+  <div class="hero-deco"></div>
+</section>
+
+<div class="detail-wrapper">
+
+  <!-- Back link  -->
+  {% if back_params %}
+    {% set bp = back_params %}
+    <a href="/cuisines?cuisine={{ bp.cuisine }}&stars={{ bp.stars }}&sort={{ bp.sort }}&q={{ bp.q }}&max_price={{ bp.max_price }}{% for a in bp.allergens %}&allergens={{ a }}{% endfor %}"
+       class="back-link">← Back to results</a>
+  {% else %}
+    <a href="/cuisines" class="back-link">← Back to results</a>
+  {% endif %}
+
+  {% if error %}
+    <!-- Error state -->
+    <div class="empty-state">
+      <span style="font-size:3rem;display:block;margin-bottom:1rem;">🍽️</span>
+      <h3>{{ error }}</h3>
+      <p>Please go back and select a stall.</p>
+    </div>
+
+  {% else %}
+
+    <!-- Stall header card  -->
+    <div class="stall-header-card">
+      <span class="stall-header-badge">{{ stall.cuisine_type | default('—') }}</span>
+      <div class="stall-header-name">{{ stall.stall_name | default('Unknown Stall') }}</div>
+      <div class="stall-header-location">📍 {{ stall.hawker_name | default('Unknown Centre') }}</div>
+      {% if stall.address_myenv is defined and stall.address_myenv %}
+        <div class="stall-header-address">🏠 {{ stall.address_myenv }}</div>
+      {% endif %}
+
+      <div class="stall-header-meta">
+        <div class="stall-header-rating">
+          <span class="rating-num">{{ "%.1f"|format(stall.avg_rating | default(0)) }}</span>
+          <div class="stars-row">
+            {% set r = (stall.avg_rating | default(0)) | round | int %}
+            {% for i in range(1, 6) %}
+              <span class="{{ 'star' if i <= r else 'star-empty' }}">★</span>
+            {% endfor %}
+          </div>
+        </div>
+        <span class="review-count">{{ stall.n_reviews | default(0) }} reviews</span>
+        {% if stall.distance_km is defined and stall.distance_km %}
+          <span class="review-count">📍 {{ "%.1f"|format(stall.distance_km) }} km away</span>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Menu table -->
+    <p class="section-heading">// Menu Items</p>
+
+    {% if back_params and (back_params.allergens or (back_params.max_price | int) < 15) %}
+    <div class="allergen-notice">
+      <span>⚠️ Filtered:</span>
+      {% if back_params.max_price | int < 15 %}
+        <span class="a-tag">💰 Max ${{ back_params.max_price | int }}</span>
+      {% endif %}
+      {% if back_params.allergens %}
+        <span>free from:</span>
+      {% endif %}
+      {% for key, icon, label in [
+        ('gluten','🌾','Gluten'),('dairy','🥛','Dairy'),('eggs','🥚','Eggs'),
+        ('nuts','🥜','Nuts'),('shellfish','🦐','Shellfish'),('seafood','🐟','Seafood'),
+        ('soy','🫘','Soy'),('pork','🐷','Pork')
+      ] %}
+        {% if key in back_params.allergens %}
+          <span class="a-tag">{{ icon }} {{ label }}</span>
+        {% endif %}
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if menu_items %}
+    <div class="menu-table-wrapper">
+      <table class="menu-table">
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th>Price</th>
+            <th>Allergens</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in menu_items %}
+          <tr>
+            <td>
+              <div class="item-name">{{ item.item_name }}</div>
+              {% if item.description %}
+                <div class="item-desc">{{ item.description }}</div>
+              {% endif %}
+            </td>
+            <td class="price-cell">
+              {% if item.price is not none %}
+                ${{ "%.2f"|format(item.price) }}
+              {% else %}
+                <span class="price-na">—</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if item.allergens %}
+                <div class="allergen-tags">
+                  {% for a in item.allergens %}
+                    <span class="a-tag">{{ a }}</span>
+                  {% endfor %}
+                </div>
+              {% else %}
+                <span class="no-allergens">✓ None listed</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% else %}
+      <div class="empty-state">
+        <span style="font-size:2.5rem;display:block;margin-bottom:0.75rem;">🍜</span>
+        <h3>No menu items found</h3>
+        <p>Menu details for this stall are not yet available.</p>
+      </div>
+    {% endif %}
+
+  {% endif %}
+</div>
+
+{% endblock %}
