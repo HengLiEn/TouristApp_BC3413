@@ -4,7 +4,8 @@ import re
 from feature_cuisines import CuisineFeatureHandler, CuisinePreferences
 from feature_onboarding import TouristProfileDA
 from features_location import LocationPlanner
-from datetime import datetime
+from datetime import datetime, timedelta
+from collections import Counter
 import pandas as pd
 # from functools import wraps
 import os
@@ -403,6 +404,178 @@ def update_trip_dates():
     flash(f"Trip dates saved: {trip_start} → {trip_end}", "success")
     return redirect(url_for("location"))
 
+
+# ── Itinerary  ─────
+# These routes expect:
+#   da.get_saved_stalls(username)  → list of stall_ids
+#   da.add_saved_stall(username, stall_id)
+#   da.remove_saved_stall(username, stall_id)
+#   da.clear_saved_stalls(username)
+#   handler.get_stalls_by_ids(stall_ids, ...) → DataFrame
+
+@app.route("/itinerary/save/<int:stall_id>")  # needs a button incorporated in feature_pricing.html
+def itinerary_save(stall_id):
+    session["username"] = "test_user"  # TEMP
+    da.add_saved_stall(session["username"], stall_id)
+    flash("Stall saved to your itinerary!", "success")
+    return redirect(request.referrer or url_for("cuisines"))
+
+
+@app.route("/itinerary")
+def itinerary():
+    # TEMPORARY — remove once login is ready
+    session["username"] = "test_user"
+
+    profile = da.get_profile(session["username"])
+    saved_ids = da.get_saved_stalls(session["username"])
+
+    # Resolve stall details
+    handler = CuisineFeatureHandler()
+    itinerary_list = []
+    if saved_ids:
+        coords = None
+        radius_km = 5.0
+        trip_start = trip_end = None
+        if profile:
+            if profile.location_lat and profile.location_lng:
+                coords = (float(profile.location_lat), float(profile.location_lng))
+            if profile.radius_km:
+                radius_km = float(profile.radius_km)
+            trip_start = profile.trip_start
+            trip_end = profile.trip_end
+
+        stalls_df = handler.get_stalls_by_ids(
+            saved_ids,
+            coords=coords,
+            radius_km=max(radius_km, 5.0),  # widen radius for itinerary
+            trip_start=trip_start,
+            trip_end=trip_end,
+        )
+        scores_df = handler._get_review_scores()
+        if not stalls_df.empty and not scores_df.empty:
+            stalls_df = stalls_df.merge(scores_df, on='stall_id', how='left')
+
+        stalls_df['n_reviews'] = stalls_df['n_reviews'].fillna(0).astype(int) if 'n_reviews' in stalls_df.columns else 0
+        stalls_df['avg_rating'] = stalls_df['avg_rating'].fillna(0.0) if 'avg_rating' in stalls_df.columns else 0.0
+
+        # Preserve saved order
+        id_order = {sid: i for i, sid in enumerate(saved_ids)}
+        stalls_df['_order'] = stalls_df['stall_id'].map(id_order)
+        stalls_df = stalls_df.sort_values('_order').drop(columns=['_order'])
+
+        for _, row in stalls_df.iterrows():
+            d = row.to_dict()
+            d = {k: (None if isinstance(v, float) and pd.isna(v) else v) for k, v in d.items()}
+            d['n_reviews'] = int(d.get('n_reviews', 0) or 0)
+            d['avg_rating'] = float(d.get('avg_rating', 0.0) or 0.0)
+            itinerary_list.append(d)
+
+    # Build day-by-day structure if trip dates are set
+    days = []
+    days_count = 0
+    trip_start = profile.trip_start if profile else None
+    trip_end = profile.trip_end if profile else None
+
+    if trip_start and trip_end and itinerary_list:
+        try:
+            start_dt = datetime.strptime(trip_start, "%d/%m/%Y")
+            end_dt = datetime.strptime(trip_end, "%d/%m/%Y")
+            days_count = (end_dt - start_dt).days + 1
+
+            # Round-robin distribute stalls across days
+            day_buckets = [[] for _ in range(days_count)]
+            for i, stall in enumerate(itinerary_list):
+                day_buckets[i % days_count].append(stall)
+
+            WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+            for d_idx, bucket in enumerate(day_buckets):
+                cur_dt = start_dt + timedelta(days=d_idx)
+                days.append({
+                    "day_num": d_idx + 1,
+                    "weekday": WEEKDAYS[cur_dt.weekday()],
+                    "date_str": cur_dt.strftime("%d %b %Y"),
+                    "stalls": bucket,
+                })
+        except ValueError:
+            pass  # malformed dates — fall back to flat list
+
+    # Cuisine breakdown
+    cuisine_counts = Counter(
+        s.get('cuisine_type', 'Other') or 'Other'
+        for s in itinerary_list
+    )
+    cuisine_breakdown = cuisine_counts.most_common()
+
+    # Avg rating
+    ratings = [s['avg_rating'] for s in itinerary_list if s.get('avg_rating')]
+    avg_rating = sum(ratings) / len(ratings) if ratings else None
+
+    return render_template(
+        "feature_itinerary.html",
+        active_page="itinerary",
+        itinerary=itinerary_list,
+        days=days,
+        days_count=days_count or 0,
+        trip_start=trip_start,
+        trip_end=trip_end,
+        cuisines_count=len(cuisine_counts),
+        cuisine_breakdown=cuisine_breakdown,
+        avg_rating=avg_rating,
+    )
+
+
+@app.route("/itinerary/remove/<int:stall_id>")
+def itinerary_remove(stall_id):
+    session["username"] = "test_user"
+    current = da.get_saved_stalls(session["username"])
+    kept = [sid for sid in current if sid != stall_id]
+    da.clear_saved_stalls(session["username"])
+    for sid in kept:
+        da.add_saved_stall(session["username"], sid)
+    flash("Stall removed from your itinerary.", "success")
+    return redirect(url_for("itinerary"))
+
+
+@app.route("/itinerary/clear")
+def itinerary_clear():
+    session["username"] = "test_user"  # TEMP
+    da.clear_saved_stalls(session["username"])
+    flash("Itinerary cleared.", "success")
+    return redirect(url_for("itinerary"))
+
+
+@app.route("/itinerary/export")
+def itinerary_export():
+    """Simple plain-text export of saved stalls."""
+    session["username"] = "test_user"  # TEMP
+
+    profile = da.get_profile(session["username"])
+    saved_ids = da.get_saved_stalls(session["username"])
+    handler = CuisineFeatureHandler()
+
+    lines = ["HAWKER HUNT — MY ITINERARY", "=" * 40]
+    if profile and profile.trip_start:
+        lines.append(f"Trip: {profile.trip_start} → {profile.trip_end}")
+    lines.append("")
+
+    if saved_ids:
+        stalls_df = handler.get_stalls_by_ids(saved_ids, coords=None, radius_km=50)
+        scores_df = handler._get_review_scores()
+        if not stalls_df.empty and not scores_df.empty:
+            stalls_df = stalls_df.merge(scores_df, on='stall_id', how='left')
+        for i, (_, row) in enumerate(stalls_df.iterrows(), 1):
+            lines.append(f"[{i}] {row.get('stall_name', '?')}")
+            lines.append(f"    @ {row.get('hawker_name', '?')}")
+            lines.append(
+                f"    Rating: {float(row.get('avg_rating', 0) or 0):.1f} | Cuisine: {row.get('cuisine_type', '?')}")
+            lines.append("")
+
+    from flask import Response
+    return Response(
+        "\n".join(lines),
+        mimetype="text/plain",
+        headers={"Content-Disposition": "attachment; filename=hawker_hunt_itinerary.txt"}
+    )
 
 # ── Private date-conversion helpers ──────────────────────────────────────────
 
