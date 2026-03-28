@@ -290,9 +290,11 @@
         {% if stall.distance_km is defined and stall.distance_km %}
           <span class="review-count">📍 {{ "%.1f"|format(stall.distance_km) }} km away</span>
         {% endif %}
+
         <a href="/itinerary/save/{{ stall.stall_id }}" class="save-itin-btn">
           + Save to Itinerary
         </a>
+
       </div>
     </div>
 

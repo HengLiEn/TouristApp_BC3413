@@ -405,7 +405,7 @@ def update_trip_dates():
     return redirect(url_for("location"))
 
 
-# ── Itinerary  ─────
+# ───── Itinerary  ─────
 # These routes expect:
 #   da.get_saved_stalls(username)  → list of stall_ids
 #   da.add_saved_stall(username, stall_id)
