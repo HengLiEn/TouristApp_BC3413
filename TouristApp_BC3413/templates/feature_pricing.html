@@ -102,6 +102,22 @@
   color: var(--smoke, #888);
 }
 
+.save-itin-btn {
+  display: inline-block;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: var(--accent, #e05c2a);
+  color: #fff;
+  border-radius: 8px;
+  padding: 0.5rem 1.1rem;
+  text-decoration: none;
+  transition: opacity 0.15s, transform 0.1s;
+  margin-left: auto;
+}
+.save-itin-btn:hover { opacity: 0.85; transform: translateY(-1px); }
+
 /* ── Section heading ── */
 .section-heading {
   font-size: 0.72rem;
@@ -274,6 +290,9 @@
         {% if stall.distance_km is defined and stall.distance_km %}
           <span class="review-count">📍 {{ "%.1f"|format(stall.distance_km) }} km away</span>
         {% endif %}
+        <a href="/itinerary/save/{{ stall.stall_id }}" class="save-itin-btn">
+          + Save to Itinerary
+        </a>
       </div>
     </div>
 

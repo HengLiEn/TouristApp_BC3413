@@ -413,12 +413,22 @@ def update_trip_dates():
 #   da.clear_saved_stalls(username)
 #   handler.get_stalls_by_ids(stall_ids, ...) → DataFrame
 
-@app.route("/itinerary/save/<int:stall_id>")  # needs a button incorporated in feature_pricing.html
+@app.route("/itinerary/save/<int:stall_id>")
 def itinerary_save(stall_id):
     session["username"] = "test_user"  # TEMP
     da.add_saved_stall(session["username"], stall_id)
-    flash("Stall saved to your itinerary!", "success")
-    return redirect(request.referrer or url_for("cuisines"))
+    flash("Stall saved! Choose which day to visit it below.", "success")
+    return redirect(url_for("itinerary"))
+
+
+@app.route("/itinerary/assign/<int:stall_id>/<int:day_index>")
+def itinerary_assign(stall_id, day_index):
+    """Store the user's chosen day for a stall in the session."""
+    session["username"] = "test_user"  # TEMP
+    day_map = session.get("stall_day_map", {})
+    day_map[str(stall_id)] = day_index
+    session["stall_day_map"] = day_map
+    return redirect(url_for("itinerary"))
 
 
 @app.route("/itinerary")
@@ -447,7 +457,7 @@ def itinerary():
         stalls_df = handler.get_stalls_by_ids(
             saved_ids,
             coords=coords,
-            radius_km=max(radius_km, 5.0),  # widen radius for itinerary
+            radius_km=999.0,  # no radius filter — itinerary shows ALL saved stalls
             trip_start=trip_start,
             trip_end=trip_end,
         )
@@ -468,13 +478,19 @@ def itinerary():
             d = {k: (None if isinstance(v, float) and pd.isna(v) else v) for k, v in d.items()}
             d['n_reviews'] = int(d.get('n_reviews', 0) or 0)
             d['avg_rating'] = float(d.get('avg_rating', 0.0) or 0.0)
+            if 'distance_km' not in d:
+                d['distance_km'] = None
             itinerary_list.append(d)
 
     # Build day-by-day structure if trip dates are set
     days = []
     days_count = 0
+    unscheduled = []
     trip_start = profile.trip_start if profile else None
     trip_end = profile.trip_end if profile else None
+
+    # stall_day_map: {str(stall_id): day_index} — user-chosen assignments in session
+    stall_day_map = session.get("stall_day_map", {})
 
     if trip_start and trip_end and itinerary_list:
         try:
@@ -482,20 +498,33 @@ def itinerary():
             end_dt = datetime.strptime(trip_end, "%d/%m/%Y")
             days_count = (end_dt - start_dt).days + 1
 
-            # Round-robin distribute stalls across days
-            day_buckets = [[] for _ in range(days_count)]
-            for i, stall in enumerate(itinerary_list):
-                day_buckets[i % days_count].append(stall)
-
             WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
-            for d_idx, bucket in enumerate(day_buckets):
+
+            # Build empty day buckets
+            day_list = []
+            for d_idx in range(days_count):
                 cur_dt = start_dt + timedelta(days=d_idx)
-                days.append({
+                day_list.append({
                     "day_num": d_idx + 1,
                     "weekday": WEEKDAYS[cur_dt.weekday()],
                     "date_str": cur_dt.strftime("%d %b %Y"),
-                    "stalls": bucket,
+                    "stalls": [],
                 })
+
+            # Assign stalls: user-chosen day or unscheduled
+            for stall in itinerary_list:
+                sid_key = str(stall['stall_id'])
+                if sid_key in stall_day_map:
+                    chosen = stall_day_map[sid_key]
+                    if 0 <= chosen < days_count:
+                        day_list[chosen]["stalls"].append(stall)
+                    else:
+                        unscheduled.append(stall)
+                else:
+                    unscheduled.append(stall)
+
+            days = day_list
+
         except ValueError:
             pass  # malformed dates — fall back to flat list
 
@@ -516,6 +545,7 @@ def itinerary():
         itinerary=itinerary_list,
         days=days,
         days_count=days_count or 0,
+        unscheduled=unscheduled,
         trip_start=trip_start,
         trip_end=trip_end,
         cuisines_count=len(cuisine_counts),
@@ -532,6 +562,10 @@ def itinerary_remove(stall_id):
     da.clear_saved_stalls(session["username"])
     for sid in kept:
         da.add_saved_stall(session["username"], sid)
+    # Also clear the day assignment for this stall from the session
+    day_map = session.get("stall_day_map", {})
+    day_map.pop(str(stall_id), None)
+    session["stall_day_map"] = day_map
     flash("Stall removed from your itinerary.", "success")
     return redirect(url_for("itinerary"))
 
@@ -540,6 +574,7 @@ def itinerary_remove(stall_id):
 def itinerary_clear():
     session["username"] = "test_user"  # TEMP
     da.clear_saved_stalls(session["username"])
+    session.pop("stall_day_map", None)
     flash("Itinerary cleared.", "success")
     return redirect(url_for("itinerary"))
 
@@ -576,6 +611,7 @@ def itinerary_export():
         mimetype="text/plain",
         headers={"Content-Disposition": "attachment; filename=hawker_hunt_itinerary.txt"}
     )
+
 
 # ── Private date-conversion helpers ──────────────────────────────────────────
 

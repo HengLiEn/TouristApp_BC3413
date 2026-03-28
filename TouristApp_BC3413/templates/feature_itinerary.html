@@ -300,8 +300,8 @@
   content: '';
   position: absolute;
   left: -1.75rem;
-  top: 1.1rem;
-  width: 12px; height: 12px;
+  top: 1.25rem;
+  width: 11px; height: 11px;
   border-radius: 50%;
   background: var(--card-bg);
   border: 2px solid var(--accent);
@@ -312,29 +312,80 @@
 .stall-card {
   background: var(--card-bg);
   border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 1.1rem 1.25rem;
+  border-radius: 14px;
+  padding: 1.1rem 1.25rem 0.85rem;
   transition: box-shadow 0.18s, transform 0.14s, border-color 0.15s;
-  cursor: pointer;
 }
-.stall-card:hover {
-  box-shadow: 0 6px 24px rgba(0,0,0,0.08);
-  transform: translateX(3px);
+.stall-card:not(.unscheduled-stall-card):hover {
+  box-shadow: 0 4px 20px rgba(0,0,0,0.07);
+  transform: translateX(2px);
   border-color: var(--accent-glow);
 }
-.stall-card-top {
+
+/* ── Row 1: stop label + badges inline ───────────────────────────────────── */
+.stall-card-row1 {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1rem;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+  flex-wrap: wrap;
+  min-height: 1.4rem;
 }
-.stall-card-left { flex: 1; min-width: 0; }
 .stall-order {
   font-family: var(--mono);
-  font-size: 0.68rem;
+  font-size: 0.65rem;
   color: var(--smoke);
   letter-spacing: 0.06em;
   text-transform: uppercase;
+  flex-shrink: 0;
+}
+.cuisine-tag {
+  font-family: var(--mono);
+  font-size: 0.65rem;
+  font-weight: 500;
+  background: var(--accent-dim);
+  color: var(--accent);
+  border-radius: 20px;
+  padding: 0.15rem 0.6rem;
+  letter-spacing: 0.03em;
+  flex-shrink: 0;
+}
+.status-open {
+  font-family: var(--mono);
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--success);
+  background: var(--success-dim);
+  border-radius: 20px;
+  padding: 0.15rem 0.55rem;
+  flex-shrink: 0;
+}
+.status-closed {
+  font-family: var(--mono);
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: #c0392b;
+  background: rgba(192,57,43,0.1);
+  border-radius: 20px;
+  padding: 0.15rem 0.55rem;
+  flex-shrink: 0;
+}
+.status-unknown {
+  font-family: var(--mono);
+  font-size: 0.65rem;
+  color: var(--smoke);
+  background: rgba(0,0,0,0.05);
+  border-radius: 20px;
+  padding: 0.15rem 0.55rem;
+  flex-shrink: 0;
+}
+
+/* ── Row 2: name + rating side by side ───────────────────────────────────── */
+.stall-card-row2 {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
   margin-bottom: 0.25rem;
 }
 .stall-name {
@@ -342,73 +393,72 @@
   font-size: 1.05rem;
   font-weight: 700;
   color: var(--ink);
-  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-.stall-hawker {
-  font-family: var(--mono);
-  font-size: 0.75rem;
-  color: var(--smoke);
-  margin-top: 0.2rem;
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
-}
-.stall-card-right {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 0.35rem;
-  flex-shrink: 0;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
 }
 .stall-rating {
   display: flex;
   align-items: center;
   gap: 0.3rem;
+  flex-shrink: 0;
 }
 .rating-num {
   font-family: var(--mono);
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   font-weight: 600;
   color: var(--ink);
 }
-.stars-mini { color: var(--accent); font-size: 0.72rem; letter-spacing: -1px; }
+.stars-mini { color: var(--accent); font-size: 0.7rem; letter-spacing: -1px; }
 .stars-mini .empty { color: var(--border-dark); }
-.cuisine-tag {
+
+/* ── Row 3: hawker location ──────────────────────────────────────────────── */
+.stall-hawker {
   font-family: var(--mono);
-  font-size: 0.66rem;
-  font-weight: 500;
-  background: var(--accent-dim);
-  color: var(--accent);
-  border-radius: 20px;
-  padding: 0.2rem 0.6rem;
-  letter-spacing: 0.04em;
+  font-size: 0.73rem;
+  color: var(--smoke);
+  margin-bottom: 0.75rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
+/* ── Row 4: meta chips + action buttons ──────────────────────────────────── */
 .stall-card-meta {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.6rem;
-  margin-top: 0.85rem;
-  padding-top: 0.75rem;
-  border-top: 1px dashed var(--border);
   align-items: center;
+  gap: 0.75rem;
+  padding-top: 0.7rem;
+  border-top: 1px dashed var(--border);
+  flex-wrap: wrap;
 }
 .meta-chip {
   font-family: var(--mono);
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   color: var(--smoke);
   display: flex;
   align-items: center;
-  gap: 0.3rem;
+  gap: 0.25rem;
+  white-space: nowrap;
 }
 .meta-chip strong { color: var(--ink); }
+.meta-address {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  color: var(--smoke);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 220px;
+}
 
 .stall-actions {
   display: flex;
   gap: 0.5rem;
   margin-left: auto;
+  flex-shrink: 0;
 }
 .btn-remove {
   font-family: var(--mono);
@@ -636,6 +686,197 @@
 }
 .flash-inner.success { background: var(--success-dim); color: var(--success); border-color: var(--success); }
 .flash-inner.error   { background: rgba(192,57,43,0.08); color: #c0392b; border-color: #c0392b; }
+
+/* ── Unscheduled section ────────────────────────────────────────────────── */
+.unscheduled-section {
+  margin-bottom: 2rem;
+  border: 1px dashed var(--border-dark);
+  border-radius: 12px;
+  padding: 1rem 1.25rem;
+  background: var(--paper);
+}
+.unscheduled-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.85rem;
+}
+.unscheduled-pip {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  background: var(--border-dark);
+  color: var(--smoke);
+  font-size: 0.72rem;
+  font-weight: 600;
+  font-family: var(--mono);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.unscheduled-title {
+  font-family: var(--serif);
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+.unscheduled-sub {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  color: var(--smoke);
+  margin-top: 0.1rem;
+}
+/* ── Day picker ─────────────────────────────────────────────────────────── */
+.day-picker-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin: 0.75rem 0;
+  padding: 0.75rem 0;
+  border-top: 1px dashed var(--border);
+  border-bottom: 1px dashed var(--border);
+}
+
+.day-picker-btn {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--border-dark);
+  border-radius: 6px;
+  padding: 0.3rem 0.75rem;
+  text-decoration: none;
+  transition: all 0.13s;
+  white-space: nowrap;
+}
+.day-picker-btn:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+/* ── Address layout fix ─────────────────────────────────────────────────── */
+.meta-address {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  color: var(--smoke);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 260px;
+}
+
+/* ── Scheduled card overrides ────────────────────────────────────────────── */
+.scheduled-stall-card {
+  display: block !important;
+  overflow: hidden;
+  padding: 1.4rem 1.5rem 1.25rem;
+}
+/* stop label row */
+.scheduled-stall-card .sc-stop {
+  font-family: var(--mono);
+  font-size: 0.65rem;
+  color: var(--smoke);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin-bottom: 0.6rem;
+}
+/* cuisine tag row */
+.scheduled-stall-card .sc-cuisine {
+  margin-bottom: 0.45rem;
+}
+/* stall name */
+.scheduled-stall-card .sc-name {
+  font-family: var(--serif);
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--ink);
+  line-height: 1.2;
+  margin-bottom: 0.3rem;
+}
+/* hawker centre */
+.scheduled-stall-card .sc-hawker {
+  font-family: var(--mono);
+  font-size: 0.73rem;
+  color: var(--smoke);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 45%;
+}
+/* divider before meta */
+.scheduled-stall-card .sc-meta {
+  margin-top: 1rem;
+  padding-top: 0.9rem;
+  border-top: 1px dashed var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+.scheduled-stall-card .sc-meta .meta-chip {
+  font-size: 0.72rem;
+}
+.scheduled-stall-card .sc-meta .stall-actions {
+  margin-top: 0.35rem;
+  margin-left: 0;
+}
+
+/* ── Unscheduled card overrides ─────────────────────────────────────────── */
+.unscheduled-stall-card {
+  border-style: dashed !important;
+  display: block !important;
+  overflow: hidden;
+}
+/* Name: block, wraps, full width */
+.unscheduled-stall-card .stall-name {
+  display: block;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
+  flex: none;
+  width: 100%;
+  margin: 0.35rem 0 0.1rem;
+}
+/* Location: full width, never clipped */
+.unscheduled-stall-card .stall-hawker {
+  display: block;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
+  max-width: 100%;
+  width: 100%;
+  margin-bottom: 0;
+}
+/* ── Clickable address link ──────────────────────────────────────────────── */
+.meta-address-link {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  color: var(--smoke);
+  text-decoration: none;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
+  max-width: 100%;
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 0.25rem;
+  transition: color 0.15s;
+  line-height: 1.5;
+}
+.meta-address-link:hover { color: var(--accent); text-decoration: underline; }
+
+/* Day picker label styling */
+.day-picker-label {
+  font-family: var(--mono);
+  font-size: 0.65rem;
+  color: var(--smoke);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+  width: 100%;
+  white-space: nowrap;
+  margin-bottom: 0.1rem;
+}
 </style>
 
 <!-- ── HERO ──────────────────────────────────────────────────────────────── -->
@@ -706,6 +947,64 @@
     <p class="section-comment">// <em>{{ itinerary | length }}</em> stall{{ 's' if itinerary | length != 1 }} saved — organised across your trip</p>
 
     {% if days %}
+
+      {# ── Unscheduled stalls (no day chosen yet) #}
+      {% if unscheduled %}
+      <div class="unscheduled-section">
+        <div class="unscheduled-header">
+          <div class="unscheduled-pip">?</div>
+          <div>
+            <div class="unscheduled-title">Unscheduled Stalls</div>
+            <div class="unscheduled-sub">Pick a day for each stall below</div>
+          </div>
+          <span class="day-count-badge" style="margin-left:auto;">{{ unscheduled | length }} stall{{ 's' if unscheduled | length != 1 }}</span>
+        </div>
+
+        {% for stall in unscheduled %}
+        <div style="margin-bottom:0.85rem;">
+          <div class="stall-card unscheduled-stall-card">
+
+            <!-- Row 1: cuisine tag -->
+            <div class="stall-card-row1">
+              {% if stall.cuisine_type %}
+              <span class="cuisine-tag">{{ stall.cuisine_type }}</span>
+              {% endif %}
+            </div>
+
+            <!-- Row 2: name only (no rating) -->
+            <div class="stall-name" style="margin:0.35rem 0 0.1rem;">{{ stall.stall_name | default('Unknown Stall') }}</div>
+
+            <!-- Row 3: hawker centre — full width, never truncated -->
+            <div class="stall-hawker">📍 {{ stall.hawker_name | default('Unknown Centre') }}</div>
+
+            <!-- Day picker -->
+            <div class="day-picker-row">
+              <span class="day-picker-label">ADD TO DAY:</span>
+              {% for day in days %}
+              <a href="/itinerary/assign/{{ stall.stall_id }}/{{ loop.index0 }}"
+                 class="day-picker-btn">D{{ day.day_num }} · {{ day.weekday[:3] }} {{ day.date_str }}</a>
+              {% endfor %}
+            </div>
+
+            <!-- Row 4: distance + actions -->
+            <div class="stall-card-meta">
+              {% if stall.distance_km is not none %}
+              <span class="meta-chip">🚶 <strong>{{ "%.1f"|format(stall.distance_km) }} km</strong></span>
+              {% endif %}
+              <div class="stall-actions">
+                <a href="/pricing?stall_id={{ stall.stall_id }}" class="btn-details">View Menu</a>
+                <a href="/itinerary/remove/{{ stall.stall_id }}" class="btn-remove"
+                   onclick="return confirm('Remove {{ stall.stall_name }} from your itinerary?')">✕ Remove</a>
+              </div>
+            </div>
+
+          </div><!-- /.stall-card -->
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      {# ── Day-by-day scheduled stalls #}
       {% for day in days %}
       <section class="day-section">
         <div class="day-header">
@@ -717,65 +1016,54 @@
           <span class="day-count-badge">{{ day.stalls | length }} stall{{ 's' if day.stalls | length != 1 }}</span>
         </div>
 
+        {% if day.stalls %}
         <div class="timeline">
           {% for stall in day.stalls %}
           <div class="stall-entry">
-            <div class="stall-card">
-              <div class="stall-card-top">
-                <div class="stall-card-left">
-                  <div class="stall-order">// stop {{ loop.index }}</div>
-                  <div class="stall-name">{{ stall.stall_name | default('Unknown Stall') }}</div>
-                  <div class="stall-hawker">📍 {{ stall.hawker_name | default('Unknown Centre') }}</div>
-                </div>
-                <div class="stall-card-right">
-                  <div class="stall-rating">
-                    <span class="rating-num">{{ "%.1f"|format(stall.avg_rating | default(0)) }}</span>
-                    <span class="stars-mini">
-                      {% set r = (stall.avg_rating | default(0)) | round | int %}
-                      {% for i in range(1, 6) %}
-                        <span class="{{ '' if i <= r else 'empty' }}">★</span>
-                      {% endfor %}
-                    </span>
-                  </div>
-                  {% if stall.cuisine_type %}
-                  <span class="cuisine-tag">{{ stall.cuisine_type }}</span>
-                  {% endif %}
-                  {% if stall.is_open is defined %}
-                    {% if stall.is_open %}
-                      <span class="status-open">● Open</span>
-                    {% else %}
-                      <span class="status-closed">● Closed</span>
-                    {% endif %}
-                  {% else %}
-                    <span class="status-unknown">● Check hours</span>
-                  {% endif %}
-                </div>
+            <div class="stall-card scheduled-stall-card">
+
+              <!-- Stop label -->
+              <div class="sc-stop">// stop {{ loop.index }}</div>
+
+              <!-- Cuisine tag -->
+              {% if stall.cuisine_type %}
+              <div class="sc-cuisine">
+                <span class="cuisine-tag">{{ stall.cuisine_type }}</span>
+              </div>
+              {% endif %}
+
+              <!-- Stall name + hawker centre on same row -->
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:1rem;margin-bottom:0.3rem;">
+                <div class="sc-name">{{ stall.stall_name | default('Unknown Stall') }}</div>
+                <div class="sc-hawker" style="flex-shrink:0;text-align:right;">📍 {{ stall.hawker_name | default('Unknown Centre') }}</div>
               </div>
 
-              <div class="stall-card-meta">
-                {% if stall.distance_km is defined and stall.distance_km != None %}
+              <!-- Meta: address, distance, actions -->
+              <div class="sc-meta">
+                {% if stall.address_myenv %}
+                <a class="meta-address-link"
+                   href="https://www.google.com/maps/search/?api=1&query={{ stall.address_myenv | urlencode }}"
+                   target="_blank">🏠 {{ stall.address_myenv }}</a>
+                {% endif %}
+                {% if stall.distance_km is not none %}
                 <span class="meta-chip">🚶 <strong>{{ "%.1f"|format(stall.distance_km) }} km</strong></span>
                 {% endif %}
-                {% if stall.n_reviews %}
-                <span class="meta-chip">💬 <strong>{{ stall.n_reviews }}</strong> reviews</span>
-                {% endif %}
-                {% if stall.avg_price is defined and stall.avg_price %}
-                <span class="meta-chip">💰 avg <strong>${{ "%.2f"|format(stall.avg_price) }}</strong></span>
-                {% endif %}
-                {% if stall.address_myenv %}
-                <span class="meta-chip">🏠 {{ stall.address_myenv }}</span>
-                {% endif %}
-
                 <div class="stall-actions">
                   <a href="/pricing?stall_id={{ stall.stall_id }}" class="btn-details">View Menu</a>
                   <a href="/itinerary/remove/{{ stall.stall_id }}" class="btn-remove"
                      onclick="return confirm('Remove {{ stall.stall_name }} from your itinerary?')">✕ Remove</a>
                 </div>
               </div>
+
             </div>
           </div>
           {% endfor %}
         </div>
+        {% else %}
+        <div style="font-family:var(--mono);font-size:0.78rem;color:var(--smoke);padding:0.5rem 0 0.5rem 2rem;">
+          No stalls scheduled — assign stalls from the unscheduled list above.
+        </div>
+        {% endif %}
       </section>
       {% endfor %}
 
@@ -858,7 +1146,7 @@
         </div>
         <div class="summary-row">
           <span class="summary-label">Stalls / day</span>
-          <span class="summary-value">~{{ (itinerary | length / days_count) | round(1) if days_count > 0 else '—' }}</span>
+          <span class="summary-value">~{{ (itinerary | length / days_count) | round(1) }}</span>
         </div>
         {% endif %}
         <div class="summary-row">
