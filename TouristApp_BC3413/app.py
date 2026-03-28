@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, session, flash
+from flask import Flask, render_template, request, redirect, url_for, session, flash, Response
 from typing import Optional
 import re
 from feature_cuisines import CuisineFeatureHandler, CuisinePreferences
@@ -405,7 +405,7 @@ def update_trip_dates():
     return redirect(url_for("location"))
 
 
-# ───── Itinerary  ─────
+# ───── Itinerary  ───── # improvements: to include ratings
 # These routes expect:
 #   da.get_saved_stalls(username)  → list of stall_ids
 #   da.add_saved_stall(username, stall_id)
@@ -605,7 +605,6 @@ def itinerary_export():
                 f"    Rating: {float(row.get('avg_rating', 0) or 0):.1f} | Cuisine: {row.get('cuisine_type', '?')}")
             lines.append("")
 
-    from flask import Response
     return Response(
         "\n".join(lines),
         mimetype="text/plain",
