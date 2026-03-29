@@ -865,6 +865,81 @@
 }
 .meta-address-link:hover { color: var(--accent); text-decoration: underline; }
 
+/* ── Route optimiser ─────────────────────────────────────────────────────── */
+.btn-optimise {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: var(--accent-dim);
+  border: 1px solid var(--accent-glow);
+  border-radius: 6px;
+  padding: 0.3rem 0.85rem;
+  text-decoration: none;
+  transition: all 0.14s;
+  margin-left: auto;
+  white-space: nowrap;
+}
+.btn-optimise:hover { background: rgba(224,92,42,0.22); }
+.btn-optimise.active {
+  color: #fff;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.btn-reset-route {
+  font-family: var(--mono);
+  font-size: 0.65rem;
+  color: var(--smoke);
+  background: none;
+  border: 1px solid var(--border-dark);
+  border-radius: 6px;
+  padding: 0.3rem 0.7rem;
+  text-decoration: none;
+  transition: all 0.14s;
+  white-space: nowrap;
+}
+.btn-reset-route:hover { color: var(--accent); border-color: var(--accent); }
+.leg-connector {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0 0.35rem 1.25rem;
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  color: var(--smoke);
+}
+.leg-connector::before {
+  content: '';
+  display: block;
+  width: 2px;
+  height: 1.5rem;
+  background: linear-gradient(to bottom, var(--accent-glow), transparent);
+  flex-shrink: 0;
+}
+.reorder-btns {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.btn-reorder {
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  color: var(--smoke);
+  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.1rem 0.45rem;
+  text-decoration: none;
+  line-height: 1.4;
+  transition: all 0.12s;
+}
+.btn-reorder:hover { color: var(--accent); border-color: var(--accent); }
+.btn-reorder.disabled { opacity: 0.3; pointer-events: none; }
+
 /* Day picker label styling */
 .day-picker-label {
   font-family: var(--mono);
@@ -1006,6 +1081,8 @@
 
       {# ── Day-by-day scheduled stalls #}
       {% for day in days %}
+      {% set d_idx = loop.index0 %}
+      {% set route = route_orders.get(d_idx | string, none) %}
       <section class="day-section">
         <div class="day-header">
           <div class="day-pip">D{{ day.day_num }}</div>
@@ -1014,16 +1091,64 @@
             <div class="day-date-str">{{ day.date_str }}</div>
           </div>
           <span class="day-count-badge">{{ day.stalls | length }} stall{{ 's' if day.stalls | length != 1 }}</span>
+          {% if day.stalls | length > 1 %}
+            {% if route %}
+            <a href="/itinerary/route-clear/{{ d_idx }}" class="btn-reset-route">↺ Reset Order</a>
+            <a href="/itinerary/optimise/{{ d_idx }}" class="btn-optimise active">✦ Re-optimise</a>
+            {% else %}
+            <a href="/itinerary/optimise/{{ d_idx }}" class="btn-optimise">✦ Optimise Route</a>
+            {% endif %}
+          {% endif %}
         </div>
 
         {% if day.stalls %}
-        <div class="timeline">
+        {% set day_stall_map = {} %}
+        {% for stall in day.stalls %}{% set _ = day_stall_map.update({stall.stall_id: stall}) %}{% endfor %}
+
+        {# Build display list: route order if optimised, else default order #}
+        {% if route %}
+          {% set display_stalls = [] %}
+          {% for r in route %}
+            {% if r.stall_id in day_stall_map %}
+              {% set stall = day_stall_map[r.stall_id] %}
+              {% set _ = display_stalls.append({'stall': stall, 'leg_dist_km': r.leg_dist_km, 'leg_time_mins': r.leg_time_mins}) %}
+            {% endif %}
+          {% endfor %}
+        {% else %}
+          {% set display_stalls = [] %}
           {% for stall in day.stalls %}
+            {% set _ = display_stalls.append({'stall': stall, 'leg_dist_km': none, 'leg_time_mins': none}) %}
+          {% endfor %}
+        {% endif %}
+
+        <div class="timeline">
+          {% for item in display_stalls %}
+          {% set stall = item.stall %}
+          {% set stop_num = loop.index %}
+          {% set is_last = loop.last %}
+
+          {# Leg connector between stops (only when route is optimised and not first stop) #}
+          {% if route and not loop.first and item.leg_dist_km %}
+          <div class="leg-connector">
+            🚶 {{ item.leg_dist_km }} km · ~{{ item.leg_time_mins }} min walk
+          </div>
+          {% endif %}
+
           <div class="stall-entry">
             <div class="stall-card scheduled-stall-card">
 
-              <!-- Stop label -->
-              <div class="sc-stop">// stop {{ loop.index }}</div>
+              <!-- Stop label + reorder arrows (when optimised) -->
+              <div class="sc-stop" style="justify-content:space-between;">
+                <span>// stop {{ stop_num }}</span>
+                {% if route %}
+                <div class="reorder-btns">
+                  <a href="/itinerary/reorder/{{ d_idx }}/{{ stall.stall_id }}/up"
+                     class="btn-reorder {{ 'disabled' if loop.first }}">▲</a>
+                  <a href="/itinerary/reorder/{{ d_idx }}/{{ stall.stall_id }}/down"
+                     class="btn-reorder {{ 'disabled' if loop.last }}">▼</a>
+                </div>
+                {% endif %}
+              </div>
 
               <!-- Cuisine tag -->
               {% if stall.cuisine_type %}
@@ -1032,7 +1157,7 @@
               </div>
               {% endif %}
 
-              <!-- Stall name + hawker centre on same row -->
+              <!-- Stall name + hawker centre -->
               <div style="display:flex;align-items:baseline;justify-content:space-between;gap:1rem;margin-bottom:0.3rem;">
                 <div class="sc-name">{{ stall.stall_name | default('Unknown Stall') }}</div>
                 <div class="sc-hawker" style="flex-shrink:0;text-align:right;">📍 {{ stall.hawker_name | default('Unknown Centre') }}</div>
@@ -1046,7 +1171,7 @@
                    target="_blank">🏠 {{ stall.address_myenv }}</a>
                 {% endif %}
                 {% if stall.distance_km is not none %}
-                <span class="meta-chip">🚶 <strong>{{ "%.1f"|format(stall.distance_km) }} km</strong></span>
+                <span class="meta-chip">🚶 <strong>{{ "%.1f"|format(stall.distance_km) }} km</strong> from your location</span>
                 {% endif %}
                 <div class="stall-actions">
                   <a href="/pricing?stall_id={{ stall.stall_id }}" class="btn-details">View Menu</a>
@@ -1205,7 +1330,7 @@
       </div>
     </div>
 
-    <!--- No trip dates nudge --->
+    <!-- No trip dates nudge -->
     {% if not trip_start or not trip_end %}
     <div class="side-panel">
       <div class="side-panel-header">
