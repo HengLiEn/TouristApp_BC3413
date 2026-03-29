@@ -113,6 +113,22 @@ class ReviewFeature:
         )
         return df.drop(columns=["_date_sort"], errors="ignore")
 
+    def get_reviews_by_user(self, username: str) -> pd.DataFrame:
+        df = self.reviews_df[
+            self.reviews_df[self.user_col].astype(str).str.lower() == username.lower()
+            ].copy()
+        if df.empty:
+            return df
+        df["_date_sort"] = pd.to_datetime(df[self.date_col], errors="coerce")
+        df = df.sort_values("_date_sort", ascending=False).reset_index(drop=True)
+        df = df.merge(
+            self.stalls_df[[self.stall_id_col, self.stall_name_col]],
+            left_on=self.review_stall_id_col,
+            right_on=self.stall_id_col,
+            how="left",
+        )
+        return df.drop(columns=["_date_sort"], errors="ignore")
+
     def add_review(self, stall_id: int, rating: float, review_text: str, user_name: str = "Anonymous") -> int:
         rating_f = float(rating)
         if not 0.0 <= rating_f <= 5.0:

@@ -1,8 +1,781 @@
 {% extends "feature_onboarding.html" %}
-{% set active_page = "dashboard" %}
+{% set active_page = "reviews" %}
 
-{% block title %}Dashboard — Hawker Hunt{% endblock %}
+{% block title %}
+  {% if selected_stall_name %}{{ selected_stall_name }} Reviews{% else %}Reviews{% endif %} — Hawker Hunt
+{% endblock %}
 
 {% block content %}
-  <!-- your content here -->
+
+<style>
+/* ══ TAB BAR ══════════════════════════════════════════════════════ */
+.tab-bar {
+  display: flex;
+  margin-bottom: 1.75rem;
+  border-bottom: 2px solid var(--soy);
+}
+.tab-btn {
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -2px;
+  padding: 0.65rem 1.4rem;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.65rem;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--smoke);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+.tab-btn:hover { color: var(--soy); }
+.tab-btn.active { color: var(--chili); border-bottom-color: var(--chili); font-weight: 600; }
+.tab-pane { display: none; }
+.tab-pane.active { display: block; }
+
+/* ══ SAVE TO ITINERARY BUTTON (matches pricing page) ════════════ */
+.save-itin-btn {
+  display: inline-block;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: var(--chili);
+  color: #fff;
+  border-radius: 8px;
+  padding: 0.5rem 1.1rem;
+  text-decoration: none;
+  transition: opacity 0.15s, transform 0.1s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.save-itin-btn:hover { opacity: 0.85; transform: translateY(-1px); }
+
+/* ══ STALL HEADER ════════════════════════════════════════════════ */
+.stall-banner {
+  background: var(--soy);
+  border: 2px solid var(--soy);
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+.stall-banner-name {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--cream);
+}
+.stall-banner-sub { font-size: 0.8rem; color: var(--smoke); margin-top: 2px; }
+.stall-banner-rating {
+  font-family: 'Playfair Display', serif;
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--turmeric);
+  line-height: 1;
+}
+.stall-banner-stars { display: flex; gap: 3px; font-size: 0.85rem; justify-content: flex-end; }
+.stall-banner-count { font-family: 'DM Mono', monospace; font-size: 0.62rem; color: var(--smoke); letter-spacing: 1px; text-transform: uppercase; }
+
+/* ══ STAR FILTER CHIPS ════════════════════════════════════════════ */
+.filter-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
+}
+.filter-label {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.62rem;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--smoke);
+}
+
+/* ══ REVIEW CARDS ════════════════════════════════════════════════ */
+.review-cards { display: flex; flex-direction: column; }
+.review-card {
+  background: white;
+  border: 2px solid var(--bone);
+  border-bottom: none;
+  padding: 1.4rem 1.5rem;
+  animation: slideIn 0.35s ease both;
+}
+.review-card:last-child { border-bottom: 2px solid var(--bone); }
+.review-card:hover { border-color: var(--smoke); z-index: 2; position: relative; }
+
+.review-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.reviewer-name {
+  font-family: 'Playfair Display', serif;
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: 0.25rem;
+}
+.review-meta { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+.review-stars { display: flex; gap: 2px; font-size: 0.8rem; }
+.review-date {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.6rem;
+  letter-spacing: 1px;
+  color: var(--smoke);
+  text-transform: uppercase;
+}
+.verified-badge {
+  background: var(--pandan);
+  color: white;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.58rem;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 100px;
+}
+.rating-big {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--turmeric);
+  line-height: 1;
+  flex-shrink: 0;
+}
+.review-text {
+  font-size: 0.88rem;
+  line-height: 1.7;
+  color: var(--soy);
+  margin-bottom: 1rem;
+}
+.review-footer { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+.helpful-count {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.62rem;
+  letter-spacing: 1px;
+  color: var(--smoke);
+  text-transform: uppercase;
+}
+.helpful-btn {
+  background: none;
+  border: 1.5px solid var(--bone);
+  padding: 0.3rem 0.85rem;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.6rem;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  cursor: pointer;
+  color: var(--smoke);
+  transition: all 0.15s;
+}
+.helpful-btn:hover { border-color: var(--turmeric); color: var(--turmeric); }
+.helpful-btn.voted {
+  border-color: var(--pandan);
+  color: var(--pandan);
+  cursor: not-allowed;
+  opacity: 0.8;
+}
+.helpful-btn.voted:hover { border-color: var(--pandan); color: var(--pandan); }
+
+/* ══ WRITE REVIEW FORM ═══════════════════════════════════════════ */
+.write-form {
+  background: white;
+  border: 2px solid var(--bone);
+  padding: 2rem;
+}
+.field-group { margin-bottom: 1.25rem; }
+.field-label {
+  display: block;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.62rem;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  color: var(--smoke);
+  margin-bottom: 0.5rem;
+}
+.field-input,
+.field-textarea {
+  width: 100%;
+  border: 2px solid var(--bone);
+  background: var(--surface);
+  padding: 0.75rem 1rem;
+  font-family: 'Instrument Sans', sans-serif;
+  font-size: 0.9rem;
+  color: var(--soy);
+  outline: none;
+  transition: border-color 0.15s;
+}
+.field-input:focus,
+.field-textarea:focus { border-color: var(--chili); background: white; }
+.field-textarea        { resize: vertical; min-height: 140px; }
+
+.star-picker { display: flex; gap: 0.4rem; margin-top: 0.25rem; }
+.star-pick {
+  font-size: 2rem;
+  cursor: pointer;
+  color: var(--bone);
+  transition: color 0.1s, transform 0.1s;
+  user-select: none;
+  line-height: 1;
+}
+.star-pick.lit { color: var(--turmeric); }
+.star-pick:hover { transform: scale(1.15); }
+.rating-hint {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.62rem;
+  letter-spacing: 1px;
+  color: var(--smoke);
+  margin-top: 0.4rem;
+  text-transform: uppercase;
+}
+.submit-btn {
+  width: 100%;
+  background: var(--soy);
+  color: var(--cream);
+  border: none;
+  padding: 1rem;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.7rem;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.2s;
+  margin-top: 0.5rem;
+}
+.submit-btn:hover { background: var(--chili); }
+
+/* ══ LIVE SEARCH DROPDOWN ════════════════════════════════════════ */
+.stall-search-wrapper { position: relative; }
+.write-stall-results {
+  border: 2px solid var(--bone);
+  border-top: none;
+  background: white;
+  max-height: 200px;
+  overflow-y: auto;
+  display: none;
+  position: absolute;
+  width: 100%;
+  z-index: 50;
+}
+.write-stall-option {
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  font-size: 0.88rem;
+  border-bottom: 1px solid var(--bone);
+  transition: background 0.1s;
+}
+.write-stall-option:last-child { border-bottom: none; }
+.write-stall-option:hover      { background: #fff7f4; }
+.write-stall-option strong { font-family: 'Playfair Display', serif; display: block; }
+.write-stall-option small  { color: var(--smoke); font-size: 0.75rem; }
+.selected-stall-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bone);
+  color: var(--soy);
+  font-family: 'DM Mono', monospace;
+  font-size: 0.65rem;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 0.3rem 0.75rem;
+  margin-top: 0.4rem;
+}
+
+/* ══ FLASH / EMPTY ═══════════════════════════════════════════════ */
+.flash-bar {
+  padding: 0.8rem 1.25rem;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.68rem;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  border-left: 4px solid var(--turmeric);
+  background: var(--cream);
+  color: var(--soy);
+  margin-bottom: 1.5rem;
+}
+.flash-bar.success { border-color: var(--pandan); }
+.flash-bar.error   { border-color: var(--chili); }
+</style>
+
+<!-- ── HERO ──────────────────────────────────────────────────────── -->
+<section class="hero">
+  <div class="hero-inner">
+    <p class="hero-eyebrow">// Community Reviews</p>
+    <h1 class="hero-title">
+      {% if selected_stall_name %}
+        <em>{{ selected_stall_name }}</em>
+      {% else %}
+        Hawker <em>Reviews</em>
+      {% endif %}
+    </h1>
+    <p class="hero-desc">
+      {% if selected_stall_name %}
+        All reviews for this stall. Filter by stars or scroll to read them all.
+      {% else %}
+        Read reviews or share your own hawker experience.
+      {% endif %}
+    </p>
+  </div>
+  <div class="hero-deco"></div>
+</section>
+
+<!-- ── MAIN WRAPPER ──────────────────────────────────────────────── -->
+<div class="main-wrapper">
+
+  <!-- ═══ SIDEBAR ════════════════════════════════════════════════ -->
+  <aside class="sidebar">
+
+    <!-- Star filter — only show when viewing a stall's reviews -->
+    {% if selected_stall_id %}
+    <form method="GET" action="/reviews" id="star-filter-form">
+      <input type="hidden" name="stall_id" value="{{ selected_stall_id }}">
+      <input type="hidden" name="tab"      value="read">
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Filter by Stars</span>
+          <span>⭐</span>
+        </div>
+        <div class="panel-body">
+          <div class="chips-grid">
+            <button type="submit" name="stars" value=""
+                    class="chip {{ 'active' if not selected_stars }}">
+              All
+            </button>
+            {% for val, label in [('5','★★★★★ 5'),('4','★★★★☆ 4+'),('3','★★★☆☆ 3+'),('2','★★☆☆☆ 2+'),('1','★☆☆☆☆ 1+')] %}
+              <button type="submit" name="stars" value="{{ val }}"
+                      class="chip {{ 'active' if selected_stars == val }}">
+                {{ label }}
+              </button>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </form>
+    {% endif %}
+
+    <!-- Your Trip -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Your Trip</span>
+        <span>📍</span>
+      </div>
+      <div class="panel-body" style="display:flex;flex-direction:column;gap:0.6rem;">
+        {% if trip_start and trip_end %}
+          <div style="display:flex;justify-content:space-between;font-size:0.82rem;">
+            <span style="color:var(--smoke)">Dates</span>
+            <strong>{{ trip_start }} → {{ trip_end }}</strong>
+          </div>
+        {% else %}
+          <p style="font-size:0.82rem;color:var(--smoke);">No trip dates set.</p>
+        {% endif %}
+        <a href="/location" class="clear-btn"
+           style="text-align:center;text-decoration:none;display:block;margin-top:0.25rem;">
+          ✏️ Update Trip
+        </a>
+      </div>
+    </div>
+
+    <!-- Your Itinerary -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Your Itinerary</span>
+        <span>🗺</span>
+      </div>
+      <div class="panel-body" style="display:flex;flex-direction:column;gap:0.6rem;">
+        {% if saved_stall_count is defined and saved_stall_count > 0 %}
+          <div style="display:flex;justify-content:space-between;font-size:0.82rem;">
+            <span style="color:var(--smoke)">Saved Stalls</span>
+            <strong>{{ saved_stall_count }}</strong>
+          </div>
+          <a href="/itinerary" class="apply-btn"
+             style="text-align:center;text-decoration:none;display:block;margin-top:0.25rem;">
+            View Itinerary →
+          </a>
+        {% else %}
+          <p style="font-size:0.82rem;color:var(--smoke);margin-bottom:0.5rem;">No stalls saved yet.</p>
+          <a href="/cuisines" class="clear-btn"
+             style="text-align:center;text-decoration:none;display:block;margin-top:0;">
+            Browse Stalls →
+          </a>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Explore More -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Explore More</span>
+        <span>🍜</span>
+      </div>
+      <div class="panel-body" style="display:flex;flex-direction:column;gap:0.5rem;">
+        <a href="/cuisines"  class="clear-btn" style="text-align:center;text-decoration:none;display:block;margin-top:0;">🍽️ Browse Cuisines</a>
+        <a href="/location"  class="clear-btn" style="text-align:center;text-decoration:none;display:block;margin-top:0;">📍 My Location</a>
+        <a href="/itinerary" class="clear-btn" style="text-align:center;text-decoration:none;display:block;margin-top:0;">🗺 My Itinerary</a>
+      </div>
+    </div>
+
+  </aside>
+
+  <!-- ═══ MAIN ═══════════════════════════════════════════════════ -->
+  <main>
+
+    <!-- Flash messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="flash-bar {{ category }}">{{ message }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <!-- Tab bar -->
+    <div class="tab-bar">
+      <button class="tab-btn {{ 'active' if active_tab != 'write' }}"
+              onclick="switchTab('read')">💬 Reviews{% if reviews_list %} ({{ reviews_list|length }}){% endif %}</button>
+      <button class="tab-btn {{ 'active' if active_tab == 'write' }}"
+              onclick="switchTab('write')">✍️ Write a Review</button>
+    </div>
+
+    <!-- ══ TAB 1: READ REVIEWS ══════════════════════════════════ -->
+    <div class="tab-pane {{ 'active' if active_tab != 'write' }}" id="tab-mine">
+
+      <!-- Stall banner (shown when arriving from a specific stall) -->
+      {% if selected_stall_name %}
+      <div class="stall-banner">
+        <div>
+          <div class="stall-banner-name">{{ selected_stall_name }}</div>
+          {% if selected_stall_hawker %}
+            <div class="stall-banner-sub">📍 {{ selected_stall_hawker }}</div>
+          {% endif %}
+          <a href="/itinerary/save/{{ selected_stall_id }}" class="save-itin-btn"
+             style="margin-top:0.75rem;display:inline-block;">
+            + Save to Itinerary
+          </a>
+        </div>
+        <div style="text-align:right;">
+          {% if avg_rating %}
+            <div class="stall-banner-rating">{{ "%.1f"|format(avg_rating) }}</div>
+            <div class="stall-banner-stars">
+              {% set r = avg_rating | round | int %}
+              {% for i in range(1,6) %}
+                <span class="{{ 'star' if i <= r else 'star-empty' }}">★</span>
+              {% endfor %}
+            </div>
+          {% endif %}
+          <div class="stall-banner-count">{{ total_review_count }} review{{ 's' if total_review_count != 1 }}</div>
+        </div>
+      </div>
+
+      <!-- Sort bar -->
+      <div style="display:flex;align-items:center;flex-wrap:wrap;gap:0.5rem;margin-bottom:1rem;">
+        <div class="sort-bar" style="margin-bottom:0;gap:0.35rem;">
+          {% for sort_val, sort_label in [('date','Most Recent'),('helpful','Most Helpful'),('stars','Top Rated'),('verified','Verified')] %}
+            <a href="/reviews?stall_id={{ selected_stall_id }}&tab=read&stars={{ selected_stars | default('') }}&review_sort={{ sort_val }}"
+               class="sort-btn {{ 'active' if review_sort == sort_val or (not review_sort and sort_val == 'helpful') }}">
+              {{ sort_label }}
+            </a>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Active star filter indicator -->
+      {% if selected_stars %}
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
+        <span style="font-family:'DM Mono',monospace;font-size:0.65rem;letter-spacing:1.5px;text-transform:uppercase;color:var(--smoke);">
+          Showing {{ selected_stars }}★ reviews · {{ reviews_list|length }} result{{ 's' if reviews_list|length != 1 }}
+        </span>
+        <a href="/reviews?stall_id={{ selected_stall_id }}&tab=read&review_sort={{ review_sort | default('helpful') }}"
+           style="font-family:'DM Mono',monospace;font-size:0.62rem;color:var(--chili);text-decoration:none;letter-spacing:1px;text-transform:uppercase;">
+          ✕ Clear filter
+        </a>
+      </div>
+      {% endif %}
+      {% endif %}
+
+      <!-- Back to stall link -->
+      {% if back_stall_id %}
+      <a href="/pricing?stall_id={{ back_stall_id }}"
+         style="display:inline-flex;align-items:center;gap:6px;font-family:'DM Mono',monospace;
+                font-size:0.65rem;letter-spacing:1.5px;text-transform:uppercase;
+                color:var(--chili);text-decoration:none;margin-bottom:1.25rem;">
+        ← Back to Stall
+      </a>
+      {% endif %}
+
+      <div class="section-header">
+        <h2 class="section-title">
+          {{ selected_stall_name if selected_stall_name else 'Reviews' }}
+        </h2>
+        <span class="section-count">
+          {% if reviews_list %}
+            {{ reviews_list|length }} review{{ 's' if reviews_list|length != 1 }}
+          {% endif %}
+        </span>
+      </div>
+
+      {% if reviews_list %}
+        <div class="review-cards">
+          {% for rev in reviews_list %}
+          <div class="review-card" style="animation-delay:{{ loop.index0 * 0.05 }}s;">
+            <div class="review-top">
+              <div>
+                <div class="reviewer-name">{{ rev.reviewer_name }}</div>
+                <div class="review-meta">
+                  <div class="review-stars">
+                    {% set r = rev.rating | round | int %}
+                    {% for i in range(1,6) %}
+                      <span class="{{ 'star' if i <= r else 'star-empty' }}">★</span>
+                    {% endfor %}
+                  </div>
+                  <span class="review-date">{{ rev.date }}</span>
+                  {% if rev.verified_purchase == 'Yes' %}
+                    <span class="verified-badge">✓ Verified</span>
+                  {% endif %}
+                </div>
+              </div>
+              <span class="rating-big">{{ "%.1f"|format(rev.rating) }}</span>
+            </div>
+
+            <p class="review-text">{{ rev.review }}</p>
+
+            <div class="review-footer">
+              <span class="helpful-count">👍 {{ rev.helpful_count }} found helpful</span>
+              <form method="POST" action="/reviews/helpful" style="display:inline;"
+                    id="helpful-form-{{ rev.review_id }}"
+                    onsubmit="markHelpful(event, {{ rev.review_id }})">
+                <input type="hidden" name="review_id"  value="{{ rev.review_id }}">
+                <input type="hidden" name="stall_id"   value="{{ selected_stall_id }}">
+                <input type="hidden" name="stars"      value="{{ selected_stars | default('') }}">
+                <button type="submit"
+                        class="helpful-btn"
+                        id="helpful-btn-{{ rev.review_id }}">
+                  Mark Helpful
+                </button>
+              </form>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+
+      {% else %}
+        <div class="empty-state">
+          <span style="font-size:2.5rem;display:block;margin-bottom:0.75rem;">💬</span>
+          <h3>
+            {% if selected_stars %}
+              No {{ selected_stars }}★ reviews yet
+            {% else %}
+              No reviews yet
+            {% endif %}
+          </h3>
+          <p>Write your first review!</p>
+          <button class="apply-btn"
+                  style="width:auto;margin-top:1rem;padding:0.75rem 1.5rem;border:none;"
+                  onclick="switchTab('write')">
+            ✍️ Write a Review
+          </button>
+        </div>
+      {% endif %}
+
+    </div><!-- /tab-mine -->
+
+    <!-- ══ TAB 2: WRITE REVIEW ══════════════════════════════════ -->
+    <div class="tab-pane {{ 'active' if active_tab == 'write' }}" id="tab-write">
+
+      <div class="section-header">
+        <h2 class="section-title">Write a Review</h2>
+        <span class="section-count">Share your experience</span>
+      </div>
+
+      <form method="POST" action="/reviews/submit" class="write-form">
+
+        <!-- Stall picker — pre-filled if coming from a stall page -->
+        <div class="field-group">
+          <label class="field-label">Stall Name</label>
+          <div class="stall-search-wrapper">
+            <input type="text" id="writeStallSearch" class="field-input"
+                   placeholder="Type to search for a stall…"
+                   value="{{ write_stall_name | default('') }}"
+                   autocomplete="off"
+                   oninput="liveSearch(this.value)">
+            <div class="write-stall-results" id="writeResults"></div>
+          </div>
+          {% if write_stall_name %}
+            <div class="selected-stall-tag">✓ {{ write_stall_name }}</div>
+          {% endif %}
+          <input type="hidden" name="stall_id"   id="writeStallId"
+                 value="{{ write_stall_id | default('') }}">
+          <input type="hidden" name="stall_name" id="writeStallName"
+                 value="{{ write_stall_name | default('') }}">
+        </div>
+
+        <!-- Star rating -->
+        <div class="field-group">
+          <label class="field-label">Your Rating</label>
+          <div class="star-picker">
+            {% for i in range(1,6) %}
+              <span class="star-pick" data-val="{{ i }}"
+                    onclick="setRating({{ i }})">★</span>
+            {% endfor %}
+          </div>
+          <p class="rating-hint" id="ratingHint">Click to rate</p>
+          <input type="hidden" name="rating" id="ratingInput" value="">
+        </div>
+
+        <!-- Review text -->
+        <div class="field-group">
+          <label class="field-label" for="reviewText">Your Review</label>
+          <textarea name="review_text" id="reviewText" class="field-textarea"
+                    placeholder="What did you eat? How was the food and service? Would you recommend it?"
+                    required></textarea>
+        </div>
+
+        <!-- Name -->
+        <div class="field-group">
+          <label class="field-label" for="reviewerName">Your Name</label>
+          <input type="text" name="user_name" id="reviewerName" class="field-input"
+                 placeholder="Anonymous"
+                 value="{{ username | default('') }}">
+        </div>
+
+        <!-- Pass back stall info so after submit we return to the right stall -->
+        <input type="hidden" name="back_stall_id" value="{{ selected_stall_id | default('') }}">
+
+        <button type="submit" class="submit-btn">Submit Review →</button>
+      </form>
+
+    </div><!-- /tab-write -->
+
+  </main>
+</div>
+
+<script>
+/* ══ TAB SWITCHING ══════════════════════════════════════════════ */
+function switchTab(name) {
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  document.querySelectorAll('.tab-btn').forEach(b => {
+    if (b.getAttribute('onclick') === "switchTab('" + name + "')") b.classList.add('active');
+  });
+  const url = new URL(window.location);
+  url.searchParams.set('tab', name);
+  history.replaceState({}, '', url);
+}
+
+/* Honour ?tab= on load */
+(function() {
+  const t = new URLSearchParams(window.location.search).get('tab');
+  if (t && ['read','write'].includes(t)) switchTab(t);
+})();
+
+/* ══ LIVE STALL SEARCH ══════════════════════════════════════════ */
+let searchTimer;
+function liveSearch(val) {
+  clearTimeout(searchTimer);
+  const box = document.getElementById('writeResults');
+  if (val.trim().length < 2) { box.style.display = 'none'; return; }
+  searchTimer = setTimeout(() => {
+    fetch('/reviews/search?q=' + encodeURIComponent(val))
+      .then(r => r.json())
+      .then(data => {
+        if (!data.length) { box.style.display = 'none'; return; }
+        box.innerHTML = data.map(s =>
+          `<div class="write-stall-option"
+                onclick="pickStall(${s.stall_id},
+                  '${s.stall_name.replace(/'/g,"\\'")}',
+                  '${(s.hawker_name||'').replace(/'/g,"\\'")}')">
+            <strong>${s.stall_name}</strong>
+            ${s.hawker_name ? '<small>📍 ' + s.hawker_name + '</small>' : ''}
+          </div>`
+        ).join('');
+        box.style.display = 'block';
+      }).catch(() => {});
+  }, 280);
+}
+
+function pickStall(id, name, hawker) {
+  document.getElementById('writeStallId').value    = id;
+  document.getElementById('writeStallName').value  = name;
+  document.getElementById('writeStallSearch').value = name;
+  document.getElementById('writeResults').style.display = 'none';
+}
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('#writeStallSearch') && !e.target.closest('#writeResults'))
+    document.getElementById('writeResults').style.display = 'none';
+});
+
+/* ══ STAR RATING ════════════════════════════════════════════════ */
+const ratingLabels = ['','Terrible','Poor','Decent','Good','Excellent'];
+
+function setRating(val) {
+  document.getElementById('ratingInput').value = val;
+  document.getElementById('ratingHint').textContent = val + '/5 — ' + ratingLabels[val];
+  document.querySelectorAll('.star-pick').forEach(s =>
+    s.classList.toggle('lit', parseInt(s.dataset.val) <= val));
+}
+
+document.querySelectorAll('.star-pick').forEach(star => {
+  star.addEventListener('mouseenter', () => {
+    const v = parseInt(star.dataset.val);
+    document.querySelectorAll('.star-pick').forEach(s =>
+      s.style.color = parseInt(s.dataset.val) <= v ? 'var(--turmeric)' : 'var(--bone)');
+  });
+  star.addEventListener('mouseleave', () => {
+    const cur = parseInt(document.getElementById('ratingInput').value) || 0;
+    document.querySelectorAll('.star-pick').forEach(s =>
+      s.style.color = parseInt(s.dataset.val) <= cur ? 'var(--turmeric)' : 'var(--bone)');
+  });
+});
+
+/* ══ MARK HELPFUL ═══════════════════════════════════════════════ */
+const STORAGE_KEY = 'hawker_helpful_votes';
+
+function getVoted() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }
+  catch { return []; }
+}
+
+function saveVoted(ids) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(ids));
+}
+
+// This will be moved to database onced the login page is setup
+function applyVotedState() {
+  const voted = getVoted();
+  voted.forEach(id => {
+    const btn = document.getElementById('helpful-btn-' + id);
+    if (btn) {
+      btn.textContent  = '✓ Marked Helpful';
+      btn.classList.add('voted');
+      btn.disabled     = true;
+    }
+  });
+}
+
+function markHelpful(event, reviewId) {
+  const voted = getVoted();
+  if (voted.includes(reviewId)) {
+    event.preventDefault();   // already voted — do nothing
+    return;
+  }
+  // Save immediately so even if the page reloads the state persists
+  voted.push(reviewId);
+  saveVoted(voted);
+  // Let the form submit normally to POST to the server
+}
+
+// Apply voted states on page load
+document.addEventListener('DOMContentLoaded', applyVotedState);
+</script>
+
 {% endblock %}

@@ -374,6 +374,174 @@
     {% endif %}
 
   {% endif %}
+
+<!-- ── Top 3 Reviews ─────────────────────────────────────────── -->
+  {% if stall %}
+  <style>
+    .reviews-section { margin-top: 2.5rem; }
+    .review-card-mini {
+      background: var(--cream);
+      border: 2px solid var(--bone);
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 0.75rem;
+    }
+    .review-card-mini-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 0.6rem;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+    .mini-reviewer {
+      font-family: 'Playfair Display', serif;
+      font-weight: 700;
+      font-size: 0.95rem;
+      color: var(--soy);
+    }
+    .mini-meta { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+    .mini-stars { display: flex; gap: 2px; font-size: 0.75rem; }
+    .mini-date {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.6rem;
+      letter-spacing: 1px;
+      color: var(--smoke);
+      text-transform: uppercase;
+    }
+    .mini-rating {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: var(--turmeric);
+      flex-shrink: 0;
+    }
+    .mini-text {
+      font-size: 0.85rem;
+      line-height: 1.65;
+      color: var(--smoke);
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      margin-bottom: 0.5rem;
+    }
+    .mini-helpful {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.6rem;
+      letter-spacing: 1px;
+      color: var(--smoke);
+      text-transform: uppercase;
+    }
+    .read-all-btn {
+      display: block;
+      width: 100%;
+      text-align: center;
+      margin-top: 1rem;
+      padding: 0.85rem;
+      background: transparent;
+      border: 2px solid var(--chili);
+      color: var(--chili);
+      font-family: 'DM Mono', monospace;
+      font-size: 0.68rem;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      text-decoration: none;
+      transition: background 0.15s, color 0.15s;
+    }
+    .read-all-btn:hover { background: var(--chili); color: var(--cream); }
+    .no-reviews-box {
+      text-align: center;
+      padding: 2rem;
+      border: 2px dashed var(--bone);
+      color: var(--smoke);
+      font-size: 0.85rem;
+    }
+    .review-sort-bar {
+      display: flex;
+      gap: 0.4rem;
+      margin-bottom: 1rem;
+      flex-wrap: wrap;
+    }
+    .review-sort-btn {
+      background: white;
+      border: 1.5px solid var(--bone);
+      padding: 0.3rem 0.75rem;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.6rem;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      cursor: pointer;
+      color: var(--smoke);
+      text-decoration: none;
+      transition: all 0.15s;
+      border-radius: 1px;
+    }
+    .review-sort-btn:hover { border-color: var(--soy); color: var(--soy); }
+    .review-sort-btn.active { background: var(--soy); color: var(--cream); border-color: var(--soy);
+  </style>
+
+  <div class="reviews-section" id="reviews">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;margin-bottom:0.75rem;">
+      <p class="section-heading" style="margin-bottom:0;">// What People Say</p>
+      <div class="review-sort-bar" style="margin-bottom:0;">
+        <a href="?stall_id={{ stall.stall_id }}&review_sort=helpful{% if back_params %}&cuisine={{ back_params.cuisine }}&stars={{ back_params.stars }}&sort={{ back_params.sort }}&q={{ back_params.q }}&max_price={{ back_params.max_price }}{% for a in back_params.allergens %}&allergens={{ a }}{% endfor %}{% endif %}#reviews"
+           class="review-sort-btn {{ 'active' if review_sort == 'helpful' or not review_sort }}">
+          Most Helpful
+        </a>
+        <a href="?stall_id={{ stall.stall_id }}&review_sort=recent{% if back_params %}&cuisine={{ back_params.cuisine }}&stars={{ back_params.stars }}&sort={{ back_params.sort }}&q={{ back_params.q }}&max_price={{ back_params.max_price }}{% for a in back_params.allergens %}&allergens={{ a }}{% endfor %}{% endif %}#reviews"
+           class="review-sort-btn {{ 'active' if review_sort == 'recent' }}">
+          Most Recent
+        </a>
+        <a href="?stall_id={{ stall.stall_id }}&review_sort=stars{% if back_params %}&cuisine={{ back_params.cuisine }}&stars={{ back_params.stars }}&sort={{ back_params.sort }}&q={{ back_params.q }}&max_price={{ back_params.max_price }}{% for a in back_params.allergens %}&allergens={{ a }}{% endfor %}{% endif %}#reviews"
+           class="review-sort-btn {{ 'active' if review_sort == 'stars' }}">
+          Highest Rated
+        </a>
+      </div>
+    </div>
+
+    {% if top_reviews %}
+      {% for rev in top_reviews %}
+      <div class="review-card-mini">
+        <div class="review-card-mini-top">
+          <div>
+            <div class="mini-reviewer">{{ rev.reviewer_name }}</div>
+            <div class="mini-meta">
+              <div class="mini-stars">
+                {% set r = rev.rating | round | int %}
+                {% for i in range(1,6) %}
+                  <span class="{{ 'star' if i <= r else 'star-empty' }}">&#9733;</span>
+                {% endfor %}
+              </div>
+              <span class="mini-date">{{ rev.date }}</span>
+            </div>
+          </div>
+          <span class="mini-rating">{{ "%.1f"|format(rev.rating) }}</span>
+        </div>
+        <p class="mini-text">{{ rev.review }}</p>
+        <div class="mini-helpful">&#128077; {{ rev.helpful_count }} found this helpful</div>
+      </div>
+      {% endfor %}
+
+      <div style="display:flex;gap:0.75rem;flex-wrap:wrap;margin-top:1rem;">
+        <a href="/reviews?stall_id={{ stall.stall_id }}" class="read-all-btn" style="flex:1;margin-top:0;">
+          Read All Reviews &#8594;
+        </a>
+      </div>
+
+    {% else %}
+      <div class="no-reviews-box">
+        <span style="font-size:2rem;display:block;margin-bottom:0.5rem;">&#128172;</span>
+        No reviews yet for this stall.
+        <br><br>
+        <a href="/reviews?tab=write&write_stall_id={{ stall.stall_id }}&write_stall_name={{ stall.stall_name | urlencode }}"
+           class="read-all-btn" style="display:inline-block;width:auto;padding:0.6rem 1.5rem;">
+          Be the first to review &#8594;
+        </a>
+      </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
 </div>
 
 {% endblock %}

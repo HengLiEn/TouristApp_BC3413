@@ -1,9 +1,10 @@
-from flask import Flask, render_template, request, redirect, url_for, session, flash, Response
+from flask import Flask, render_template, request, redirect, url_for, session, flash, Response, jsonify
 from typing import Optional
 import re
 from feature_cuisines import CuisineFeatureHandler, CuisinePreferences
 from feature_onboarding import TouristProfileDA
 from features_location import LocationPlanner
+from features_reviews import ReviewFeature
 from datetime import datetime, timedelta
 from collections import Counter
 import pandas as pd
@@ -247,11 +248,30 @@ def pricing():
         'allergens': request.args.getlist('allergens'),
     }
 
+    # Top 3 reviews for this stall (shown at bottom of pricing page)
+    from features_reviews import ReviewFeature
+    rf = ReviewFeature()
+    review_sort = request.args.get('review_sort', 'helpful')  # helpful | recent | stars
+
+    rev_df = rf.get_reviews_for_stall(stall_id, limit=100)
+    all_top = rf.get_display_rows(rev_df)
+
+    if review_sort == 'recent':
+        all_top = sorted(all_top, key=lambda r: r['date'], reverse=True)
+    elif review_sort == 'stars':
+        all_top = sorted(all_top, key=lambda r: r['rating'], reverse=True)
+    else:  # helpful (default)
+        all_top = sorted(all_top, key=lambda r: r['helpful_count'], reverse=True)
+
+    top_reviews = all_top[:3]
+
     return render_template("feature_pricing.html",
                            stall=stall,
                            menu_items=menu_items,
                            error=None,
-                           back_params=back_params)
+                           back_params=back_params,
+                           top_reviews=top_reviews,
+                           review_sort=review_sort)
 
 da = TouristProfileDA()           # one shared instance
 planner = LocationPlanner()       # one shared instance
@@ -634,9 +654,178 @@ def _ddmmyyyy_to_iso(ddmmyyyy_str) -> Optional[str]:
 def closure():
     return render_template('feature_onboarding.html', active_page='closure')
 
+# ── Reviews ───────────────────────────────────────────────────────────────────
+review_feature = ReviewFeature()
+
 @app.route("/reviews")
 def reviews():
-    return render_template('feature_onboarding.html', active_page='reviews')
+    session["username"] = "test_user"  # TEMP
+
+    profile = da.get_profile(session["username"])
+    active_tab = request.args.get("tab", "read")
+    stall_id = request.args.get("stall_id", None, type=int)
+    selected_stars = request.args.get("stars", "").strip()
+    write_stall_id = request.args.get("write_stall_id", "")
+    write_stall_name = request.args.get("write_stall_name", "")
+
+    # ── Load reviews for the selected stall ───────────────────────
+    reviews_list = []
+    selected_stall_name = ""
+    selected_stall_hawker = ""
+    avg_rating = None
+    total_review_count = 0
+
+    if stall_id:
+        # Get stall name + hawker centre name
+        from feature_cuisines import CuisineFeatureHandler
+        handler = CuisineFeatureHandler()
+        stall_row = handler._stall_base()
+        stall_row = stall_row[stall_row["stall_id"] == stall_id]
+        if not stall_row.empty:
+            selected_stall_name = str(stall_row.iloc[0].get("stall_name", ""))
+            selected_stall_hawker = str(stall_row.iloc[0].get("hawker_name", ""))
+
+        # Get ALL reviews for this stall (no limit)
+        rev_df = review_feature.get_reviews_for_stall(stall_id, limit=200)
+        all_rows = review_feature.get_display_rows(rev_df)
+        total_review_count = len(all_rows)
+
+        # Average rating across all reviews
+        if all_rows:
+            avg_rating = sum(r["rating"] for r in all_rows) / len(all_rows)
+
+        # Apply star filter
+        if selected_stars:
+            try:
+                star_val = int(selected_stars)
+                all_rows = [r for r in all_rows if round(r["rating"]) == star_val]
+            except ValueError:
+                pass
+
+        # Apply sort
+        review_sort = request.args.get('review_sort', 'helpful')
+        if review_sort == 'date':
+            all_rows = sorted(all_rows, key=lambda r: r['date'], reverse=True)
+        elif review_sort == 'stars':
+            all_rows = sorted(all_rows, key=lambda r: r['rating'], reverse=True)
+        elif review_sort == 'verified':
+            all_rows = sorted(all_rows, key=lambda r: (r['verified_purchase'] == 'Yes'), reverse=True)
+        else:  # helpful (default)
+            all_rows = sorted(all_rows, key=lambda r: r['helpful_count'], reverse=True)
+
+        reviews_list = all_rows
+
+        # Pre-fill write tab with this stall
+        if not write_stall_id:
+            write_stall_id = str(stall_id)
+            write_stall_name = selected_stall_name
+
+    # ── My Reviews (reviews written by current user) ──────────────
+    username = session.get("username", "")
+    my_rev_df = review_feature.get_reviews_by_user(username)
+    my_reviews = review_feature.get_display_rows(my_rev_df)
+
+    return render_template(
+        "feature_reviews.html",
+        active_tab=active_tab,
+        # sidebar
+        trip_start=profile.trip_start if profile else None,
+        trip_end=profile.trip_end if profile else None,
+        saved_stall_count=len(da.get_saved_stalls(session["username"])),
+        # my reviews tab
+        my_reviews = my_reviews,
+        # read tab
+        selected_stall_id=stall_id,
+        selected_stall_name=selected_stall_name,
+        selected_stall_hawker=selected_stall_hawker,
+        selected_stars=selected_stars,
+        reviews_list=reviews_list,
+        avg_rating=avg_rating,
+        total_review_count=total_review_count,
+        back_stall_id=stall_id,
+        review_sort = request.args.get('review_sort', 'helpful'),
+        # write tab
+        write_stall_id=write_stall_id,
+        write_stall_name=write_stall_name,
+        username=session.get("username", ""),
+    )
+
+@app.route("/reviews/submit", methods=["POST"])
+def reviews_submit():
+    session["username"] = "test_user"  # TEMP
+
+    stall_id = request.form.get("stall_id", type=int)
+    rating_raw = request.form.get("rating", "").strip()
+    review_text = request.form.get("review_text", "").strip()
+    user_name = request.form.get("user_name", "Anonymous").strip() or "Anonymous"
+    back_stall_id = request.form.get("back_stall_id", "").strip()
+
+    if not stall_id:
+        flash("Please select a stall before submitting.", "error")
+        return redirect(url_for("reviews"))
+
+    try:
+        rating = float(rating_raw)
+        if not 0 <= rating <= 5:
+            raise ValueError
+    except (ValueError, TypeError):
+        flash("Please select a rating between 0 and 5.", "error")
+        return redirect(url_for("reviews") + f"?stall_id={back_stall_id}&tab=write" if back_stall_id else url_for("reviews"))
+
+    if not review_text:
+        flash("Review text cannot be empty.", "error")
+        return redirect(url_for("reviews") + f"?stall_id={back_stall_id}&tab=write" if back_stall_id else url_for("reviews"))
+
+    try:
+        review_feature.add_review(
+            stall_id=stall_id,
+            rating=rating,
+            review_text=review_text,
+            user_name=user_name,
+        )
+        flash("Your review has been submitted. Thank you!", "success")
+    except Exception as e:
+        flash(f"Could not save review: {e}", "error")
+
+    redirect_url = f"/reviews?stall_id={stall_id}&tab=read" if stall_id else url_for("reviews")
+
+    return redirect(redirect_url)
+
+@app.route("/reviews/helpful", methods = ["POST"])
+def reviews_helpful():
+    review_id = request.form.get("review_id", type=int)
+    stall_id = request.form.get("stall_id", type=int)
+    stars = request.form.get("stars", "")
+
+    if review_id:
+        try:
+            review_feature.mark_review_helpful(review_id)
+            flash("Marked as helpful!", "success")
+        except Exception as e:
+            flash(f"Could not update: {e}", "error")
+
+    redirect_url = f"/reviews?stall_id={stall_id}&tab=read"
+    if stars:
+        redirect_url += f"&stars={stars}"
+    return redirect(redirect_url)
+
+@app.route("/reviews/search")
+def reviews_search():
+    q = request.args.get("q", "").strip()
+    if len(q) < 2:
+        return jsonify([])
+    try:
+        matches = review_feature.search_stalls(q, limit=8)
+        results = []
+        for _, row in matches.iterrows():
+            results.append({
+                "stall_id":   int(row["stall_id"]),
+                "stall_name": str(row["stall_name"]),
+                "hawker_name": "",
+            })
+        return jsonify(results)
+    except Exception:
+        return jsonify([])
 
 @app.route('/onboarding')
 def onboarding():
