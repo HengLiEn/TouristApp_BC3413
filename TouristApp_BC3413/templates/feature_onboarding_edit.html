@@ -1,0 +1,614 @@
+{% extends "feature_onboarding.html" %}
+
+{% block title %}Onboarding | Hawker Hunt{% endblock %}
+
+{% block content %}
+<style>
+  .onboard-shell {
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 3rem 2.5rem 4rem;
+  }
+
+  .onboard-top {
+    margin-bottom: 2rem;
+  }
+
+  .onboard-eyebrow {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    color: var(--chili);
+    margin-bottom: 0.8rem;
+  }
+
+  .onboard-title {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(2rem, 4vw, 3rem);
+    font-weight: 900;
+    line-height: 0.95;
+    margin-bottom: 0.8rem;
+  }
+
+  .onboard-desc {
+    max-width: 640px;
+    color: var(--smoke);
+    line-height: 1.7;
+    font-size: 0.95rem;
+  }
+
+  .onboard-progress {
+    display: flex;
+    gap: 0.5rem;
+    margin: 2rem 0 1.5rem;
+  }
+
+  .onboard-progress-step {
+    flex: 1;
+    height: 8px;
+    background: var(--bone);
+    border-radius: 999px;
+    transition: all 0.25s ease;
+  }
+
+  .onboard-progress-step.active {
+    background: var(--chili);
+  }
+
+  .onboard-card {
+    background: white;
+    border: 2px solid var(--bone);
+    box-shadow: 0 12px 30px rgba(26, 17, 9, 0.06);
+    min-height: 470px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+
+  .onboard-card-header {
+    background: var(--soy);
+    color: var(--cream);
+    padding: 1rem 1.25rem;
+    border-bottom: 2px solid var(--wok);
+  }
+
+  .onboard-card-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    opacity: 0.9;
+  }
+
+  .onboard-card-body {
+    padding: 2rem;
+  }
+
+  .step {
+    display: none;
+    animation: fadeSlide 0.28s ease;
+  }
+
+  .step.active {
+    display: block;
+  }
+
+  @keyframes fadeSlide {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .step h2 {
+    font-family: 'Playfair Display', serif;
+    font-size: 2rem;
+    line-height: 1.05;
+    margin-bottom: 0.75rem;
+  }
+
+  .step p.step-sub {
+    color: var(--smoke);
+    font-size: 0.92rem;
+    line-height: 1.7;
+    margin-bottom: 1.5rem;
+    max-width: 620px;
+  }
+
+  .welcome-mark {
+    width: 96px;
+    height: 96px;
+    border-radius: 50%;
+    background: var(--cream);
+    border: 2px solid var(--bone);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2.3rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .choice-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 0.75rem;
+  }
+
+  .choice-card {
+    display: block;
+    cursor: pointer;
+  }
+
+  .choice-card input {
+    display: none;
+  }
+
+  .choice-card span {
+    display: block;
+    padding: 0.9rem 0.8rem;
+    text-align: center;
+    border: 1.5px solid var(--bone);
+    background: white;
+    color: var(--smoke);
+    font-weight: 600;
+    transition: all 0.18s ease;
+  }
+
+  .choice-card:hover span {
+    border-color: var(--chili);
+    color: var(--chili);
+  }
+
+  .choice-card.selected span {
+    background: var(--chili);
+    border-color: var(--chili);
+    color: white;
+  }
+
+  .tag-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.7rem;
+  }
+
+  .tag-pill {
+    display: inline-block;
+    cursor: pointer;
+  }
+
+  .tag-pill input {
+    display: none;
+  }
+
+  .tag-pill span {
+    display: inline-block;
+    padding: 0.65rem 1rem;
+    border-radius: 999px;
+    border: 1.5px solid var(--bone);
+    background: white;
+    color: var(--smoke);
+    font-size: 0.8rem;
+    font-weight: 600;
+    transition: all 0.18s ease;
+  }
+
+  .tag-pill:hover span {
+    border-color: var(--chili);
+    color: var(--chili);
+  }
+
+  .tag-pill.selected.tag-primary span {
+    background: var(--chili);
+    border-color: var(--chili);
+    color: white;
+  }
+
+  .tag-pill.selected.tag-danger span {
+    background: var(--soy);
+    border-color: var(--soy);
+    color: var(--cream);
+  }
+
+  .slider-block {
+    background: var(--surface);
+    border: 1.5px solid var(--bone);
+    padding: 1.25rem;
+  }
+
+  .slider-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    gap: 1rem;
+  }
+
+  .slider-value {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--chili);
+  }
+
+  input[type="range"] {
+    width: 100%;
+    accent-color: var(--chili);
+  }
+
+  .slider-ends {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 0.75rem;
+    font-size: 0.75rem;
+    color: var(--smoke);
+  }
+
+  .form-grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+
+  .field-block {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    margin-bottom: 1rem;
+  }
+
+  .field-block label {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--smoke);
+  }
+
+  .field-block input {
+    padding: 0.95rem 1rem;
+    border: 1.5px solid var(--bone);
+    background: white;
+    font-family: 'Instrument Sans', sans-serif;
+    color: var(--soy);
+    font-size: 0.95rem;
+    outline: none;
+  }
+
+  .field-block input:focus {
+    border-color: var(--chili);
+  }
+
+  .step-note {
+    margin-top: 0.5rem;
+    color: var(--smoke);
+    font-size: 0.82rem;
+    font-style: italic;
+  }
+
+  .onboard-actions {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    border-top: 2px solid var(--bone);
+    padding: 1.25rem 2rem;
+    background: var(--surface);
+  }
+
+  .onboard-btn {
+    min-width: 140px;
+    border: none;
+    padding: 0.95rem 1.2rem;
+    cursor: pointer;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    transition: all 0.2s ease;
+  }
+
+  .onboard-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  .onboard-btn.back {
+    background: transparent;
+    color: var(--smoke);
+    border: 1.5px solid var(--bone);
+  }
+
+  .onboard-btn.back:hover:not(:disabled) {
+    border-color: var(--soy);
+    color: var(--soy);
+  }
+
+  .onboard-btn.next,
+  .onboard-btn.finish {
+    background: var(--soy);
+    color: var(--cream);
+  }
+
+  .onboard-btn.next:hover,
+  .onboard-btn.finish:hover {
+    background: var(--chili);
+  }
+
+  .hidden {
+    display: none !important;
+  }
+
+  @media (max-width: 700px) {
+    .onboard-shell {
+      padding: 2rem 1rem 3rem;
+    }
+
+    .onboard-card-body,
+    .onboard-actions {
+      padding-left: 1.25rem;
+      padding-right: 1.25rem;
+    }
+
+    .form-grid-2 {
+      grid-template-columns: 1fr;
+    }
+
+    .onboard-actions {
+      flex-direction: column;
+    }
+
+    .onboard-btn {
+      width: 100%;
+    }
+  }
+</style>
+
+<section class="hero">
+  <div class="hero-inner">
+    <div class="hero-eyebrow">Set Up Your Journey</div>
+    <h1 class="hero-title">Curate your <em>hawker trail</em></h1>
+    <p class="hero-desc">
+      Tell us what you like, what you avoid, and how far you want to explore.
+      We’ll shape your Hawker Hunt experience around your taste.
+    </p>
+    <div class="hero-deco"></div>
+  </div>
+</section>
+
+<div class="onboard-shell">
+  <div class="onboard-top">
+    <div class="onboard-eyebrow">Personalisation Flow</div>
+    <h2 class="onboard-title">Build your food profile</h2>
+    <p class="onboard-desc">
+      This quick onboarding helps Hawker Hunt recommend stalls, cuisines, and routes
+      that actually suit your travel style and food preferences.
+    </p>
+  </div>
+
+  <div class="onboard-progress">
+    <div class="onboard-progress-step active"></div>
+    <div class="onboard-progress-step"></div>
+    <div class="onboard-progress-step"></div>
+    <div class="onboard-progress-step"></div>
+    <div class="onboard-progress-step"></div>
+    <div class="onboard-progress-step"></div>
+  </div>
+
+  <form method="POST" id="onboardingForm" class="onboard-card">
+    <div class="onboard-card-header">
+      <div class="onboard-card-label">Traveller Setup</div>
+    </div>
+
+    <div class="onboard-card-body">
+      <!-- Step 0 -->
+      <section class="step active">
+        <div class="welcome-mark">🍜</div>
+        <h2>Welcome to Hawker Hunt</h2>
+        <p class="step-sub">
+          Let’s personalise your experience so we can discover the best hawker food
+          for your cravings, spice tolerance, and travel plans.
+        </p>
+      </section>
+
+      <!-- Step 1 -->
+      <section class="step">
+        <h2>Where are you from?</h2>
+        <p class="step-sub">
+          This helps us tailor recommendations for travellers with different food familiarity
+          and taste preferences.
+        </p>
+
+        <div class="choice-grid">
+          {% for country in countries %}
+            <label class="choice-card">
+              <input type="radio" name="country" value="{{ country }}">
+              <span>{{ country }}</span>
+            </label>
+          {% endfor %}
+        </div>
+      </section>
+
+      <!-- Step 2 -->
+      <section class="step">
+        <h2>How much heat can you handle?</h2>
+        <p class="step-sub">
+          From gentle flavours to full fire — choose your spice comfort zone.
+        </p>
+
+        <div class="slider-block">
+          <div class="slider-head">
+            <div class="slider-value">Spice tolerance</div>
+            <div class="slider-value" id="spiceValue">Medium</div>
+          </div>
+          <input type="range" id="spice_level" name="spice_level" min="0" max="5" step="1" value="3">
+          <div class="slider-ends">
+            <span>No spice</span>
+            <span>Maximum heat</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Step 3 -->
+      <section class="step">
+        <h2>Any allergens to avoid?</h2>
+        <p class="step-sub">
+          Select anything we should watch out for. Leave blank if there are no restrictions.
+        </p>
+
+        <div class="tag-wrap">
+          {% for allergen in allergens %}
+            <label class="tag-pill tag-danger">
+              <input type="checkbox" name="allergens" value="{{ allergen }}">
+              <span>{{ allergen }}</span>
+            </label>
+          {% endfor %}
+        </div>
+      </section>
+
+      <!-- Step 4 -->
+      <section class="step">
+        <h2>Which cuisines do you prefer?</h2>
+        <p class="step-sub">
+          Pick your favourites so Hawker Hunt can surface stalls you’re more likely to love.
+        </p>
+
+        <div class="tag-wrap">
+          {% for cuisine in cuisines %}
+            <label class="tag-pill tag-primary">
+              <input type="checkbox" name="preferred_cuisines" value="{{ cuisine }}">
+              <span>{{ cuisine }}</span>
+            </label>
+          {% endfor %}
+        </div>
+      </section>
+
+      <!-- Step 5 -->
+      <section class="step">
+        <h2>Trip details</h2>
+        <p class="step-sub">
+          Set your visit window and how far you’re willing to travel for the next great meal.
+        </p>
+
+        <div class="form-grid-2">
+          <div class="field-block">
+            <label for="trip_start">Trip Start</label>
+            <input type="date" id="trip_start" name="trip_start">
+          </div>
+
+          <div class="field-block">
+            <label for="trip_end">Trip End</label>
+            <input type="date" id="trip_end" name="trip_end">
+          </div>
+        </div>
+
+        <div class="field-block">
+          <label for="radius_km">Search Radius</label>
+          <div class="slider-block">
+            <div class="slider-head">
+              <div class="slider-value">Distance</div>
+              <div class="slider-value"><span id="radiusValue">3</span> km</div>
+            </div>
+            <input type="range" id="radius_km" name="radius_km" min="0.5" max="10" step="0.5" value="3">
+            <div class="slider-ends">
+              <span>0.5 km</span>
+              <span>10 km</span>
+            </div>
+          </div>
+        </div>
+
+        <p class="step-note">
+          We’ll use Singapore as the default map centre unless you update your live location later.
+        </p>
+
+        <input type="hidden" name="location_lat" value="{{ singapore_center.lat }}">
+        <input type="hidden" name="location_lng" value="{{ singapore_center.lng }}">
+      </section>
+    </div>
+
+    <div class="onboard-actions">
+      <button type="button" id="backBtn" class="onboard-btn back" disabled>← Back</button>
+      <button type="button" id="nextBtn" class="onboard-btn next">Next →</button>
+      <button type="submit" id="finishBtn" class="onboard-btn finish hidden">Finish ✓</button>
+    </div>
+  </form>
+</div>
+
+<script>
+  const steps = document.querySelectorAll(".step");
+  const progressSteps = document.querySelectorAll(".onboard-progress-step");
+  const backBtn = document.getElementById("backBtn");
+  const nextBtn = document.getElementById("nextBtn");
+  const finishBtn = document.getElementById("finishBtn");
+
+  let currentStep = 0;
+
+  function updateSteps() {
+    steps.forEach((step, index) => {
+      step.classList.toggle("active", index === currentStep);
+    });
+
+    progressSteps.forEach((bar, index) => {
+      bar.classList.toggle("active", index <= currentStep);
+    });
+
+    backBtn.disabled = currentStep === 0;
+
+    if (currentStep === steps.length - 1) {
+      nextBtn.classList.add("hidden");
+      finishBtn.classList.remove("hidden");
+    } else {
+      nextBtn.classList.remove("hidden");
+      finishBtn.classList.add("hidden");
+    }
+  }
+
+  nextBtn.addEventListener("click", () => {
+    if (currentStep < steps.length - 1) {
+      currentStep++;
+      updateSteps();
+    }
+  });
+
+  backBtn.addEventListener("click", () => {
+    if (currentStep > 0) {
+      currentStep--;
+      updateSteps();
+    }
+  });
+
+  const spiceInput = document.getElementById("spice_level");
+  const spiceValue = document.getElementById("spiceValue");
+  const spiceLabels = ["None", "Mild", "Light", "Medium", "Spicy", "Extra Hot"];
+
+  spiceInput.addEventListener("input", () => {
+    spiceValue.textContent = spiceLabels[parseInt(spiceInput.value)];
+  });
+
+  const radiusInput = document.getElementById("radius_km");
+  const radiusValue = document.getElementById("radiusValue");
+
+  radiusInput.addEventListener("input", () => {
+    radiusValue.textContent = radiusInput.value;
+  });
+
+  document.querySelectorAll(".choice-card input").forEach(input => {
+    input.addEventListener("change", () => {
+      document.querySelectorAll(".choice-card").forEach(card => card.classList.remove("selected"));
+      input.parentElement.classList.add("selected");
+    });
+  });
+
+  document.querySelectorAll(".tag-pill input").forEach(input => {
+    input.addEventListener("change", () => {
+      input.parentElement.classList.toggle("selected", input.checked);
+    });
+  });
+
+  updateSteps();
+</script>
+{% endblock %}
