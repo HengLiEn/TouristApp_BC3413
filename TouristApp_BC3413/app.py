@@ -425,7 +425,7 @@ def update_trip_dates():
     return redirect(url_for("location"))
 
 
-# ───── Itinerary  ───── # improvements: to include ratings
+# ── Itinerary  ─────
 # These routes expect:
 #   da.get_saved_stalls(username)  → list of stall_ids
 #   da.add_saved_stall(username, stall_id)
@@ -571,7 +571,103 @@ def itinerary():
         cuisines_count=len(cuisine_counts),
         cuisine_breakdown=cuisine_breakdown,
         avg_rating=avg_rating,
+        route_orders=session.get("route_orders", {}),
     )
+
+
+@app.route("/itinerary/optimise/<int:day_index>")
+def itinerary_optimise(day_index):
+    session["username"] = "test_user"
+    profile = da.get_profile(session["username"])
+
+    coords = None
+    if profile and profile.location_lat and profile.location_lng:
+        coords = (float(profile.location_lat), float(profile.location_lng))
+    if not coords:
+        flash("Please set your location before optimising a route.", "error")
+        return redirect(url_for("itinerary"))
+
+    saved_ids = da.get_saved_stalls(session["username"])
+    handler = CuisineFeatureHandler()
+    trip_start = profile.trip_start if profile else None
+    trip_end = profile.trip_end if profile else None
+
+    stalls_df = handler.get_stalls_by_ids(
+        saved_ids, coords=coords, radius_km=999.0,
+        trip_start=trip_start, trip_end=trip_end,
+    )
+    if stalls_df.empty:
+        flash("No stall data found.", "error")
+        return redirect(url_for("itinerary"))
+
+    # Find stalls assigned to this day
+    stall_day_map = session.get("stall_day_map", {})
+    day_stall_ids = [int(sid) for sid, didx in stall_day_map.items() if didx == day_index]
+    if not day_stall_ids:
+        flash("No stalls assigned to that day yet.", "error")
+        return redirect(url_for("itinerary"))
+
+    day_df = stalls_df[stalls_df["stall_id"].isin(day_stall_ids)].copy()
+    if day_df.empty or not {"latitude_hc", "longitude_hc"}.issubset(day_df.columns):
+        flash("Missing location data for route optimisation.", "error")
+        return redirect(url_for("itinerary"))
+
+    route, total_km, total_mins = planner.build_stall_itinerary(
+        start_coords=coords,
+        stalls_df=day_df,
+        max_stops=len(day_stall_ids),
+    )
+    if not route:
+        flash("Could not build a route for that day.", "error")
+        return redirect(url_for("itinerary"))
+
+    # Store optimised order + leg info in session keyed by day_index
+    route_orders = session.get("route_orders", {})
+    route_orders[str(day_index)] = [
+        {
+            "stall_id": int(stop["stall_id"]),
+            "leg_dist_km": round(float(stop["leg_dist_km"]), 2),
+            "leg_time_mins": round(float(stop["leg_time_mins"])),
+        }
+        for stop in route
+    ]
+    session["route_orders"] = route_orders
+    flash(f"Route optimised — {total_km:.1f} km total walk (~{round(total_mins)} mins).", "success")
+    return redirect(url_for("itinerary"))
+
+
+@app.route("/itinerary/reorder/<int:day_index>/<int:stall_id>/<direction>")
+def itinerary_reorder(day_index, stall_id, direction):
+    """Move a stall up or down within the optimised route."""
+    session["username"] = "test_user"
+    route_orders = session.get("route_orders", {})
+    key = str(day_index)
+    order = route_orders.get(key, [])
+    ids = [s["stall_id"] for s in order]
+    if stall_id not in ids:
+        return redirect(url_for("itinerary"))
+    idx = ids.index(stall_id)
+    if direction == "up" and idx > 0:
+        order[idx], order[idx - 1] = order[idx - 1], order[idx]
+    elif direction == "down" and idx < len(order) - 1:
+        order[idx], order[idx + 1] = order[idx + 1], order[idx]
+    # Leg data is now stale — clear it
+    for stop in order:
+        stop["leg_dist_km"] = None
+        stop["leg_time_mins"] = None
+    route_orders[key] = order
+    session["route_orders"] = route_orders
+    return redirect(url_for("itinerary"))
+
+
+@app.route("/itinerary/route-clear/<int:day_index>")
+def itinerary_route_clear(day_index):
+    """Reset the optimised route for a day back to default order."""
+    session["username"] = "test_user"
+    route_orders = session.get("route_orders", {})
+    route_orders.pop(str(day_index), None)
+    session["route_orders"] = route_orders
+    return redirect(url_for("itinerary"))
 
 
 @app.route("/itinerary/remove/<int:stall_id>")
@@ -827,9 +923,43 @@ def reviews_search():
     except Exception:
         return jsonify([])
 
-@app.route('/onboarding')
+@app.route("/onboarding", methods=["GET", "POST"])
 def onboarding():
-    return render_template('feature_onboarding.html', active_page='onboarding')
+    if request.method == "POST":
+        data = {
+            "country": request.form.get("country", ""),
+            "spice_level": int(request.form.get("spice_level", 3)),
+            "allergens": request.form.getlist("allergens"),
+            "preferred_cuisines": request.form.getlist("preferred_cuisines"),
+            "location_lat": float(request.form.get("location_lat", 1.3521)),
+            "location_lng": float(request.form.get("location_lng", 103.8198)),
+            "radius_km": float(request.form.get("radius_km", 3)),
+            "trip_start": request.form.get("trip_start", ""),
+            "trip_end": request.form.get("trip_end", "")
+        }
+
+        print(data)  # replace with DB save later
+        return redirect(url_for("dashboard"))
+
+    return render_template(
+        "feature_onboarding_edit.html",
+        active_page="onboarding",
+        countries=[
+            "Australia", "Canada", "China", "France", "Germany", "India",
+            "Indonesia", "Japan", "Korea", "Malaysia", "Philippines",
+            "Singapore", "Thailand", "UK", "USA", "Other"
+        ],
+        allergens=[
+            "Nuts", "Shellfish", "Dairy", "Gluten",
+            "Eggs", "Soy", "Fish", "Sesame"
+        ],
+        cuisines=[
+            "Chinese", "Malay", "Indian", "Japanese", "Korean", "Thai",
+            "Western", "Seafood", "Vegetarian", "Halal",
+            "Peranakan", "Indonesian"
+        ],
+        singapore_center={"lat": 1.3521, "lng": 103.8198}
+    )
 
 if __name__ == "__main__":
     app.run(debug=True)
