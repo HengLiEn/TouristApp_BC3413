@@ -734,9 +734,43 @@ def closure():
 def reviews():
     return render_template('feature_onboarding.html', active_page='reviews')
 
-@app.route('/onboarding')
+@app.route("/onboarding", methods=["GET", "POST"])
 def onboarding():
-    return render_template('feature_onboarding.html', active_page='onboarding')
+    if request.method == "POST":
+        data = {
+            "country": request.form.get("country", ""),
+            "spice_level": int(request.form.get("spice_level", 3)),
+            "allergens": request.form.getlist("allergens"),
+            "preferred_cuisines": request.form.getlist("preferred_cuisines"),
+            "location_lat": float(request.form.get("location_lat", 1.3521)),
+            "location_lng": float(request.form.get("location_lng", 103.8198)),
+            "radius_km": float(request.form.get("radius_km", 3)),
+            "trip_start": request.form.get("trip_start", ""),
+            "trip_end": request.form.get("trip_end", "")
+        }
+
+        print(data)  # replace with DB save later
+        return redirect(url_for("dashboard"))
+
+    return render_template(
+        "feature_onboarding_edit.html",
+        active_page="onboarding",
+        countries=[
+            "Australia", "Canada", "China", "France", "Germany", "India",
+            "Indonesia", "Japan", "Korea", "Malaysia", "Philippines",
+            "Singapore", "Thailand", "UK", "USA", "Other"
+        ],
+        allergens=[
+            "Nuts", "Shellfish", "Dairy", "Gluten",
+            "Eggs", "Soy", "Fish", "Sesame"
+        ],
+        cuisines=[
+            "Chinese", "Malay", "Indian", "Japanese", "Korean", "Thai",
+            "Western", "Seafood", "Vegetarian", "Halal",
+            "Peranakan", "Indonesian"
+        ],
+        singapore_center={"lat": 1.3521, "lng": 103.8198}
+    )
 
 if __name__ == "__main__":
     app.run(debug=True)
