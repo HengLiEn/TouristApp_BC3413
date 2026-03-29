@@ -701,7 +701,6 @@ def itinerary_export():
                 f"    Rating: {float(row.get('avg_rating', 0) or 0):.1f} | Cuisine: {row.get('cuisine_type', '?')}")
             lines.append("")
 
-    from flask import Response
     return Response(
         "\n".join(lines),
         mimetype="text/plain",
