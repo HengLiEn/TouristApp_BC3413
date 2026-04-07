@@ -239,7 +239,7 @@
 <!-- ── Hero (reuse existing hero style) ─── -->
 <section class="hero">
   <div class="hero-inner">
-    <p class="hero-eyebrow">// Stall Detail</p>
+    <p class="hero-eyebrow">Stall Detail</p>
     <h1 class="hero-title">Menu &amp; <em>Details</em></h1>
     <p class="hero-desc">Full menu, pricing and allergen information for this stall.</p>
   </div>
@@ -299,7 +299,7 @@
     </div>
 
     <!-- Menu table -->
-    <p class="section-heading">// Menu Items</p>
+    <p class="section-heading">Menu Items</p>
 
     {% if back_params and (back_params.allergens or (back_params.max_price | int) < 15) %}
     <div class="allergen-notice">
@@ -482,7 +482,7 @@
 
   <div class="reviews-section" id="reviews">
     <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;margin-bottom:0.75rem;">
-      <p class="section-heading" style="margin-bottom:0;">// What People Say</p>
+      <p class="section-heading" style="margin-bottom:0;">What People Say</p>
       <div class="review-sort-bar" style="margin-bottom:0;">
         <a href="?stall_id={{ stall.stall_id }}&review_sort=helpful{% if back_params %}&cuisine={{ back_params.cuisine }}&stars={{ back_params.stars }}&sort={{ back_params.sort }}&q={{ back_params.q }}&max_price={{ back_params.max_price }}{% for a in back_params.allergens %}&allergens={{ a }}{% endfor %}{% endif %}#reviews"
            class="review-sort-btn {{ 'active' if review_sort == 'helpful' or not review_sort }}">
