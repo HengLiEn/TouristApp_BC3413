@@ -133,9 +133,12 @@ def cuisines():
 
     # Filter by max price
     if max_price is not None:
-        menu_df = handler._menu_base()  # get menu data
+        menu_df = handler.merged_df
 
         # Build stall_id -> min_price map
+        menu_df = handler.merged_df.copy()
+        menu_df['price'] = pd.to_numeric(menu_df['price'], errors='coerce')
+
         min_price_map = (
             menu_df.groupby('stall_id')['price']
             .min()
