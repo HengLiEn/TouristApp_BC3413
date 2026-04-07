@@ -251,6 +251,32 @@
     text-align: right;
   }
 
+  /* ── Map panel footer + back button ── */
+  .map-panel-footer {
+    padding: 1rem 1.4rem;
+    background: var(--bone);
+    border-top: 2px solid var(--soy);
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .back-to-itinerary-btn {
+    display: inline-block;
+    padding: 0.75rem 1.75rem;
+    background: var(--soy);
+    color: var(--cream);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    text-decoration: none;
+    border-radius: 1px;
+    transition: background 0.2s, transform 0.1s;
+  }
+
+  .back-to-itinerary-btn:hover { background: var(--chili); }
+  .back-to-itinerary-btn:active { transform: scale(0.99); }
+
   /* ── Divider ── */
   .loc-divider {
     border: none;
@@ -504,6 +530,12 @@
         ></iframe>
         <div class="map-coords-overlay">Enter an address above to pin your location</div>
       {% endif %}
+    </div>
+    <!-- Back to Itinerary button -->
+    <div class="map-panel-footer">
+      <a href="{{ url_for('itinerary') }}" class="back-to-itinerary-btn">
+        ← Back to Itinerary Planning
+      </a>
     </div>
   </div>
 
