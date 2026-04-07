@@ -98,17 +98,16 @@ def cuisines():
     if selected_cuisine:
         stalls_list = [
             s for s in stalls_list
-            if s.get('cuisine_type', '').lower() == selected_cuisine
+            if selected_cuisine in s.get('cuisine_type', '').lower()
         ]
 
     # Filter by stars
     if selected_stars:
         min_stars = float(selected_stars)
-        if min_stars == 5.0:
-            stalls_list = [s for s in stalls_list if s.get('avg_rating', 0) == 5.0]
-        else:
-            max_stars = min_stars + 0.9
-            stalls_list = [s for s in stalls_list if min_stars <= s.get('avg_rating', 0) <= max_stars]
+        stalls_list = [
+            s for s in stalls_list
+            if s.get('avg_rating', 0) >= min_stars
+        ]
 
     # Filter by search query (stall name or hawker centre name)
     if search_query:
@@ -132,6 +131,21 @@ def cuisines():
 
         stalls_list = [s for s in stalls_list if stall_is_safe(s)]
 
+    # Filter by max price
+    if max_price is not None:
+        menu_df = handler._menu_base()  # get menu data
+
+        # Build stall_id -> min_price map
+        min_price_map = (
+            menu_df.groupby('stall_id')['price']
+            .min()
+            .to_dict()
+        )
+
+        stalls_list = [
+            s for s in stalls_list
+            if min_price_map.get(s['stall_id'], float('inf')) <= max_price
+        ]
     # Sort
     if selected_sort == 'rating':
         stalls_list.sort(key=lambda x: x.get('avg_rating', 0), reverse=True)

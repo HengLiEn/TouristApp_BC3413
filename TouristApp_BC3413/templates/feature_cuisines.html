@@ -4,7 +4,6 @@
 {% block title %}Cuisines — Hawker Hunt{% endblock %}
 
 {% block content %}
-<link rel="stylesheet" href="{{ url_for('static', filename='feature_cuisines.css') }}">
 
 <section class="hero">
   <div class="hero-inner">
@@ -17,12 +16,15 @@
 
 <div class="main-wrapper">
 
-  <!-- SIDEBAR -->
+  <!-- ═══ SIDEBAR ═══════════════════════════════════════════════════════════ -->
   <aside class="sidebar">
 
-    <!-- ── FORM 1: CUISINE FILTER ─────────────────────────────────────────
-         Carries: sort, stars, allergens, search query, max_price
-         Does NOT carry: cuisine (comes from whichever chip is clicked)      -->
+    <!--
+      Mobile collapsible sidebar
+      On ≤768 px screens each filter panel can be toggled open/closed.
+    -->
+
+    <!-- ── FORM 1: CUISINE FILTER ────────────────────────────────────────── -->
     <form method="GET" action="/cuisines" id="cuisine-form">
       {% if search_query %}<input type="hidden" name="q" value="{{ search_query }}">{% endif %}
       <input type="hidden" name="sort" value="{{ selected_sort | default('') }}">
@@ -33,11 +35,11 @@
       <input type="hidden" name="max_price" value="{{ max_price | default(15) }}">
 
       <div class="panel">
-        <div class="panel-header">
+        <button type="button" class="panel-header panel-toggle" aria-expanded="true" data-target="panel-cuisine">
           <span class="panel-title">Filter by Cuisine</span>
-          <span>🍽</span>
-        </div>
-        <div class="panel-body">
+          <span class="panel-toggle-icon">🍽 ▾</span>
+        </button>
+        <div class="panel-body" id="panel-cuisine">
           <div class="chips-grid">
             {% for c in cuisines %}
             <button type="submit" name="cuisine" value="{{ c|lower }}"
@@ -50,9 +52,7 @@
       </div>
     </form>
 
-    <!-- ── FORM 2: STAR FILTER ────────────────────────────────────────────
-         Carries: sort, cuisine, allergens, search query, max_price
-         Does NOT carry: stars (comes from whichever chip is clicked)        -->
+    <!-- ── FORM 2: STAR FILTER ────────────────────────────────────────────── -->
     <form method="GET" action="/cuisines" id="stars-form">
       {% if search_query %}<input type="hidden" name="q" value="{{ search_query }}">{% endif %}
       <input type="hidden" name="sort" value="{{ selected_sort | default('') }}">
@@ -63,11 +63,11 @@
       <input type="hidden" name="max_price" value="{{ max_price | default(15) }}">
 
       <div class="panel">
-        <div class="panel-header">
+        <button type="button" class="panel-header panel-toggle" aria-expanded="true" data-target="panel-stars">
           <span class="panel-title">Filter by Stars</span>
-          <span>⭐</span>
-        </div>
-        <div class="panel-body">
+          <span class="panel-toggle-icon">⭐ ▾</span>
+        </button>
+        <div class="panel-body" id="panel-stars">
           <div class="chips-grid">
             <button type="submit" name="stars" value="5" class="chip {{ 'active' if selected_stars == '5' }}">★★★★★ 5</button>
             <button type="submit" name="stars" value="4" class="chip {{ 'active' if selected_stars == '4' }}">★★★★☆ 4+</button>
@@ -78,9 +78,7 @@
       </div>
     </form>
 
-    <!-- ── FORM 3: ALLERGEN FILTER ────────────────────────────────────────
-         Carries: sort, cuisine, stars, search query, max_price
-         Allergen checkboxes auto-submit on change                           -->
+    <!-- ── FORM 3: ALLERGEN FILTER ──────────────────────────────────────────── -->
     <form method="GET" action="/cuisines" id="allergen-form">
       {% if search_query %}<input type="hidden" name="q" value="{{ search_query }}">{% endif %}
       <input type="hidden" name="sort" value="{{ selected_sort | default('') }}">
@@ -89,11 +87,11 @@
       <input type="hidden" name="max_price" value="{{ max_price | default(15) }}">
 
       <div class="panel">
-        <div class="panel-header">
+        <button type="button" class="panel-header panel-toggle" aria-expanded="true" data-target="panel-allergen">
           <span class="panel-title">Exclude Allergens</span>
-          <span>⚠️</span>
-        </div>
-        <div class="panel-body">
+          <span class="panel-toggle-icon">⚠️ ▾</span>
+        </button>
+        <div class="panel-body" id="panel-allergen">
           <p class="allergen-note">Hide stalls that contain these allergens.</p>
           <div class="allergen-grid">
             {% set allergen_options = [
@@ -124,9 +122,7 @@
       </div>
     </form>
 
-    <!-- ── FORM 4: MAX PRICE SLIDER ───────────────────────────────────────
-         Carries: sort, cuisine, stars, allergens, search query
-         Auto-submits on slider release                                      -->
+    <!-- ── FORM 4: MAX PRICE SLIDER ─────────────────────────────────────────── -->
     <form method="GET" action="/cuisines" id="price-form">
       {% if search_query %}<input type="hidden" name="q" value="{{ search_query }}">{% endif %}
       <input type="hidden" name="sort" value="{{ selected_sort | default('') }}">
@@ -137,17 +133,16 @@
       {% endfor %}
 
       <div class="panel">
-        <div class="panel-header">
+        <button type="button" class="panel-header panel-toggle" aria-expanded="true" data-target="panel-price">
           <span class="panel-title">Budget</span>
-          <span>💰</span>
-        </div>
-        <div class="panel-body">
+          <span class="panel-toggle-icon">💰 ▾</span>
+        </button>
+        <div class="panel-body" id="panel-price">
           <div class="price-filter">
             <div class="price-label-row">
               <span class="price-label-text">Up to</span>
               <span class="price-display">$<span id="price-value">{{ max_price | default(15) | int }}</span></span>
             </div>
-
             <div class="slider-track-wrapper">
               <input
                 type="range"
@@ -160,10 +155,7 @@
                 class="price-slider"
               >
               <div class="slider-ticks" aria-hidden="true">
-                <span>$1</span>
-                <span>$5</span>
-                <span>$10</span>
-                <span>$15</span>
+                <span>$1</span><span>$5</span><span>$10</span><span>$15</span>
               </div>
             </div>
           </div>
@@ -173,9 +165,9 @@
 
     <a href="/cuisines" class="clear-btn" style="text-align:center;text-decoration:none;display:block;">✕ Clear Filters</a>
 
-  </aside>
+  </aside><!-- /sidebar -->
 
-  <!-- RESULTS -->
+  <!-- ═══ RESULTS ════════════════════════════════════════════════════════════ -->
   <main>
 
     <!-- SECTION HEADER + INLINE SEARCH -->
@@ -185,7 +177,7 @@
         <span class="section-count">Showing {{ stalls|length }} result{{ 's' if stalls|length != 1 }}</span>
       </div>
 
-      <!-- SEARCH BAR: carries cuisine, stars, sort, allergens, max_price -->
+      <!-- SEARCH BAR -->
       <form method="GET" action="/cuisines" id="search-form" class="inline-search-form">
         {% if selected_cuisine %}<input type="hidden" name="cuisine" value="{{ selected_cuisine }}">{% endif %}
         {% if selected_stars   %}<input type="hidden" name="stars"   value="{{ selected_stars }}">{% endif %}
@@ -214,7 +206,7 @@
       </form>
     </div>
 
-    <!-- Active filter summary -->
+    <!-- Active filter summary bar -->
     {% if search_query or selected_allergens or (max_price is defined and max_price < 15) %}
     <div class="allergen-active-bar">
       {% if search_query %}
@@ -238,6 +230,7 @@
     </div>
     {% endif %}
 
+    <!-- Sort bar -->
     <div class="sort-bar">
       <a href="/cuisines?cuisine={{ selected_cuisine or '' }}&stars={{ selected_stars or '' }}&q={{ search_query or '' }}&max_price={{ max_price | default(15) }}{% for a in selected_allergens %}&allergens={{ a }}{% endfor %}&sort=score"
          class="sort-btn {{ 'active' if selected_sort == 'score' or not selected_sort }}">Best Match</a>
@@ -249,6 +242,7 @@
          class="sort-btn {{ 'active' if selected_sort == 'distance' }}">Nearest</a>
     </div>
 
+    <!-- Stall cards -->
     <div class="stalls-list">
       {% if stalls %}
         {% for stall in stalls %}
@@ -275,7 +269,11 @@
               {% endfor %}
             </div>
             <div class="reviews-count">{{ stall.n_reviews | default(0) }} reviews</div>
-            {% if stall.distance_km is defined and stall.distance_km != None %}
+            {# ✅ FIX: guard against inf (no location set) — show nothing instead of "inf km" #}
+            {% if stall.distance_km is defined
+                  and stall.distance_km != None
+                  and stall.distance_km != 'inf'
+                  and stall.distance_km < 9999 %}
               <div class="dist-badge">{{ "%.1f"|format(stall.distance_km) }} km</div>
             {% endif %}
           </div>
@@ -283,9 +281,10 @@
           <div class="stall-menu">
             <div class="menu-title">// Stall Details</div>
             {% if stall.address_myenv is defined and stall.address_myenv %}
-              <p style="font-size:0.85rem;color:var(--smoke);margin-bottom:0.5rem;">🏠 {{ stall.address_myenv }}</p>
+              <p style="font-size:0.85rem;color:var(--smoke);margin-bottom:0.5rem;">
+                🏠 {{ stall.address_myenv }}
+              </p>
             {% endif %}
-
             {% if stall.allergens is defined and stall.allergens %}
             <div class="stall-allergens">
               <span class="stall-allergen-label">Contains:</span>
@@ -294,8 +293,7 @@
               {% endfor %}
             </div>
             {% endif %}
-
-            <p class="menu-note">More menu details coming soon.</p>
+            <p class="menu-note">Click to view full menu and pricing.</p>
           </div>
 
         </div>
@@ -312,129 +310,252 @@
   </main>
 </div>
 
-<!-- ── Price Slider Styles ──────────────────────────────────────────────────── -->
+<!-- ── Styles (page-specific) ────────────────────────────────────────────── -->
 <style>
-.price-filter {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
 
-.price-label-row {
+/* ── Collapsible panel body ─────────────────────────────────────────────── */
+.panel-header.panel-toggle {
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  background-color: var(--soy);
+  color: var(--cream);
+  padding: 1rem 1.25rem;
+  border: none;
+  font-family: inherit;
 }
-
-.price-label-text {
-  font-size: 0.85rem;
-  color: var(--smoke, #888);
+.panel-toggle-icon {
+  font-size: 0.75rem;
+  transition: transform 0.2s;
+  font-family: 'DM Mono', monospace;
+  letter-spacing: 1px;
 }
-
-.price-display {
-  font-weight: 700;
-  font-size: 1.1rem;
-  color: var(--accent, #e05c2a);
+.panel-header.panel-toggle[aria-expanded="false"] .panel-toggle-icon {
+  transform: rotate(-90deg);
 }
+.panel-body.collapsed { display: none; }
 
-.slider-track-wrapper {
+/* ── Search bar ─────────────────────────────────────────────────────────── */
+.section-header-left { display: flex; flex-direction: column; gap: 0.2rem; }
+.inline-search-form  { flex-shrink: 0; }
+.search-bar {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
+  align-items: center;
+  gap: 0;
+  border: 2px solid var(--bone);
+  background: white;
+  border-radius: 2px;
+  overflow: hidden;
+}
+.search-icon   { padding: 0 0.6rem; font-size: 0.85rem; color: var(--smoke); }
+.search-input  {
+  flex: 1;
+  border: none;
+  outline: none;
+  font-size: 0.82rem;
+  font-family: 'Instrument Sans', sans-serif;
+  padding: 0.55rem 0.25rem;
+  background: transparent;
+  min-width: 0;
+}
+.search-submit {
+  background: var(--soy);
+  color: var(--cream);
+  border: none;
+  padding: 0.55rem 1rem;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.65rem;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+.search-submit:hover { background: var(--chili); }
+.search-clear-link  {
+  padding: 0.55rem 0.75rem;
+  color: var(--smoke);
+  text-decoration: none;
+  font-size: 0.8rem;
+}
+.search-clear-link:hover { color: var(--chili); }
+
+/* ── Active filter bar ──────────────────────────────────────────────────── */
+.allergen-active-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 1rem;
+  padding: 0.6rem 0.9rem;
+  background: var(--bone);
+  border-radius: 2px;
+  font-size: 0.75rem;
+}
+.allergen-active-label {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.65rem;
+  letter-spacing: 1px;
+  color: var(--smoke);
+  text-transform: uppercase;
+}
+.allergen-tag {
+  background: var(--chili);
+  color: white;
+  padding: 0.15rem 0.5rem;
+  border-radius: 100px;
+  font-size: 0.65rem;
+  font-family: 'DM Mono', monospace;
 }
 
-.price-slider {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 100%;
-  height: 6px;
-  border-radius: 3px;
-  outline: none;
+/* ── Allergen grid ──────────────────────────────────────────────────────── */
+.allergen-note {
+  font-size: 0.78rem;
+  color: var(--smoke);
+  margin-bottom: 0.75rem;
+  font-style: italic;
+}
+.allergen-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.4rem;
+}
+.allergen-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.65rem;
+  border: 1.5px solid var(--bone);
+  border-radius: 2px;
   cursor: pointer;
+  background: white;
+  font-size: 0.75rem;
+  transition: all 0.15s;
+  user-select: none;
+  color: var(--soy);
+}
+.allergen-chip input { display: none; }
+.allergen-chip:hover   { border-color: var(--chili); }
+.allergen-chip.active  {
+  background: var(--chili);
+  border-color: var(--chili);
+  color: white;
+}
+.allergen-icon  { font-size: 1rem; }
+.allergen-label { font-size: 0.72rem; font-weight: 500; }
+
+/* ── Price slider ───────────────────────────────────────────────────────── */
+.price-filter { display: flex; flex-direction: column; gap: 10px; }
+.price-label-row {
+  display: flex; align-items: center; justify-content: space-between;
+}
+.price-label-text { font-size: 0.85rem; color: var(--smoke); }
+.price-display    { font-weight: 700; font-size: 1.1rem; color: var(--chili); }
+.slider-track-wrapper { display: flex; flex-direction: column; gap: 6px; }
+.price-slider {
+  -webkit-appearance: none; appearance: none;
+  width: 100%; height: 6px; border-radius: 3px; outline: none; cursor: pointer;
   background: linear-gradient(
     to right,
-    var(--accent, #e05c2a) 0%,
-    var(--accent, #e05c2a) calc(var(--pct, 100%) * 1%),
-    #ddd                   calc(var(--pct, 100%) * 1%),
-    #ddd                   100%
+    var(--chili) 0%,
+    var(--chili) calc(var(--pct, 100%) * 1%),
+    #ddd         calc(var(--pct, 100%) * 1%),
+    #ddd         100%
   );
 }
-
 .price-slider::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: var(--accent, #e05c2a);
-  border: 2px solid #fff;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.25);
-  cursor: grab;
+  -webkit-appearance: none; appearance: none;
+  width: 20px; height: 20px; border-radius: 50%;
+  background: var(--chili); border: 2px solid #fff;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.25); cursor: grab;
   transition: transform 0.1s;
 }
-
-.price-slider::-webkit-slider-thumb:active {
-  cursor: grabbing;
-  transform: scale(1.15);
-}
-
+.price-slider::-webkit-slider-thumb:active { cursor: grabbing; transform: scale(1.15); }
 .price-slider::-moz-range-thumb {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: var(--accent, #e05c2a);
-  border: 2px solid #fff;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.25);
-  cursor: grab;
+  width: 20px; height: 20px; border-radius: 50%;
+  background: var(--chili); border: 2px solid #fff;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.25); cursor: grab;
 }
-
 .slider-ticks {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.72rem;
-  color: #aaa;
-  padding: 0 2px;
+  display: flex; justify-content: space-between;
+  font-size: 0.72rem; color: #aaa; padding: 0 2px;
 }
 
-.stall-card-link {
-  display: block;
-  text-decoration: none;
-  color: inherit;
-}
+/* ── Stall card link wrapper ────────────────────────────────────────────── */
+.stall-card-link { display: block; text-decoration: none; color: inherit; }
 .stall-card-link:hover .stall-card,
 .stall-card-link:focus .stall-card {
   transform: translateY(-2px);
   box-shadow: 0 6px 24px rgba(0,0,0,0.13);
-  cursor: pointer;
+}
+
+/* ── Allergen tags inside expanded card ─────────────────────────────────── */
+.stall-allergens {
+  display: flex; flex-wrap: wrap; gap: 0.35rem;
+  margin: 0.5rem 0;
+  align-items: center;
+}
+.stall-allergen-label {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.62rem;
+  letter-spacing: 1px;
+  color: var(--smoke);
+  text-transform: uppercase;
+}
+.stall-allergen-tag {
+  background: var(--bone);
+  color: var(--smoke);
+  padding: 0.15rem 0.5rem;
+  border-radius: 100px;
+  font-size: 0.65rem;
+  font-family: 'DM Mono', monospace;
+}
+
+/* ── Mobile: stack section header ───────────────────────────────────────── */
+@media (max-width: 640px) {
+  .section-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .inline-search-form { width: 100%; }
+  .search-bar { width: 100%; }
+
+  .allergen-grid { grid-template-columns: 1fr 1fr; }
 }
 </style>
 
-<!-- ── Price Slider Script ──────────────────────────────────────────────────── -->
+<!-- ── Scripts ────────────────────────────────────────────────────────────── -->
 <script>
+// Price slider — live label + auto-submit
 (function () {
   const slider  = document.getElementById('max_price');
   const display = document.getElementById('price-value');
   if (!slider) return;
 
   function updateSlider() {
-    const min = Number(slider.min);
-    const max = Number(slider.max);
-    const val = Number(slider.value);
-    display.textContent = val;
-    const pct = ((val - min) / (max - min)) * 100;
+    const pct = ((+slider.value - +slider.min) / (+slider.max - +slider.min)) * 100;
+    display.textContent = slider.value;
     slider.style.setProperty('--pct', pct.toFixed(1));
   }
-
-  // Live label while dragging
-  slider.addEventListener('input', updateSlider);
-
-  // Auto-submit when thumb is released
-  slider.addEventListener('change', function () {
-    this.closest('form').submit();
-  });
-
-  // Initialise fill on page load
+  slider.addEventListener('input',  updateSlider);
+  slider.addEventListener('change', function () { this.closest('form').submit(); });
   updateSlider();
+})();
+
+// Collapsible sidebar panels
+(function () {
+  document.querySelectorAll('.panel-toggle').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      const targetId = btn.getAttribute('data-target');
+      const body     = document.getElementById(targetId);
+      if (!body) return;
+      const isOpen = btn.getAttribute('aria-expanded') === 'true';
+      btn.setAttribute('aria-expanded', !isOpen);
+      body.classList.toggle('collapsed', isOpen);
+    });
+  });
 })();
 </script>
 
