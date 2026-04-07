@@ -956,7 +956,7 @@ def onboarding():
         }
 
         print(data)  # replace with DB save later
-        return redirect(url_for("dashboard"))
+        return redirect(url_for("cuisines"))
 
     return render_template(
         "feature_onboarding_edit.html",
