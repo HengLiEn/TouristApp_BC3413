@@ -748,7 +748,7 @@ def _ddmmyyyy_to_iso(ddmmyyyy_str) -> Optional[str]:
 
 @app.route("/closure")
 def closure():
-    return render_template('feature_onboarding.html', active_page='closure')
+    return render_template('base_layout.html', active_page='closure')
 
 # ── Reviews ───────────────────────────────────────────────────────────────────
 review_feature = ReviewFeature()
