@@ -958,7 +958,7 @@
 <section class="itin-hero">
   <div class="itin-hero-inner">
     <div class="hero-text-block">
-      <p class="hero-eyebrow">// Hawker Hunt — Itinerary Planner</p>
+      <p class="hero-eyebrow">Hawker Hunt — Itinerary Planner</p>
       <h1 class="hero-title">Your <em>Saved</em><br/>Hawker Journey</h1>
       <p class="hero-sub">Your curated list of stalls, organised by day.<br>
       Plan, visit, devour.</p>
@@ -1019,7 +1019,7 @@
   {% else %}
   <!-- ── MAIN: Day-by-day timeline ───────────────────────────────────────── -->
   <main>
-    <p class="section-comment">// <em>{{ itinerary | length }}</em> stall{{ 's' if itinerary | length != 1 }} saved — organised across your trip</p>
+    <p class="section-comment"><em>{{ itinerary | length }}</em> stall{{ 's' if itinerary | length != 1 }} saved — organised across your trip</p>
 
     {% if days %}
 
@@ -1139,7 +1139,7 @@
 
               <!-- Stop label + reorder arrows (when optimised) -->
               <div class="sc-stop" style="justify-content:space-between;">
-                <span>// stop {{ stop_num }}</span>
+                <span>stop {{ stop_num }}</span>
                 {% if route %}
                 <div class="reorder-btns">
                   <a href="/itinerary/reorder/{{ d_idx }}/{{ stall.stall_id }}/up"
@@ -1210,7 +1210,7 @@
             <div class="stall-card">
               <div class="stall-card-top">
                 <div class="stall-card-left">
-                  <div class="stall-order">// stall {{ loop.index }} of {{ itinerary | length }}</div>
+                  <div class="stall-order">stall {{ loop.index }} of {{ itinerary | length }}</div>
                   <div class="stall-name">{{ stall.stall_name | default('Unknown Stall') }}</div>
                   <div class="stall-hawker">📍 {{ stall.hawker_name | default('Unknown Centre') }}</div>
                 </div>
@@ -1256,7 +1256,7 @@
     <!-- Summary stats -->
     <div class="side-panel">
       <div class="side-panel-header">
-        <span class="side-panel-title">// Trip Summary</span>
+        <span class="side-panel-title">Trip Summary</span>
         <span>📊</span>
       </div>
       <div class="side-panel-body">
@@ -1291,7 +1291,7 @@
     {% if cuisine_breakdown %}
     <div class="side-panel">
       <div class="side-panel-header">
-        <span class="side-panel-title">// Cuisine Mix</span>
+        <span class="side-panel-title">Cuisine Mix</span>
         <span>🍽</span>
       </div>
       <div class="side-panel-body">
@@ -1315,7 +1315,7 @@
     <!-- Actions -->
     <div class="side-panel">
       <div class="side-panel-header">
-        <span class="side-panel-title">// Actions</span>
+        <span class="side-panel-title">Actions</span>
         <span>⚡</span>
       </div>
         <div class="side-panel-body">
@@ -1335,7 +1335,7 @@
     {% if not trip_start or not trip_end %}
     <div class="side-panel">
       <div class="side-panel-header">
-        <span class="side-panel-title">// Set Trip Dates</span>
+        <span class="side-panel-title">Set Trip Dates</span>
         <span>🗓</span>
       </div>
       <div class="side-panel-body">
