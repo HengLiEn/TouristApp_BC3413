@@ -67,7 +67,7 @@ class CuisineFeatureHandler:
         parts = re.split(r"[,;/|]+", str(cell).strip().lower())
         return [p.strip() for p in parts if p.strip()]
 
-    EXCLUDE_CUISINES = {"Hardware","Dry Goods","Fruits"}
+    EXCLUDE_CUISINES = {"Hardware","Dry Goods","Sundries", "Poultry"}
 
     def get_available_cuisines(self) -> List[str]:
         if "cuisine_type" not in self.stalls_df.columns:
