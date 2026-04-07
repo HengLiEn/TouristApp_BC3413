@@ -972,8 +972,8 @@ def onboarding():
         ],
         cuisines=[
             "Chinese", "Malay", "Indian", "Japanese", "Korean", "Thai",
-            "Western", "Seafood", "Vegetarian", "Halal",
-            "Peranakan", "Indonesian"
+            "Western", "Seafood", "Vegetarian", "Halal", "Beverage",
+            "Dessert", "Fruits", "Peranakan"
         ],
         singapore_center={"lat": 1.3521, "lng": 103.8198}
     )
