@@ -128,6 +128,13 @@ def dashboard():
     stall_names  = top8['stall_name'].tolist()
     stall_scores = top8['avg_rating'].tolist()
 
+# ── Hawker Centre Explorer dropdown list ──────────────────────
+    all_centres = (
+             hc[['center_id', 'center_name']]
+             .sort_values('center_name')
+             .to_dict(orient='records')
+          )
+
     return render_template(
         "dashboard.html",
         username       = session["username"],
@@ -145,7 +152,158 @@ def dashboard():
         trend_scores   = closure_counts,
         top_stall_names  = stall_names,
         top_stall_scores = stall_scores,
+        all_centres=all_centres,
     )
+
+
+@app.route("/api/hawker_centre_stats")
+def hawker_centre_stats():
+    """
+    Returns JSON with all stats for a single hawker centre.
+    Query param: ?center_id=<int>
+    """
+    center_id = request.args.get("center_id", type=int)
+    if center_id is None:
+        return jsonify({"error": "center_id required"}), 400
+
+    # ── Load data ────────────────────────────────────────────────────
+    hc = pd.read_csv(CENTRES_CSV)
+    cl = pd.read_csv(CLOSURES_CSV)
+    menu = pd.read_csv(MENU_CSV)
+    rev = pd.read_csv(REVIEWS_CSV)
+    stalls = pd.read_csv(STALLS_CSV)
+
+    MARKET_TYPES = {
+        'Dry Goods', 'Hardware', 'Fruits', 'Seafood',
+        'Sundries', 'Poultry', 'Vegetables', 'Wet Market'
+    }
+
+    # ── Validate centre ──────────────────────────────────────────────
+    centre_row = hc[hc['center_id'] == center_id]
+    if centre_row.empty:
+        return jsonify({"error": "centre not found"}), 404
+    centre_info = centre_row.iloc[0]
+
+    # ── Stalls in this centre (food stalls only) ─────────────────────
+    hc_stalls = stalls[
+        (stalls['hawker_center_id'] == center_id) &
+        (~stalls['cuisine_type'].isin(MARKET_TYPES))
+        ]
+
+    total_stalls = len(hc_stalls)
+
+    # ── Average rating ────────────────────────────────────────────────
+    stall_ids = hc_stalls['stall_id'].tolist()
+    hc_reviews = rev[rev['stall_id'].isin(stall_ids)]
+    avg_rating = (
+        round(float(hc_reviews['rating'].mean()), 2)
+        if not hc_reviews.empty else None
+    )
+
+    # ── Average price ─────────────────────────────────────────────────
+    hc_menu = menu[menu['stall_id'].isin(stall_ids)]
+    avg_price = (
+        round(float(hc_menu['price'].mean()), 2)
+        if not hc_menu.empty else None
+    )
+
+    # ── Area / region ─────────────────────────────────────────────────
+    # Try common column names; adapt if your CSV uses a different one.
+    area = None
+    for col in ['area', 'region', 'location_area', 'town', 'zone']:
+        if col in centre_info.index and pd.notna(centre_info[col]):
+            area = str(centre_info[col])
+            break
+    if area is None:
+        area = "Central"  # sensible fallback
+
+    # ── Cuisine breakdown ─────────────────────────────────────────────
+    cuisine_series = (
+        hc_stalls['cuisine_type']
+            .value_counts()
+            .head(10)
+    )
+    cuisine_labels = cuisine_series.index.tolist()
+    cuisine_counts = [int(v) for v in cuisine_series.values]
+
+    # ── Closure dates for this centre ─────────────────────────────────
+    # The closures CSV matches on centre name; adapt key if needed.
+    closures_dict = {"q1": [], "q2": [], "q3": [], "q4": []}
+
+    # Try matching by center_id first, then by name
+    cl_row = cl[cl.get('center_id', pd.Series(dtype=int)) == center_id] if 'center_id' in cl.columns else pd.DataFrame()
+    if cl_row.empty:
+        # Fuzzy-ish name match (strip anything in parentheses)
+        cname = str(centre_info.get('center_name', '')).split('(')[0].strip().lower()
+        cl['_name_clean'] = cl.iloc[:, 0].astype(str).str.split('(').str[0].str.strip().str.lower()
+        cl_row = cl[cl['_name_clean'] == cname]
+
+    if not cl_row.empty:
+        row = cl_row.iloc[0]
+        quarter_cols = {
+            'q1': 'q1_cleaningstartdate',
+            'q2': 'q2_cleaningstartdate',
+            'q3': 'q3_cleaningstartdate',
+            'q4': 'q4_cleaningstartdate',
+        }
+        for qkey, col in quarter_cols.items():
+            if col in row.index:
+                val = str(row[col]).strip()
+                if val and val.upper() not in ('TBC', 'NIL', 'NA', 'NAN', ''):
+                    # May be comma-separated date ranges
+                    dates = [d.strip() for d in val.split(',') if d.strip()]
+                    closures_dict[qkey] = dates
+
+    # ── Top-rated stalls (up to 8) ────────────────────────────────────
+    if not hc_reviews.empty:
+        stall_avg = (
+            hc_reviews.groupby('stall_id')['rating']
+                .mean().round(2)
+                .reset_index()
+                .rename(columns={'rating': 'avg_rating'})
+        )
+        top8 = (
+            stall_avg
+                .merge(hc_stalls[['stall_id', 'stall_name']], on='stall_id')
+                .nlargest(8, 'avg_rating')[['stall_name', 'avg_rating']]
+        )
+        top_stalls = [
+            {"name": str(r['stall_name']), "rating": round(float(r['avg_rating']), 2)}
+            for _, r in top8.iterrows()
+        ]
+    else:
+        top_stalls = []
+
+    # ── Price range distribution (for the bar chart) ──────────────────
+    if not hc_menu.empty:
+        bins = [0, 3, 5, 8, 10, 15, float('inf')]
+        labels = ['<$3', '$3–5', '$5–8', '$8–10', '$10–15', '>$15']
+        hc_menu = hc_menu.copy()
+        hc_menu['price_band'] = pd.cut(
+            hc_menu['price'], bins=bins, labels=labels, right=True
+        )
+        band_counts = hc_menu['price_band'].value_counts().reindex(labels, fill_value=0)
+        price_range_labels = labels
+        price_range_counts = [int(v) for v in band_counts.values]
+    else:
+        price_range_labels = []
+        price_range_counts = []
+
+    return jsonify({
+        "center_id": center_id,
+        "center_name": str(centre_info.get('center_name', '')),
+        "area": area,
+        "total_stalls": total_stalls,
+        "avg_rating": avg_rating,
+        "avg_price": avg_price,
+        "cuisine_labels": cuisine_labels,
+        "cuisine_counts": cuisine_counts,
+        "closures": closures_dict,
+        "top_stalls": top_stalls,
+        "price_range_labels": price_range_labels,
+        "price_range_counts": price_range_counts,
+    })
+
 # ── Cuisines (ACTIVE) ─────────────────────────────────────────────────────────
 @app.route('/cuisines')
 def cuisines():
