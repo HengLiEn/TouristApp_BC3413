@@ -390,14 +390,12 @@
     </p>
   </div>
 
-  <div class="onboard-progress">
-    <div class="onboard-progress-step active"></div>
-    <div class="onboard-progress-step"></div>
-    <div class="onboard-progress-step"></div>
-    <div class="onboard-progress-step"></div>
-    <div class="onboard-progress-step"></div>
-    <div class="onboard-progress-step"></div>
-  </div>
+    <div class="onboard-progress">
+  <div class="onboard-progress-step active"></div>
+  <div class="onboard-progress-step"></div>
+  <div class="onboard-progress-step"></div>
+  <div class="onboard-progress-step"></div>
+    </div>
 
   <form method="POST" id="onboardingForm" class="onboard-card">
     <div class="onboard-card-header">
@@ -417,44 +415,6 @@
 
       <!-- Step 1 -->
       <section class="step">
-        <h2>Where are you from?</h2>
-        <p class="step-sub">
-          This helps us tailor recommendations for travellers with different food familiarity
-          and taste preferences.
-        </p>
-
-        <div class="choice-grid">
-          {% for country in countries %}
-            <label class="choice-card">
-              <input type="radio" name="country" value="{{ country }}">
-              <span>{{ country }}</span>
-            </label>
-          {% endfor %}
-        </div>
-      </section>
-
-      <!-- Step 2 -->
-      <section class="step">
-        <h2>How much heat can you handle?</h2>
-        <p class="step-sub">
-          From gentle flavours to full fire — choose your spice comfort zone.
-        </p>
-
-        <div class="slider-block">
-          <div class="slider-head">
-            <div class="slider-value">Spice tolerance</div>
-            <div class="slider-value" id="spiceValue">Medium</div>
-          </div>
-          <input type="range" id="spice_level" name="spice_level" min="0" max="5" step="1" value="3">
-          <div class="slider-ends">
-            <span>No spice</span>
-            <span>Maximum heat</span>
-          </div>
-        </div>
-      </section>
-
-      <!-- Step 3 -->
-      <section class="step">
         <h2>Any allergens to avoid?</h2>
         <p class="step-sub">
           Select anything we should watch out for. Leave blank if there are no restrictions.
@@ -470,7 +430,7 @@
         </div>
       </section>
 
-      <!-- Step 4 -->
+      <!-- Step 2 -->
       <section class="step">
         <h2>Which cuisines do you prefer?</h2>
         <p class="step-sub">
@@ -487,7 +447,7 @@
         </div>
       </section>
 
-      <!-- Step 5 -->
+      <!-- Step 3 -->
       <section class="step">
         <h2>Trip details</h2>
         <p class="step-sub">
@@ -579,14 +539,6 @@
       currentStep--;
       updateSteps();
     }
-  });
-
-  const spiceInput = document.getElementById("spice_level");
-  const spiceValue = document.getElementById("spiceValue");
-  const spiceLabels = ["None", "Mild", "Light", "Medium", "Spicy", "Extra Hot"];
-
-  spiceInput.addEventListener("input", () => {
-    spiceValue.textContent = spiceLabels[parseInt(spiceInput.value)];
   });
 
   const radiusInput = document.getElementById("radius_km");
