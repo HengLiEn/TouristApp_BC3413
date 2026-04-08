@@ -790,7 +790,7 @@ def itinerary_optimise(day_index):
 @app.route("/itinerary/reorder/<int:day_index>/<int:stall_id>/<direction>")
 def itinerary_reorder(day_index, stall_id, direction):
     """Move a stall up or down within the day, then recalculate leg distances
-    using the same OneMap walking route API as the optimiser."""
+    using the same OneMap walking route API as the optimiser"""
     session["username"] = "test_user"
     route_orders = session.get("route_orders", {})
     key = str(day_index)
