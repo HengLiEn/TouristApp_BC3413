@@ -12,8 +12,6 @@ class TouristProfile:
     username: str
     password: str
     name: str
-    country: str
-    spice_level: int
     allergens: List[str]
     preferred_cuisines: List[str]
     created_at: str
@@ -30,8 +28,6 @@ class TouristProfileDA:
         "username": "TEXT",
         "password": "TEXT",
         "name": "TEXT",
-        "country": "TEXT",
-        "spice_level": "INTEGER",
         "allergens": "TEXT",
         "preferred_cuisines": "TEXT",
         "created_at": "TEXT",
@@ -70,8 +66,6 @@ class TouristProfileDA:
             username TEXT PRIMARY KEY,
             password TEXT NOT NULL,
             name TEXT NOT NULL,
-            country TEXT NOT NULL,
-            spice_level INTEGER NOT NULL,
             allergens TEXT,
             preferred_cuisines TEXT,
             created_at TEXT NOT NULL,
@@ -157,15 +151,13 @@ class TouristProfileDA:
 
     def insert_profile(self, p: TouristProfile) -> None:
         sql = """
-        INSERT INTO tourist_profiles (username, password, name, country, spice_level, allergens, preferred_cuisines, created_at, saved_stalls, saved_hawker_center_ids, location_lat, location_lng, radius_km, trip_start, trip_end
+        INSERT INTO tourist_profiles (username, password, name, allergens, preferred_cuisines, created_at, saved_stalls, saved_hawker_center_ids, location_lat, location_lng, radius_km, trip_start, trip_end
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
         """
         data = (
             p.username,
             p.password,
             p.name,
-            p.country,
-            int(p.spice_level),
             self._pack_list(p.allergens),
             self._pack_list(p.preferred_cuisines),
             p.created_at,
@@ -183,7 +175,7 @@ class TouristProfileDA:
 
     def get_profile(self, username: str) -> Optional[TouristProfile]:
         sql = """
-        SELECT username, password, name, country, spice_level, allergens, preferred_cuisines, created_at, saved_stalls, saved_hawker_center_ids, location_lat, location_lng, radius_km, trip_start, trip_end
+        SELECT username, password, name, allergens, preferred_cuisines, created_at, saved_stalls, saved_hawker_center_ids, location_lat, location_lng, radius_km, trip_start, trip_end
         FROM tourist_profiles
         WHERE username = ?;
         """
@@ -196,8 +188,6 @@ class TouristProfileDA:
             username=row[0],
             password=row[1] or "",
             name=row[2] or "",
-            country=row[3] or "",
-            spice_level=int(row[4] or 0),
             allergens=self._unpack_list(row[5]),
             preferred_cuisines=self._unpack_list(row[6]),
             created_at=row[7] or "",
@@ -313,16 +303,12 @@ def create_account(da: TouristProfileDA) -> Optional[TouristProfile]:
             break
         print("Passwords do not match. Try again.")
     name = input_nonempty("\nWhat is your name? ")
-    country = input_nonempty("Which country are you from? ")
-    spice = input_int("What is your spice tolerance from 0-5? ", 0, 5)
     allergens = input_list("Allergens to avoid (comma-separated) [optional]: ")
     cuisines = input_list("Preferred cuisines (comma-separated) [optional]: ")
     profile = TouristProfile(
         username=username,
         password=password,
         name=name,
-        country=country,
-        spice_level=spice,
         allergens=allergens,
         preferred_cuisines=cuisines,
         created_at=now_iso(),
