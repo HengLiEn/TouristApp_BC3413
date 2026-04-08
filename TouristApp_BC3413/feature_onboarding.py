@@ -152,7 +152,7 @@ class TouristProfileDA:
     def insert_profile(self, p: TouristProfile) -> None:
         sql = """
         INSERT INTO tourist_profiles (username, password, name, allergens, preferred_cuisines, created_at, saved_stalls, saved_hawker_center_ids, location_lat, location_lng, radius_km, trip_start, trip_end
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
         """
         data = (
             p.username,
@@ -188,16 +188,16 @@ class TouristProfileDA:
             username=row[0],
             password=row[1] or "",
             name=row[2] or "",
-            allergens=self._unpack_list(row[5]),
-            preferred_cuisines=self._unpack_list(row[6]),
-            created_at=row[7] or "",
-            saved_stalls=self._unpack_ints(row[8]),
-            saved_hawker_center_ids=self._unpack_ints(row[9]),
-            location_lat=float(row[10]) if row[10] is not None else None,
-            location_lng=float(row[11]) if row[11] is not None else None,
-            radius_km=float(row[12]) if row[12] is not None else 2.0,
-            trip_start=row[13] if row[13] else None,
-            trip_end=row[14] if row[14] else None,
+            allergens=self._unpack_list(row[3]),
+            preferred_cuisines=self._unpack_list(row[4]),
+            created_at=row[5] or "",
+            saved_stalls=self._unpack_ints(row[6]),
+            saved_hawker_center_ids=self._unpack_ints(row[7]),
+            location_lat=float(row[8]) if row[8] is not None else None,
+            location_lng=float(row[9]) if row[9] is not None else None,
+            radius_km=float(row[10]) if row[10] is not None else 2.0,
+            trip_start=row[11] if row[11] else None,
+            trip_end=row[12] if row[12] else None,
         )
 
     def _update_int_list_column(self, username: str, column: str, values: List[int]) -> None:

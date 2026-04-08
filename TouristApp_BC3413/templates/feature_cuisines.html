@@ -19,11 +19,6 @@
   <!-- ═══ SIDEBAR ═══════════════════════════════════════════════════════════ -->
   <aside class="sidebar">
 
-    <!--
-      Mobile collapsible sidebar
-      On ≤768 px screens each filter panel can be toggled open/closed.
-    -->
-
     <!-- ── FORM 1: CUISINE FILTER ────────────────────────────────────────── -->
     <form method="GET" action="/cuisines" id="cuisine-form">
       {% if search_query %}<input type="hidden" name="q" value="{{ search_query }}">{% endif %}
@@ -165,7 +160,7 @@
 
     <a href="/cuisines" class="clear-btn" style="text-align:center;text-decoration:none;display:block;">✕ Clear Filters</a>
 
-  </aside><!-- /sidebar -->
+  </aside>
 
   <!-- ═══ RESULTS ════════════════════════════════════════════════════════════ -->
   <main>

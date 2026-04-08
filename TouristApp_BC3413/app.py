@@ -6,11 +6,17 @@ from feature_onboarding import TouristProfileDA
 from features_location import LocationPlanner
 from features_reviews import ReviewFeature
 from datetime import datetime, timedelta
-from collections import Counter
-import pandas as pd
-# from functools import wraps
+import pandas as pd,json
 import os
-# import sqlite3
+from collections import Counter
+BASE_DIR     = os.path.dirname(os.path.abspath(__file__))
+CENTRES_CSV  = os.path.join(BASE_DIR, 'dataset', 'Hawker Centre Data', 'hawker_centers.csv')
+CLOSURES_CSV = os.path.join(BASE_DIR, 'dataset', 'Hawker Centre Data', 'DatesofHawkerCentresClosure.csv')
+MENU_CSV     = os.path.join(BASE_DIR, 'dataset', 'Multiple Stalls Menu and Data', 'menu_items.csv')
+REVIEWS_CSV  = os.path.join(BASE_DIR, 'dataset', 'Multiple Stalls Menu and Data', 'reviews.csv')
+STALLS_JSON  = os.path.join(BASE_DIR, 'dataset', 'Multiple Stalls Menu and Data', 'stalls.json')
+STALLS_CSV = os.path.join(BASE_DIR, 'dataset', 'Multiple Stalls Menu and Data', 'stalls.csv')
+
 
 app = Flask(__name__, template_folder=os.path.join(os.path.dirname(os.path.abspath(__file__)), "templates"))
 app.secret_key = "bc3413-secret"
@@ -55,10 +61,90 @@ app.secret_key = "bc3413-secret"
 #     session.clear()
 #     return redirect(url_for("login"))
 
-# @app.route("/dashboard")
-# def dashboard():
-#     return render_template("dashboard.html", username=session["username"])
 
+@app.route("/dashboard")
+def dashboard():
+    hc   = pd.read_csv(CENTRES_CSV)
+    cl   = pd.read_csv(CLOSURES_CSV)
+    menu = pd.read_csv(MENU_CSV)
+    rev  = pd.read_csv(REVIEWS_CSV)
+
+    STALLS_CSV = os.path.join(BASE_DIR, 'dataset', 'Multiple Stalls Menu and Data', 'stalls.csv')
+    stalls = pd.read_csv(STALLS_CSV)
+
+    # Filter to food stalls only (exclude market types)
+    MARKET_TYPES = {'Dry Goods', 'Hardware', 'Fruits', 'Seafood', 'Sundries',
+                    'Poultry', 'Vegetables', 'Wet Market'}
+    food_stalls = stalls[~stalls['cuisine_type'].isin(MARKET_TYPES)]
+
+    # ── Stat cards ─────────────────────────────────────────────────
+    total_stalls  = len(food_stalls)
+    total_centres = len(cl)
+    avg_price     = round(menu['price'].mean(), 2)
+    avg_rating    = round(rev['rating'].mean(), 2)
+    total_reviews = len(rev)
+
+    # ── Bar: avg price per hawker centre (top 10) ──────────────────
+    menu_stalls = menu.merge(stalls[['stall_id', 'hawker_center_id']], on='stall_id')
+    menu_hc = menu_stalls.merge(
+        hc[['center_id', 'center_name']],
+        left_on='hawker_center_id', right_on='center_id'
+    )
+    price_by_centre = (
+        menu_hc.groupby('center_name')['price']
+        .mean().round(2)
+        .sort_values(ascending=False)
+        .head(10)
+    )
+    price_labels = price_by_centre.index.str.split('(').str[0].str.strip().tolist()
+    price_values = price_by_centre.values.tolist()
+
+    # ── Donut: food cuisine breakdown only ─────────────────────────
+    cuisine_counts_s = food_stalls['cuisine_type'].value_counts().head(8)
+    cuisine_labels   = cuisine_counts_s.index.tolist()
+    cuisine_counts   = cuisine_counts_s.values.tolist()
+
+    # ── Line: quarterly closure counts ────────────────────────────
+    quarter_labels = ['Q1 2026', 'Q2 2026', 'Q3 2026', 'Q4 2025']
+    quarter_cols   = ['q1_cleaningstartdate', 'q2_cleaningstartdate',
+                      'q3_cleaningstartdate', 'q4_cleaningstartdate']
+    closure_counts = []
+    for col in quarter_cols:
+        valid = cl[col].notna() & (~cl[col].str.upper().isin(['TBC', 'NIL', 'NA']))
+        closure_counts.append(int(valid.sum()))
+
+    # ── Horizontal bar: top 8 stalls by avg review rating ──────────
+    stall_avg = (
+        rev.groupby('stall_id')['rating']
+        .mean().round(2)
+        .reset_index()
+        .rename(columns={'rating': 'avg_rating'})
+    )
+    top8 = (
+        stall_avg.merge(food_stalls[['stall_id', 'stall_name']], on='stall_id')
+        .nlargest(8, 'avg_rating')[['stall_name', 'avg_rating']]
+    )
+    stall_names  = top8['stall_name'].tolist()
+    stall_scores = top8['avg_rating'].tolist()
+
+    return render_template(
+        "dashboard.html",
+        username       = session["username"],
+        active_page    = "dashboard",
+        total_stalls   = f"{total_stalls:,}",
+        total_centres  = total_centres,
+        avg_rating     = avg_rating,
+        total_reviews  = f"{total_reviews:,}",
+        avg_price      = avg_price,
+        price_labels   = price_labels,
+        price_values   = price_values,
+        cuisine_labels = cuisine_labels,
+        cuisine_counts = cuisine_counts,
+        trend_months   = quarter_labels,
+        trend_scores   = closure_counts,
+        top_stall_names  = stall_names,
+        top_stall_scores = stall_scores,
+    )
 # ── Cuisines (ACTIVE) ─────────────────────────────────────────────────────────
 @app.route('/cuisines')
 def cuisines():
@@ -342,7 +428,7 @@ def location():
         from feature_onboarding import TouristProfile
         da.insert_profile(TouristProfile(
             username="test_user", password="test",
-            name="Test", country="SG", spice_level=2,
+            name="Test",
             allergens=[], preferred_cuisines=[],
             created_at=datetime.now().isoformat()
         ))
