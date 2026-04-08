@@ -948,7 +948,7 @@ def itinerary_optimise(day_index):
 @app.route("/itinerary/reorder/<int:day_index>/<int:stall_id>/<direction>")
 def itinerary_reorder(day_index, stall_id, direction):
     """Move a stall up or down within the day, then recalculate leg distances
-    using the same OneMap walking route API as the optimiser"""
+    using the same OneMap walking route API as the optimiser."""
     session["username"] = "test_user"
     route_orders = session.get("route_orders", {})
     key = str(day_index)
@@ -1026,6 +1026,7 @@ def itinerary_clear():
     session["username"] = "test_user"  # TEMP
     da.clear_saved_stalls(session["username"])
     session.pop("stall_day_map", None)
+    session.pop("route_orders", None)
     flash("Itinerary cleared.", "success")
     return redirect(url_for("itinerary"))
 

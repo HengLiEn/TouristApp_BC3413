@@ -1514,24 +1514,26 @@
         </div>
 
         {% if day.stalls %}
-        {% set day_stall_map = {} %}
-        {% for stall in day.stalls %}{% set _ = day_stall_map.update({stall.stall_id: stall}) %}{% endfor %}
+        {# Use namespace throughout to avoid Jinja scoping issues #}
+        {% set ns = namespace(display_stalls=[], day_stall_map={}) %}
+        {% for stall in day.stalls %}
+          {% set _ = ns.day_stall_map.update({stall.stall_id: stall}) %}
+        {% endfor %}
 
         {# Build display list: route order if optimised, else default order #}
         {% if route %}
-          {% set display_stalls = [] %}
           {% for r in route %}
-            {% if r.stall_id in day_stall_map %}
-              {% set stall = day_stall_map[r.stall_id] %}
-              {% set _ = display_stalls.append({'stall': stall, 'leg_dist_km': r.leg_dist_km, 'leg_time_mins': r.leg_time_mins}) %}
+            {% if r.stall_id in ns.day_stall_map %}
+              {% set stall = ns.day_stall_map[r.stall_id] %}
+              {% set _ = ns.display_stalls.append({'stall': stall, 'leg_dist_km': r.leg_dist_km, 'leg_time_mins': r.leg_time_mins}) %}
             {% endif %}
           {% endfor %}
         {% else %}
-          {% set display_stalls = [] %}
           {% for stall in day.stalls %}
-            {% set _ = display_stalls.append({'stall': stall, 'leg_dist_km': none, 'leg_time_mins': none}) %}
+            {% set _ = ns.display_stalls.append({'stall': stall, 'leg_dist_km': none, 'leg_time_mins': none}) %}
           {% endfor %}
         {% endif %}
+        {% set display_stalls = ns.display_stalls %}
 
         <div class="timeline">
           {% for item in display_stalls %}
