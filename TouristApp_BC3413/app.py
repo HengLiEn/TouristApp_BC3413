@@ -559,7 +559,11 @@ def update_trip_dates():
     )
 
     flash(f"Trip dates saved: {trip_start} → {trip_end}", "success")
-    return redirect(url_for("location"))
+
+    # if the user was sent here from the itinerary save flow,
+    # send them back to the itinerary now that dates are set.
+    redirect_target = session.pop("after_dates_redirect", None)
+    return redirect(redirect_target or url_for("location"))
 
 
 # ── Itinerary  ─────
@@ -574,6 +578,16 @@ def update_trip_dates():
 def itinerary_save(stall_id):
     session["username"] = "test_user"  # TEMP
     da.add_saved_stall(session["username"], stall_id)
+
+    profile = da.get_profile(session["username"])
+    if not profile or not profile.trip_start or not profile.trip_end:
+        flash(
+            "Stall saved! Please set your trip dates so we can organise your itinerary by day.",
+            "info"
+        )
+        session["after_dates_redirect"] = url_for("itinerary")
+        return redirect(url_for("location"))
+
     flash("Stall saved! Choose which day to visit it below.", "success")
     return redirect(url_for("itinerary"))
 
@@ -775,7 +789,8 @@ def itinerary_optimise(day_index):
 
 @app.route("/itinerary/reorder/<int:day_index>/<int:stall_id>/<direction>")
 def itinerary_reorder(day_index, stall_id, direction):
-    """Move a stall up or down within the optimised route."""
+    """Move a stall up or down within the day, then recalculate leg distances
+    using the same OneMap walking route API as the optimiser."""
     session["username"] = "test_user"
     route_orders = session.get("route_orders", {})
     key = str(day_index)
@@ -788,10 +803,35 @@ def itinerary_reorder(day_index, stall_id, direction):
         order[idx], order[idx - 1] = order[idx - 1], order[idx]
     elif direction == "down" and idx < len(order) - 1:
         order[idx], order[idx + 1] = order[idx + 1], order[idx]
-    # Leg data is now stale — clear it
-    for stop in order:
-        stop["leg_dist_km"] = None
-        stop["leg_time_mins"] = None
+
+    # Recalculate leg distances using the same OneMap routing as the optimiser
+    handler = CuisineFeatureHandler()
+    all_ids = [s["stall_id"] for s in order]
+    stalls_df = handler.get_stalls_by_ids(all_ids, coords=None, radius_km=999)
+    coord_map = {}
+    if not stalls_df.empty:
+        for _, row in stalls_df.iterrows():
+            sid = int(row["stall_id"])
+            lat = row.get("latitude_hc")
+            lng = row.get("longitude_hc")
+            if lat and lng:
+                coord_map[sid] = (float(lat), float(lng))
+
+    order[0]["leg_dist_km"] = None
+    order[0]["leg_time_mins"] = None
+    for i in range(1, len(order)):
+        prev_id = order[i - 1]["stall_id"]
+        curr_id = order[i]["stall_id"]
+        if prev_id in coord_map and curr_id in coord_map:
+            dist_km, time_mins = planner._route_walk_km_mins(
+                coord_map[prev_id], coord_map[curr_id]
+            )
+            order[i]["leg_dist_km"] = round(dist_km, 2)
+            order[i]["leg_time_mins"] = round(time_mins)
+        else:
+            order[i]["leg_dist_km"] = None
+            order[i]["leg_time_mins"] = None
+
     route_orders[key] = order
     session["route_orders"] = route_orders
     return redirect(url_for("itinerary"))
@@ -855,7 +895,7 @@ def itinerary_export():
             lines.append(f"[{i}] {row.get('stall_name', '?')}")
             lines.append(f"    @ {row.get('hawker_name', '?')}")
             lines.append(
-                f"    Rating: {float(row.get('avg_rating', 0) or 0):.1f} | Cuisine: {row.get('cuisine_type', '?')}")
+                f"    Cuisine: {row.get('cuisine_type', '?')}")
             lines.append("")
 
     return Response(
@@ -863,7 +903,6 @@ def itinerary_export():
         mimetype="text/plain",
         headers={"Content-Disposition": "attachment; filename=hawker_hunt_itinerary.txt"}
     )
-
 
 # ── Private date-conversion helpers ──────────────────────────────────────────
 

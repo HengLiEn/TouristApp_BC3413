@@ -7,6 +7,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,700;1,9..144,300&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 
 <style>
 /* ── Design Tokens (matching feature_cuisines palette) ───────────────────── */
@@ -940,6 +942,43 @@
 .btn-reorder:hover { color: var(--accent); border-color: var(--accent); }
 .btn-reorder.disabled { opacity: 0.3; pointer-events: none; }
 
+
+/* ── Change-day picker (scheduled cards) ────────────────────────────────── */
+.btn-change-day {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--smoke);
+  background: var(--paper);
+  border: 1px solid var(--border-dark);
+  border-radius: 6px;
+  padding: 0.25rem 0.65rem;
+  cursor: pointer;
+  transition: all 0.14s;
+  white-space: nowrap;
+}
+.btn-change-day:hover { border-color: var(--accent); color: var(--accent); }
+.btn-change-day.open  { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+
+.change-day-picker {
+  display: none;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin-top: 0.85rem;
+  padding-top: 0.75rem;
+  border-top: 1px dashed var(--border);
+}
+.change-day-picker.visible { display: flex; }
+
+.day-picker-btn-current {
+  background: var(--accent-dim) !important;
+  border-color: var(--accent) !important;
+  color: var(--accent) !important;
+  cursor: default;
+  pointer-events: none;
+}
+
 /* Day picker label styling */
 .day-picker-label {
   font-family: var(--mono);
@@ -951,6 +990,119 @@
   width: 100%;
   white-space: nowrap;
   margin-bottom: 0.1rem;
+}
+
+/* ── How-it-works hint banner ───────────────────────────────────────────── */
+.how-it-works {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  background: var(--accent-dim);
+  border: 1px solid var(--accent-glow);
+  border-radius: 10px;
+  padding: 0.85rem 1.1rem;
+  margin-bottom: 1.5rem;
+}
+.hiw-step {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+  min-width: 160px;
+}
+.hiw-num {
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-family: var(--mono);
+  font-size: 0.65rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.hiw-text {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--ink);
+  line-height: 1.5;
+}
+.hiw-text strong { color: var(--accent); }
+.hiw-divider {
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+@media (max-width: 640px) {
+  .hiw-divider { display: none; }
+}
+
+/* ── Overall trip map ───────────────────────────────────────────────────── */
+.overall-map-wrap {
+  margin-bottom: 2rem;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.overall-map-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 0.75rem 1rem;
+  background: var(--paper);
+  border-bottom: 1px solid var(--border);
+}
+.overall-map-title {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--ink);
+}
+.map-day-filters {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+.map-filter-btn {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--smoke);
+  background: white;
+  border: 1px solid var(--border-dark);
+  border-radius: 6px;
+  padding: 0.25rem 0.7rem;
+  cursor: pointer;
+  transition: all 0.14s;
+  white-space: nowrap;
+}
+.map-filter-btn:hover { border-color: var(--accent); color: var(--accent); }
+.map-filter-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.overall-map {
+  width: 100%;
+  height: 360px;
+  z-index: 0;
+}
+.overall-map-footer {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  color: var(--smoke);
+  padding: 0.4rem 1rem;
+  background: var(--paper);
+  border-top: 1px solid var(--border);
+  letter-spacing: 0.03em;
 }
 </style>
 
@@ -1022,6 +1174,17 @@
     <p class="section-comment"><em>{{ itinerary | length }}</em> stall{{ 's' if itinerary | length != 1 }} saved — organised across your trip</p>
 
     {% if days %}
+    <div class="how-it-works">
+      <div class="hiw-step">
+        <span class="hiw-num">1</span>
+        <span class="hiw-text">After assigning each stall to a day, hit the <strong>✦ Optimise Route</strong> button to get the most efficient route!</span>
+      </div>
+      <div class="hiw-divider">→</div>
+      <div class="hiw-step">
+        <span class="hiw-num">2</span>
+        <span class="hiw-text">You may reorder using the ▲▼ arrows after optimising</span>
+      </div>
+    </div>
 
       {# ── Unscheduled stalls (no day chosen yet) #}
       {% if unscheduled %}
@@ -1079,6 +1242,255 @@
       </div>
       {% endif %}
 
+      {# ── Overall map with day filter #}
+      {# Build stall list from display_stalls (route order if optimised) so leg distances are available #}
+      {% set all_day_stalls = [] %}
+      {% for day in days %}
+        {% set d_num = loop.index0 %}
+        {% set route = route_orders.get(d_num | string, none) %}
+        {% set stop_counter = namespace(n=0) %}
+
+        {# Rebuild display order same way as the timeline does #}
+        {% set day_stall_map = {} %}
+        {% for stall in day.stalls %}{% set _ = day_stall_map.update({stall.stall_id: stall}) %}{% endfor %}
+
+        {% if route %}
+          {% for r in route %}
+            {% if r.stall_id in day_stall_map %}
+              {% set stall = day_stall_map[r.stall_id] %}
+              {% if stall.latitude_hc and stall.longitude_hc %}
+                {% set stop_counter.n = stop_counter.n + 1 %}
+                {% set _ = all_day_stalls.append({
+                  'stall':        stall,
+                  'day_idx':      d_num,
+                  'day_num':      day.day_num,
+                  'stop_num':     stop_counter.n,
+                  'leg_dist_km':  r.leg_dist_km,
+                  'leg_time_mins':r.leg_time_mins,
+                  'day_label':    day.weekday[:3] ~ ' ' ~ day.date_str
+                }) %}
+              {% endif %}
+            {% endif %}
+          {% endfor %}
+        {% else %}
+          {% for stall in day.stalls %}
+            {% if stall.latitude_hc and stall.longitude_hc %}
+              {% set stop_counter.n = stop_counter.n + 1 %}
+              {% set _ = all_day_stalls.append({
+                'stall':        stall,
+                'day_idx':      d_num,
+                'day_num':      day.day_num,
+                'stop_num':     stop_counter.n,
+                'leg_dist_km':  none,
+                'leg_time_mins':none,
+                'day_label':    day.weekday[:3] ~ ' ' ~ day.date_str
+              }) %}
+            {% endif %}
+          {% endfor %}
+        {% endif %}
+      {% endfor %}
+
+      {% if all_day_stalls | length > 0 %}
+      <div class="overall-map-wrap">
+        <div class="overall-map-header">
+          <span class="overall-map-title">🗺 Trip Map</span>
+          <div class="map-day-filters">
+            <button class="map-filter-btn active" onclick="filterMapDay('all', this)">All Days</button>
+            {% for day in days %}
+            {% if day.stalls | length > 0 %}
+            <button class="map-filter-btn" onclick="filterMapDay({{ loop.index0 }}, this)">
+              D{{ day.day_num }} · {{ day.weekday[:3] }}
+            </button>
+            {% endif %}
+            {% endfor %}
+          </div>
+        </div>
+        <div id="overall-map" class="overall-map"></div>
+        <div class="overall-map-footer">Click a pin to see stall details · scroll to zoom</div>
+      </div>
+
+      <script>
+      // Stall data built by Jinja with correct day index and stop number
+      // globalNum    = continuous number across all days (for All Days view)
+      // stopNum      = per-day number (for single-day filter view)
+      // legDistKm    = walking distance FROM previous stop (null if not optimised)
+      // legTimeMins  = walking time FROM previous stop (null if not optimised)
+      var _allStalls = [
+        {% for item in all_day_stalls %}
+        {% set s = item.stall %}
+        {
+          lat:         {{ s.latitude_hc }},
+          lng:         {{ s.longitude_hc }},
+          name:        {{ s.stall_name | default('Unknown') | tojson }},
+          hawker:      {{ s.hawker_name | default('') | tojson }},
+          address:     {{ s.address_myenv | default('') | tojson }},
+          dayIdx:      {{ item.day_idx }},
+          dayNum:      {{ item.day_num }},
+          stopNum:     {{ item.stop_num }},
+          globalNum:   {{ loop.index }},
+          legDistKm:   {{ item.leg_dist_km if item.leg_dist_km is not none else 'null' }},
+          legTimeMins: {{ item.leg_time_mins if item.leg_time_mins is not none else 'null' }}
+        }{% if not loop.last %},{% endif %}
+        {% endfor %}
+      ];
+
+      // Initialise map after DOM + Leaflet are fully ready
+      document.addEventListener('DOMContentLoaded', function() {
+        var DAY_COLORS = ['#e05c2a','#2d9e6b','#c08b20','#4a90d9','#9b59b6','#e74c3c','#1abc9c'];
+        var mapEl = document.getElementById('overall-map');
+        if (!mapEl || _allStalls.length === 0) return;
+
+        var map = L.map('overall-map', { zoomControl: true, scrollWheelZoom: true });
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '&copy; OpenStreetMap contributors',
+          maxZoom: 18
+        }).addTo(map);
+
+        // Default view — Singapore, in case fitBounds fails
+        map.setView([1.3521, 103.8198], 12);
+
+        var markers = [];
+        var lines   = [];
+
+        function makeIcon(label, color) {
+          return L.divIcon({
+            className: '',
+            html: '<div style="width:28px;height:28px;border-radius:50%;background:' + color + ';color:#fff;display:flex;align-items:center;justify-content:center;font-family:monospace;font-size:11px;font-weight:700;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.3);">' + label + '</div>',
+            iconSize:   [28, 28],
+            iconAnchor: [14, 14],
+            popupAnchor:[0, -18]
+          });
+        }
+
+        // showGlobal=true: show global stop number; false: show per-day stop number
+        function makePopup(s, color, showGlobal) {
+          var mapsUrl = s.address
+            ? 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(s.address)
+            : 'https://www.google.com/maps/search/?api=1&query=' + s.lat + ',' + s.lng;
+          var addrLine = s.address
+            ? '<a href="' + mapsUrl + '" target="_blank" style="font-family:monospace;font-size:0.72rem;color:' + color + ';text-decoration:underline;display:block;margin-top:5px;">&#127968; ' + s.address + ' &#8599;</a>'
+            : '';
+          var stopLabel = showGlobal
+            ? 'Day ' + s.dayNum + ' &middot; Stop #' + s.globalNum
+            : 'Day ' + s.dayNum + ' &middot; Stop ' + s.stopNum;
+          var legLine = (s.legDistKm !== null && s.stopNum > 1)
+            ? '<div style="font-family:monospace;font-size:0.68rem;color:#888;margin-top:4px;padding-top:4px;border-top:1px dashed #ddd;">&#128694; ' + s.legDistKm + ' km &middot; ~' + s.legTimeMins + ' min walk from prev stop</div>'
+            : '';
+          return '<div style="min-width:200px;line-height:1.5;">'
+            + '<div style="font-family:monospace;font-size:0.63rem;color:' + color + ';text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">' + stopLabel + '</div>'
+            + '<strong style="font-family:serif;font-size:1rem;">' + s.name + '</strong>'
+            + '<div style="font-family:monospace;font-size:0.72rem;color:#888;margin-top:3px;">&#128205; ' + s.hawker + '</div>'
+            + addrLine
+            + legLine
+            + '</div>';
+        }
+
+        // Add a distance label in the middle of a line segment
+        function addDistLabel(map, latA, lngA, latB, lngB, text, color) {
+          var midLat = (latA + latB) / 2;
+          var midLng = (lngA + lngB) / 2;
+          var icon = L.divIcon({
+            className: '',
+            html: '<div style="background:white;border:1px solid ' + color + ';border-radius:10px;padding:1px 6px;font-family:monospace;font-size:10px;color:' + color + ';white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,0.15);">' + text + '</div>',
+            iconSize: null,
+            iconAnchor: null
+          });
+          return L.marker([midLat, midLng], { icon: icon, interactive: false, zIndexOffset: -100 }).addTo(map);
+        }
+
+        function drawAll(filterDayIdx) {
+          markers.forEach(function(m) { map.removeLayer(m); });
+          lines.forEach(function(l)   { map.removeLayer(l); });
+          markers = []; lines = [];
+
+          var isAllDays = filterDayIdx === 'all';
+          var visible = isAllDays
+            ? _allStalls
+            : _allStalls.filter(function(s) { return s.dayIdx === filterDayIdx; });
+
+          if (visible.length === 0) return;
+
+          if (isAllDays) {
+            // ── All Days: global sequence 1→2→3→… coloured by day
+            var byDay = {};
+            visible.forEach(function(s) {
+              if (!byDay[s.dayIdx]) byDay[s.dayIdx] = [];
+              byDay[s.dayIdx].push(s);
+            });
+
+            // Faint grey backbone across all stalls in global order
+            if (visible.length > 1) {
+              var allLatLngs = visible.map(function(s) { return [s.lat, s.lng]; });
+              lines.push(L.polyline(allLatLngs, { color: '#bbb', weight: 1.5, opacity: 0.4, dashArray: '4,6' }).addTo(map));
+            }
+
+            // Per-day coloured segments + distance labels
+            Object.keys(byDay).forEach(function(dIdx) {
+              var group = byDay[dIdx];
+              var color = DAY_COLORS[parseInt(dIdx) % DAY_COLORS.length];
+              if (group.length > 1) {
+                var latlngs = group.map(function(s) { return [s.lat, s.lng]; });
+                lines.push(L.polyline(latlngs, { color: color, weight: 2.5, opacity: 0.85, dashArray: '6,5' }).addTo(map));
+                // Distance labels between consecutive stops
+                for (var i = 1; i < group.length; i++) {
+                  var prev = group[i - 1], curr = group[i];
+                  if (curr.legDistKm !== null) {
+                    markers.push(addDistLabel(map, prev.lat, prev.lng, curr.lat, curr.lng, curr.legDistKm + ' km', color));
+                  }
+                }
+              }
+              group.forEach(function(s) {
+                markers.push(
+                  L.marker([s.lat, s.lng], { icon: makeIcon(s.globalNum, color) })
+                    .addTo(map)
+                    .bindPopup(makePopup(s, color, true), { maxWidth: 270 })
+                );
+              });
+            });
+
+          } else {
+            // ── Single day: per-day stop numbers 1→2→3…
+            var color = DAY_COLORS[filterDayIdx % DAY_COLORS.length];
+            if (visible.length > 1) {
+              var latlngs = visible.map(function(s) { return [s.lat, s.lng]; });
+              lines.push(L.polyline(latlngs, { color: color, weight: 2.5, opacity: 0.85, dashArray: '6,5' }).addTo(map));
+              // Distance labels between consecutive stops
+              for (var i = 1; i < visible.length; i++) {
+                var prev = visible[i - 1], curr = visible[i];
+                if (curr.legDistKm !== null) {
+                  markers.push(addDistLabel(map, prev.lat, prev.lng, curr.lat, curr.lng, curr.legDistKm + ' km', color));
+                }
+              }
+            }
+            visible.forEach(function(s) {
+              markers.push(
+                L.marker([s.lat, s.lng], { icon: makeIcon(s.stopNum, color) })
+                  .addTo(map)
+                  .bindPopup(makePopup(s, color, false), { maxWidth: 270 })
+              );
+            });
+          }
+
+          try {
+            var bounds = visible.map(function(s) { return [s.lat, s.lng]; });
+            map.fitBounds(bounds, { padding: [40, 40] });
+          } catch(e) {}
+        }
+
+        window.filterMapDay = function(dayIdx, btn) {
+          document.querySelectorAll('.map-filter-btn').forEach(function(b) { b.classList.remove('active'); });
+          btn.classList.add('active');
+          drawAll(dayIdx === 'all' ? 'all' : parseInt(dayIdx));
+        };
+
+        drawAll('all');
+
+        // Force tile repaint after layout settles
+        setTimeout(function() { map.invalidateSize(); }, 200);
+      });
+      </script>
+      {% endif %}
+
       {# ── Day-by-day scheduled stalls #}
       {% for day in days %}
       {% set d_idx = loop.index0 %}
@@ -1130,22 +1542,24 @@
           {# Leg connector between stops (only when route is optimised and not first stop) #}
           {% if route and not loop.first and item.leg_dist_km %}
           <div class="leg-connector">
-            🚶 {{ item.leg_dist_km }} km · ~{{ item.leg_time_mins }} min walk
+            📍 {{ item.leg_dist_km }} km from previous stop
           </div>
           {% endif %}
 
           <div class="stall-entry">
             <div class="stall-card scheduled-stall-card">
 
-              <!-- Stop label + reorder arrows (when optimised) -->
+              <!-- Stop label + reorder arrows (only when route is optimised) -->
               <div class="sc-stop" style="justify-content:space-between;">
                 <span>stop {{ stop_num }}</span>
                 {% if route %}
                 <div class="reorder-btns">
                   <a href="/itinerary/reorder/{{ d_idx }}/{{ stall.stall_id }}/up"
-                     class="btn-reorder {{ 'disabled' if loop.first }}">▲</a>
+                     class="btn-reorder {{ 'disabled' if loop.first }}"
+                     title="Move up">▲</a>
                   <a href="/itinerary/reorder/{{ d_idx }}/{{ stall.stall_id }}/down"
-                     class="btn-reorder {{ 'disabled' if loop.last }}">▼</a>
+                     class="btn-reorder {{ 'disabled' if loop.last }}"
+                     title="Move down">▼</a>
                 </div>
                 {% endif %}
               </div>
@@ -1173,11 +1587,27 @@
                 {% if stall.distance_km is not none %}
                 <span class="meta-chip">🚶 <strong>{{ "%.1f"|format(stall.distance_km) }} km</strong> from your location</span>
                 {% endif %}
+
                 <div class="stall-actions">
+                  <button class="btn-change-day"
+                          onclick="toggleDayPicker('day-picker-{{ stall.stall_id }}', this)">
+                    ✎ Change Day
+                  </button>
                   <a href="/pricing?stall_id={{ stall.stall_id }}" class="btn-details">View Menu</a>
                   <a href="/itinerary/remove/{{ stall.stall_id }}" class="btn-remove"
                      onclick="return confirm('Remove {{ stall.stall_name }} from your itinerary?')">✕ Remove</a>
                 </div>
+              </div>
+
+              <!-- Collapsible day-change picker -->
+              <div class="change-day-picker" id="day-picker-{{ stall.stall_id }}">
+                <span class="day-picker-label">MOVE TO DAY:</span>
+                {% for day in days %}
+                <a href="/itinerary/assign/{{ stall.stall_id }}/{{ loop.index0 }}"
+                   class="day-picker-btn {{ 'day-picker-btn-current' if loop.index0 == d_idx }}">
+                  D{{ day.day_num }} · {{ day.weekday[:3] }} {{ day.date_str }}
+                </a>
+                {% endfor %}
               </div>
 
             </div>
@@ -1353,5 +1783,26 @@
   {% endif %}
 
 </div>
+
+<script>
+function toggleDayPicker(pickerId, btn) {
+  var picker = document.getElementById(pickerId);
+  if (!picker) return;
+  var isOpen = picker.classList.contains('visible');
+  // Close all other open pickers first
+  document.querySelectorAll('.change-day-picker.visible').forEach(function(p) {
+    p.classList.remove('visible');
+  });
+  document.querySelectorAll('.btn-change-day.open').forEach(function(b) {
+    b.classList.remove('open');
+    b.textContent = '✎ Change Day';
+  });
+  if (!isOpen) {
+    picker.classList.add('visible');
+    btn.classList.add('open');
+    btn.textContent = '✕ Cancel';
+  }
+}
+</script>
 
 {% endblock %}
