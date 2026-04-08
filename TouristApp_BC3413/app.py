@@ -77,22 +77,51 @@ def cuisines():
     stalls_df['avg_rating'] = stalls_df['avg_rating'].fillna(0.0)
     stalls_df['bayes_score'] = stalls_df['bayes_score'].fillna(0.0)
 
-    per_cuisine = (
-        stalls_df.groupby('cuisine_type', group_keys=False)
-                 .apply(lambda g: g.sample(min(len(g), 1), random_state=42))
-    )
-
-    remaining = (
-        stalls_df[~stalls_df['stall_id'].isin(per_cuisine['stall_id'])]
-        .sort_values('bayes_score', ascending=False)
-    )
-    slots_left = max(0, 50 - len(per_cuisine))
-    filler = remaining.head(slots_left)
-
-    varied = pd.concat([per_cuisine, filler]).sample(frac=1, random_state=42).head(50)
-    stalls_list = varied.to_dict(orient='records')
-
     cuisines_list = handler.get_available_cuisines()
+    onboarding_cuisines = [c.lower() for c in session.get("preferred_cuisines", [])]
+
+    # Build the default stall pool, hoisting onboarding-preferred cuisines to the top
+    # when no explicit cuisine filter has been selected by the user.
+    if not selected_cuisine and onboarding_cuisines:
+        preferred_mask = stalls_df['cuisine_type'].str.lower().isin(onboarding_cuisines)
+        other_df = (
+            stalls_df[~preferred_mask]
+            .sort_values('bayes_score', ascending=False)
+        )
+
+        # Build a per-cuisine list sorted by score, then round-robin interleave
+        # so all chosen cuisines appear evenly rather than one dominating.
+        cuisine_buckets = [
+            stalls_df[stalls_df['cuisine_type'].str.lower() == c]
+            .sort_values('bayes_score', ascending=False)
+            .to_dict(orient='records')
+            for c in onboarding_cuisines
+        ]
+        interleaved = []
+        i = 0
+        while len(interleaved) < 50 and any(cuisine_buckets):
+            bucket = cuisine_buckets[i % len(cuisine_buckets)]
+            if bucket:
+                interleaved.append(bucket.pop(0))
+            i += 1
+
+        slots_left = max(0, 50 - len(interleaved))
+        filler_records = other_df.head(slots_left).to_dict(orient='records')
+        varied = pd.DataFrame(interleaved + filler_records)
+    else:
+        per_cuisine = (
+            stalls_df.groupby('cuisine_type', group_keys=False)
+                     .apply(lambda g: g.sample(min(len(g), 1), random_state=42))
+        )
+        remaining = (
+            stalls_df[~stalls_df['stall_id'].isin(per_cuisine['stall_id'])]
+            .sort_values('bayes_score', ascending=False)
+        )
+        slots_left = max(0, 50 - len(per_cuisine))
+        filler = remaining.head(slots_left)
+        varied = pd.concat([per_cuisine, filler]).sample(frac=1, random_state=42).head(50)
+
+    stalls_list = varied.to_dict(orient='records')
 
     # Filter by cuisine
     if selected_cuisine:
@@ -149,14 +178,17 @@ def cuisines():
             s for s in stalls_list
             if min_price_map.get(s['stall_id'], float('inf')) <= max_price
         ]
-    # Sort
+    # Sort — when onboarding cuisines drive the default view and no explicit
+    # sort is requested, preserve the round-robin interleaved order as-is.
+    using_onboarding_order = (not selected_cuisine and bool(onboarding_cuisines)
+                              and selected_sort == 'score')
     if selected_sort == 'rating':
         stalls_list.sort(key=lambda x: x.get('avg_rating', 0), reverse=True)
     elif selected_sort == 'reviews':
         stalls_list.sort(key=lambda x: x.get('n_reviews', 0), reverse=True)
     elif selected_sort == 'distance':
         stalls_list.sort(key=lambda x: x.get('distance_km', 999))
-    else:
+    elif not using_onboarding_order:
         stalls_list.sort(key=lambda x: x.get('bayes_score', 0), reverse=True)
 
     # Cap at 50 hawker stalls
@@ -171,6 +203,7 @@ def cuisines():
                            search_query=search_query,
                            selected_allergens=selected_allergens,
                            max_price=max_price,
+                           onboarding_cuisines=onboarding_cuisines,
                            )
 
 # ------ PRICING -------
@@ -944,8 +977,6 @@ def reviews_search():
 def onboarding():
     if request.method == "POST":
         data = {
-            "country": request.form.get("country", ""),
-            "spice_level": int(request.form.get("spice_level", 3)),
             "allergens": request.form.getlist("allergens"),
             "preferred_cuisines": request.form.getlist("preferred_cuisines"),
             "location_lat": float(request.form.get("location_lat", 1.3521)),
@@ -956,23 +987,19 @@ def onboarding():
         }
 
         print(data)  # replace with DB save later
+        session["preferred_cuisines"] = data["preferred_cuisines"]
         return redirect(url_for("cuisines"))
 
     return render_template(
         "feature_onboarding_edit.html",
         active_page="onboarding",
-        countries=[
-            "Australia", "Canada", "China", "France", "Germany", "India",
-            "Indonesia", "Japan", "Korea", "Malaysia", "Philippines",
-            "Singapore", "Thailand", "UK", "USA", "Other"
-        ],
         allergens=[
             "Nuts", "Shellfish", "Dairy", "Gluten",
             "Eggs", "Soy", "Fish", "Sesame"
         ],
         cuisines=[
             "Chinese", "Malay", "Indian", "Japanese", "Korean", "Thai",
-            "Western", "Seafood", "Vegetarian", "Halal", "Beverage",
+            "Western", "Seafood", "Vegetables", "Beverage",
             "Dessert", "Fruits", "Peranakan"
         ],
         singapore_center={"lat": 1.3521, "lng": 103.8198}
