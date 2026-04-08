@@ -1,0 +1,604 @@
+{% extends "base_layout.html" %}
+{% block title %}Dashboard — Hawker Hunt{% endblock %}
+
+{% block content %}
+
+<style>
+  /* ── DASHBOARD-SPECIFIC STYLES ─────────────────────────────────── */
+
+  /* Hero */
+  .dash-hero {
+    background-color: var(--soy);
+    padding: 3.5rem 2.5rem 2.5rem;
+    position: relative;
+    overflow: hidden;
+  }
+  .dash-hero-inner { max-width: 1200px; margin: 0 auto; }
+  .dash-eyebrow {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.62rem;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    color: var(--turmeric);
+    margin-bottom: 0.75rem;
+  }
+  .dash-title {
+    font-family: 'Playfair Display', serif;
+    font-weight: 900;
+    font-size: clamp(2rem, 4.5vw, 3.5rem);
+    line-height: 1;
+    color: var(--cream);
+    margin-bottom: 0.75rem;
+  }
+  .dash-title em { font-style: italic; color: var(--turmeric); }
+  .dash-sub {
+    color: var(--smoke);
+    font-size: 0.85rem;
+    line-height: 1.7;
+    max-width: 480px;
+  }
+  .dash-live-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    background: rgba(216,58,31,0.15);
+    border: 1px solid rgba(216,58,31,0.3);
+    color: var(--chili);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.6rem;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 0.3rem 0.7rem;
+    border-radius: 100px;
+    margin-top: 1.25rem;
+  }
+  .dash-live-pill::before {
+    content: '';
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--chili);
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+  .dash-hero-deco {
+    position: absolute; right: -80px; top: -80px;
+    width: 400px; height: 400px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(232,160,32,0.08) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  /* ── PAGE WRAPPER ───────────────────────────────────────────────── */
+  .dash-wrapper {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2.5rem 2.5rem 4rem;
+  }
+
+  /* ── STAT CARDS ─────────────────────────────────────────────────── */
+  .stat-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+    margin-bottom: 2.5rem;
+  }
+  .stat-card {
+    background: var(--cream);
+    border: 2px solid var(--bone);
+    padding: 1.5rem 1.25rem;
+    position: relative;
+    overflow: hidden;
+    animation: fadeUp 0.5s ease both;
+  }
+  .stat-card:nth-child(1) { animation-delay: 0.05s; }
+  .stat-card:nth-child(2) { animation-delay: 0.10s; }
+  .stat-card:nth-child(3) { animation-delay: 0.15s; }
+  .stat-card:nth-child(4) { animation-delay: 0.20s; }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .stat-card::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 3px;
+    background: var(--chili);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.3s ease;
+  }
+  .stat-card:hover::after { transform: scaleX(1); }
+  .stat-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.6rem;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--smoke);
+    margin-bottom: 0.6rem;
+  }
+  .stat-value {
+    font-family: 'Playfair Display', serif;
+    font-size: 2.2rem;
+    font-weight: 900;
+    color: var(--soy);
+    line-height: 1;
+    margin-bottom: 0.25rem;
+  }
+  .stat-value span { font-size: 1rem; font-weight: 400; color: var(--smoke); }
+  .stat-sub {
+    font-size: 0.72rem;
+    color: var(--smoke);
+  }
+  .stat-icon {
+    position: absolute;
+    top: 1rem; right: 1rem;
+    font-size: 1.4rem;
+    opacity: 0.15;
+  }
+
+  /* ── SECTION LABEL ──────────────────────────────────────────────── */
+  .dash-section-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.6rem;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    color: var(--smoke);
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  .dash-section-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--bone);
+  }
+
+  /* ── CHART GRID ──────────────────────────────────────────────────── */
+  .chart-grid-top {
+    display: grid;
+    grid-template-columns: 1fr 340px;
+    gap: 1.25rem;
+    margin-bottom: 1.25rem;
+  }
+  .chart-grid-bottom {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.25rem;
+  }
+
+  /* ── CHART CARD ──────────────────────────────────────────────────── */
+  .chart-card {
+    background: var(--cream);
+    border: 2px solid var(--bone);
+    overflow: hidden;
+    animation: fadeUp 0.5s ease both;
+  }
+  .chart-card:nth-child(1) { animation-delay: 0.25s; }
+  .chart-card:nth-child(2) { animation-delay: 0.35s; }
+  .chart-card:nth-child(3) { animation-delay: 0.45s; }
+  .chart-card:nth-child(4) { animation-delay: 0.55s; }
+
+  .chart-head {
+    background: var(--soy);
+    padding: 1rem 1.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .chart-head-left { display: flex; flex-direction: column; gap: 0.2rem; }
+  .chart-tag {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.58rem;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--turmeric);
+  }
+  .chart-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--cream);
+  }
+  .chart-badge {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.58rem;
+    letter-spacing: 1px;
+    color: var(--smoke);
+    background: rgba(255,255,255,0.08);
+    padding: 0.25rem 0.6rem;
+    border-radius: 1px;
+  }
+  .chart-body {
+    padding: 1.5rem;
+    position: relative;
+  }
+  .chart-body.donut { padding: 1.25rem 1rem; }
+
+  canvas { display: block; width: 100% !important; }
+
+  /* ── RESPONSIVE ─────────────────────────────────────────────────── */
+  @media (max-width: 1024px) {
+    .stat-grid { grid-template-columns: repeat(2, 1fr); }
+    .chart-grid-top { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 768px) {
+    .dash-wrapper { padding: 1.5rem 1rem 3rem; }
+    .dash-hero { padding: 2.5rem 1rem 2rem; }
+    .chart-grid-bottom { grid-template-columns: 1fr; }
+    .stat-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 480px) {
+    .stat-grid { grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+    .stat-value { font-size: 1.8rem; }
+  }
+</style>
+
+<!-- ── HERO ──────────────────────────────────────────────────────── -->
+<section class="dash-hero">
+  <div class="dash-hero-inner">
+    <p class="dash-eyebrow">Analytics</p>
+    <h1 class="dash-title">Food <em>Insights</em> Dashboard</h1>
+    <p class="dash-sub">
+      Explore pricing trends across hawker centres and review scores of top stalls.
+    </p>
+    <div class="dash-live-pill">Live Data</div>
+  </div>
+  <div class="dash-hero-deco"></div>
+</section>
+
+<!-- ── DASHBOARD BODY ────────────────────────────────────────────── -->
+<div class="dash-wrapper">
+
+  <!-- STAT CARDS -->
+  <div class="stat-grid">
+    <div class="stat-card">
+      <div class="stat-icon">🍜</div>
+      <div class="stat-label">Total Stalls</div>
+      <div class="stat-value">{{ total_stalls or '—' }}</div>
+      <div class="stat-sub">across all hawker centres</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">⭐</div>
+      <div class="stat-label">Avg. Rating</div>
+      <div class="stat-value">{{ avg_rating or '—' }}<span>/5</span></div>
+      <div class="stat-sub">from {{ total_reviews or 0 }} reviews</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">💰</div>
+      <div class="stat-label">Avg. Price</div>
+      <div class="stat-value"><span>$</span>{{ avg_price or '—' }}</div>
+      <div class="stat-sub">per dish</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">🗺️</div>
+      <div class="stat-label">Hawker Centres</div>
+      <div class="stat-value">{{ total_centres or '—' }}</div>
+      <div class="stat-sub">locations mapped</div>
+    </div>
+  </div>
+
+  <!-- SECTION LABEL -->
+  <div class="dash-section-label">Charts & Breakdown</div>
+
+  <!-- TOP ROW: Bar chart (wide) + Donut (narrow) -->
+  <div class="chart-grid-top">
+
+    <!-- BAR: Price Distribution -->
+    <div class="chart-card">
+      <div class="chart-head">
+        <div class="chart-head-left">
+          <span class="chart-tag">Price</span>
+          <span class="chart-title">Avg. Price by Hawker Centre</span>
+        </div>
+        <span class="chart-badge">Bar Chart</span>
+      </div>
+      <div class="chart-body" style="height: 300px;">
+        <canvas id="barChart"></canvas>
+      </div>
+    </div>
+
+    <!-- TREEMAP: Cuisine Breakdown -->
+    <div class="chart-card">
+      <div class="chart-head">
+        <div class="chart-head-left">
+         <span class="chart-tag">Status</span>
+          <span class="chart-title">Cuisines Type Breakdown</span>
+        </div>
+        <span class="chart-badge">Treemap</span>
+      </div>
+      <div class="chart-body" style="height:300px;">
+      <canvas id="treemapChart"></canvas>
+    </div>
+    </div>
+
+  </div>
+
+  <!-- BOTTOM ROW: Line chart + Top Stalls bar -->
+  <div class="chart-grid-bottom">
+
+    <!-- LINE: Review Score Trend -->
+    <div class="chart-card">
+      <div class="chart-head">
+        <div class="chart-head-left">
+          <span class="chart-tag">Closures</span>
+          <span class="chart-title">Confirmed Closures per Quarter</span>
+        </div>
+        <span class="chart-badge">Line Chart</span>
+      </div>
+      <div class="chart-body" style="height: 260px;">
+        <canvas id="lineChart"></canvas>
+      </div>
+    </div>
+
+    <!-- BAR (horizontal): Top Rated Stalls -->
+    <div class="chart-card">
+      <div class="chart-head">
+        <div class="chart-head-left">
+          <span class="chart-tag">Top Stalls</span>
+          <span class="chart-title">Highest Rated Stalls</span>
+        </div>
+        <span class="chart-badge">Bar Chart</span>
+      </div>
+      <div class="chart-body" style="height: 260px;">
+        <canvas id="topStallsChart"></canvas>
+      </div>
+    </div>
+
+  </div>
+
+</div><!-- end .dash-wrapper -->
+
+<!-- ── CHART.JS ──────────────────────────────────────────────────── -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-chart-treemap@2.3.0/dist/chartjs-chart-treemap.min.js"></script>
+<script>
+  // ── Colour palette matching Hawker Hunt theme ──
+  const CHILI    = '#D63B1F';
+  const SOY      = '#1A1109';
+  const TURMERIC = '#E8A020';
+  const PANDAN   = '#3A6B4A';
+  const SMOKE    = '#8B7355';
+  const BONE     = '#EDE3CC';
+  const CREAM    = '#F5EFE0';
+
+  // Chart.js global defaults
+  Chart.defaults.font.family  = "'Instrument Sans', sans-serif";
+  Chart.defaults.color        = SMOKE;
+  Chart.defaults.borderColor  = BONE;
+
+  // ── Jinja data injected from Flask ───────────────────────────────
+  // Bar: Price distribution
+  const priceLabels = {{ price_labels | tojson }};
+  const priceValues = {{ price_values | tojson }};
+
+  // Donut: Cuisine breakdown
+  const cuisineLabels = {{ cuisine_labels | tojson }};
+  const cuisineCounts = {{ cuisine_counts | tojson }};
+
+  // Line: monthly rating trend
+  const trendMonths = {{ trend_months | tojson }};
+  const trendScores = {{ trend_scores | tojson }};
+
+  // Horizontal bar: top-rated stalls
+  const stallNames  = {{ top_stall_names  | tojson }};
+  const stallScores = {{ top_stall_scores | tojson }};
+
+  // ── 1. PRICE DISTRIBUTION BAR ────────────────────────────────────
+  new Chart(document.getElementById('barChart'), {
+    type: 'bar',
+    data: {
+      labels: priceLabels,
+      datasets: [{
+        label: 'Avg. Price ($)',
+        data: priceValues,
+        backgroundColor: priceValues.map((_, i) =>
+          i === 0 ? CHILI : `rgba(216,58,31,${0.55 - i * 0.03})`
+        ),
+        borderWidth: 0,
+        borderRadius: 2,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: SOY,
+          titleColor: CREAM,
+          bodyColor: TURMERIC,
+          padding: 10,
+          callbacks: {
+            label: ctx => ` $${ctx.parsed.y.toFixed(2)}`
+          }
+        }
+      },
+      scales: {
+        x: {
+          ticks: {
+            maxRotation: 35,
+            font: { size: 9, family: "'DM Mono', monospace" },
+            color: SMOKE,
+            maxTicksLimit: 12,
+          },
+          grid: { display: false },
+        },
+        y: {
+          beginAtZero: true,
+          ticks: {
+            font: { size: 9, family: "'DM Mono', monospace" },
+            callback: v => '$' + v
+          },
+          grid: { color: BONE },
+        }
+      }
+    }
+  });
+
+  // ── 2. CUISINE TREEMAP ───────────────────────────────────────────
+const treemapPalette = [
+  CHILI, TURMERIC, PANDAN,
+  '#8B2FC9', '#2563EB', '#C2410C',
+  '#0F766E', '#B45309', '#6D28D9', '#047857'
+];
+const treemapData = cuisineLabels.map((label, i) => ({
+  label,
+  value: cuisineCounts[i],
+  color: treemapPalette[i % treemapPalette.length],
+}));
+
+new Chart(document.getElementById('treemapChart'), {
+  type: 'treemap',
+  data: {
+    datasets: [{
+      label: 'Cuisines',
+      tree: treemapData,
+      key: 'value',
+      groups: ['label'],
+      backgroundColor(ctx) {
+        const item = treemapData[ctx.dataIndex];
+        return item ? item.color : CHILI;
+      },
+      borderColor: CREAM,
+      borderWidth: 2,
+      spacing: 2,
+      labels: {
+        display: true,
+        formatter(ctx) {
+          const d = ctx.raw._data;
+          return d ? [d.label, d.value + ' stalls'] : '';
+        },
+        color: CREAM,
+        font: [
+          { size: 11, weight: 'bold', family: "'Instrument Sans', sans-serif" },
+          { size: 9, family: "'DM Mono', monospace" },
+        ],
+      },
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: SOY,
+        titleColor: CREAM,
+        bodyColor: TURMERIC,
+        padding: 10,
+        callbacks: {
+          title: ctx => ctx[0].raw._data.label,
+          label: ctx => ` ${ctx.raw._data.value} stalls`,
+        }
+      }
+    }
+  }
+});
+
+  // ── 3. RATING TREND LINE ─────────────────────────────────────────
+  new Chart(document.getElementById('lineChart'), {
+    type: 'line',
+    data: {
+      labels: trendMonths,
+      datasets: [{
+        label: 'Avg. Rating',
+        data: trendScores,
+        borderColor: CHILI,
+        backgroundColor: 'rgba(216,58,31,0.08)',
+        borderWidth: 2.5,
+        pointBackgroundColor: CHILI,
+        pointRadius: 4,
+        pointHoverRadius: 6,
+        fill: true,
+        tension: 0.35,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: SOY,
+          titleColor: CREAM,
+          bodyColor: TURMERIC,
+          padding: 10,
+          callbacks: { label: ctx => ` ${ctx.parsed.y} centres` }
+        }
+      },
+      scales: {
+      x: {
+        ticks: { font: { size: 9, family: "'DM Mono', monospace" }, color: SMOKE },
+        grid: { display: false },
+      },
+      y: {
+        beginAtZero: true,          // ← remove the hardcoded min/max
+        ticks: {
+          font: { size: 9, family: "'DM Mono', monospace" },
+          callback: v => v + ' centres'
+        },
+        grid: { color: BONE },
+      }
+    }
+  }
+});
+
+  // ── 4. TOP STALLS HORIZONTAL BAR ────────────────────────────────
+// ── 4. TOP STALLS HORIZONTAL BAR ────────────────────────────────
+new Chart(document.getElementById('topStallsChart'), {
+  type: 'bar',
+  data: {
+    labels: stallNames,
+    datasets: [{
+      label: 'Score',
+      data: stallScores,
+      backgroundColor: stallScores.map((_, i) =>
+        i < 3 ? CHILI : TURMERIC
+      ),
+      borderWidth: 0,
+      borderRadius: 2,
+    }]
+  },
+  options: {
+    indexAxis: 'y',
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: SOY,
+        titleColor: CREAM,
+        bodyColor: TURMERIC,
+        padding: 10,
+        callbacks: { label: ctx => ` ★ ${ctx.parsed.x.toFixed(1)}` }
+      }
+    },
+    scales: {
+      x: {
+        min: 3.5,
+        max: 5,
+        ticks: {
+          font: { size: 9, family: "'DM Mono', monospace" },
+          callback: v => '★ ' + v
+        },
+        grid: { color: BONE },
+      },
+      y: {
+        ticks: {
+          font: { size: 9, family: "'DM Mono', monospace" },
+          color: SMOKE,
+        },
+        grid: { display: false },
+      }
+    }
+  }
+});
+
+</script>
+
+{% endblock %}

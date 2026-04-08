@@ -64,6 +64,7 @@ app.secret_key = "bc3413-secret"
 
 @app.route("/dashboard")
 def dashboard():
+    session["username"] = "test_user"
     hc   = pd.read_csv(CENTRES_CSV)
     cl   = pd.read_csv(CLOSURES_CSV)
     menu = pd.read_csv(MENU_CSV)
