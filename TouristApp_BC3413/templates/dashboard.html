@@ -221,19 +221,208 @@
 
   canvas { display: block; width: 100% !important; }
 
+  /* ── HAWKER CENTRE EXPLORER ─────────────────────────────────────── */
+  .hc-explorer-section {
+    margin-top: 3rem;
+  }
+  .hc-selector-bar {
+    background: var(--soy);
+    border: 2px solid var(--bone);
+    padding: 1.5rem 1.75rem;
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+  }
+  .hc-selector-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.62rem;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--turmeric);
+    white-space: nowrap;
+  }
+  .hc-select {
+    flex: 1;
+    min-width: 260px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.15);
+    color: var(--cream);
+    font-family: 'Instrument Sans', sans-serif;
+    font-size: 0.9rem;
+    padding: 0.6rem 1rem;
+    cursor: pointer;
+    outline: none;
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23E8A020' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 1rem center;
+    padding-right: 2.5rem;
+    transition: border-color 0.2s ease;
+  }
+  .hc-select:focus { border-color: var(--turmeric); }
+  .hc-select option { background: var(--soy); color: var(--cream); }
+  .hc-area-pill {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.62rem;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    background: rgba(232,160,32,0.15);
+    border: 1px solid rgba(232,160,32,0.3);
+    color: var(--turmeric);
+    padding: 0.35rem 0.85rem;
+    border-radius: 100px;
+    white-space: nowrap;
+    display: none;
+  }
+  .hc-area-pill.visible { display: inline-flex; align-items: center; gap: 0.4rem; }
+
+  /* HC stat grid (4 cards) */
+  .hc-stat-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    opacity: 0;
+    transform: translateY(12px);
+    transition: opacity 0.4s ease, transform 0.4s ease;
+  }
+  .hc-stat-grid.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  /* HC charts grid */
+  .hc-chart-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.25rem;
+    margin-bottom: 1.25rem;
+    opacity: 0;
+    transform: translateY(12px);
+    transition: opacity 0.4s ease 0.1s, transform 0.4s ease 0.1s;
+  }
+  .hc-chart-grid.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  .hc-chart-grid-bottom {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.25rem;
+    opacity: 0;
+    transform: translateY(12px);
+    transition: opacity 0.4s ease 0.2s, transform 0.4s ease 0.2s;
+  }
+  .hc-chart-grid-bottom.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  /* Closures table */
+  .closures-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8rem;
+  }
+  .closures-table thead tr {
+    border-bottom: 2px solid var(--bone);
+  }
+  .closures-table th {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.58rem;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--smoke);
+    padding: 0 0 0.75rem 0;
+    text-align: left;
+    font-weight: 400;
+  }
+  .closures-table td {
+    padding: 0.6rem 0;
+    border-bottom: 1px solid var(--bone);
+    color: var(--soy);
+    vertical-align: top;
+  }
+  .closures-table td:first-child {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 1px;
+    color: var(--smoke);
+  }
+  .closure-badge {
+    display: inline-block;
+    background: rgba(216,58,31,0.1);
+    border: 1px solid rgba(216,58,31,0.2);
+    color: var(--chili);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.6rem;
+    letter-spacing: 1px;
+    padding: 0.15rem 0.5rem;
+    border-radius: 2px;
+    margin: 0.1rem 0.2rem 0.1rem 0;
+  }
+  .tbc-badge {
+    background: rgba(139,115,85,0.1);
+    border-color: rgba(139,115,85,0.2);
+    color: var(--smoke);
+  }
+
+  /* Empty state */
+  .hc-empty {
+    text-align: center;
+    padding: 3rem 2rem;
+    color: var(--smoke);
+  }
+  .hc-empty-icon { font-size: 2.5rem; margin-bottom: 0.75rem; opacity: 0.5; }
+  .hc-empty-text {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.1rem;
+    color: var(--smoke);
+  }
+  .hc-empty-sub { font-size: 0.78rem; margin-top: 0.35rem; }
+
+  /* Loading spinner */
+  .hc-loading {
+    display: none;
+    text-align: center;
+    padding: 2rem;
+    color: var(--smoke);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 2px;
+  }
+  .hc-loading.active { display: block; }
+  .spinner {
+    width: 24px; height: 24px;
+    border: 2px solid var(--bone);
+    border-top-color: var(--chili);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    margin: 0 auto 0.75rem;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
   /* ── RESPONSIVE ─────────────────────────────────────────────────── */
   @media (max-width: 1024px) {
     .stat-grid { grid-template-columns: repeat(2, 1fr); }
+    .hc-stat-grid { grid-template-columns: repeat(2, 1fr); }
     .chart-grid-top { grid-template-columns: 1fr; }
+    .hc-chart-grid { grid-template-columns: 1fr; }
+    .hc-chart-grid-bottom { grid-template-columns: 1fr; }
   }
   @media (max-width: 768px) {
     .dash-wrapper { padding: 1.5rem 1rem 3rem; }
     .dash-hero { padding: 2.5rem 1rem 2rem; }
     .chart-grid-bottom { grid-template-columns: 1fr; }
     .stat-grid { grid-template-columns: repeat(2, 1fr); }
+    .hc-stat-grid { grid-template-columns: repeat(2, 1fr); }
   }
   @media (max-width: 480px) {
     .stat-grid { grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+    .hc-stat-grid { grid-template-columns: 1fr 1fr; gap: 0.75rem; }
     .stat-value { font-size: 1.8rem; }
   }
 </style>
@@ -285,7 +474,7 @@
   <!-- SECTION LABEL -->
   <div class="dash-section-label">Charts & Breakdown</div>
 
-  <!-- TOP ROW: Bar chart (wide) + Donut (narrow) -->
+  <!-- TOP ROW: Bar chart (wide) + Treemap (narrow) -->
   <div class="chart-grid-top">
 
     <!-- BAR: Price Distribution -->
@@ -321,7 +510,7 @@
   <!-- BOTTOM ROW: Line chart + Top Stalls bar -->
   <div class="chart-grid-bottom">
 
-    <!-- LINE: Review Score Trend -->
+    <!-- LINE: Confirmed Closures per Quarter -->
     <div class="chart-card">
       <div class="chart-head">
         <div class="chart-head-left">
@@ -351,6 +540,150 @@
 
   </div>
 
+  <!-- ══════════════════════════════════════════════════════════════ -->
+  <!-- HAWKER CENTRE EXPLORER                                        -->
+  <!-- ══════════════════════════════════════════════════════════════ -->
+  <div class="hc-explorer-section">
+
+    <div class="dash-section-label" style="margin-top: 2.5rem;">Hawker Centre Explorer</div>
+
+    <!-- Dropdown selector bar -->
+    <div class="hc-selector-bar">
+      <span class="hc-selector-label">📍 Select Centre</span>
+      <select class="hc-select" id="hcDropdown">
+        <option value="">— Choose a hawker centre —</option>
+        {% for centre in all_centres %}
+          <option value="{{ centre.center_id }}">{{ centre.center_name }}</option>
+        {% endfor %}
+      </select>
+      <span class="hc-area-pill" id="hcAreaPill">📍 Area</span>
+    </div>
+
+    <!-- Loading indicator -->
+    <div class="hc-loading" id="hcLoading">
+      <div class="spinner"></div>
+      Loading centre data…
+    </div>
+
+    <!-- Empty / placeholder state -->
+    <div id="hcEmptyState" class="chart-card">
+      <div class="hc-empty">
+        <div class="hc-empty-icon">🏙️</div>
+        <div class="hc-empty-text">Select a hawker centre to explore its stats</div>
+        <div class="hc-empty-sub">Ratings, prices, cuisines, closures and top stalls — all in one view.</div>
+      </div>
+    </div>
+
+    <!-- ── HC CONTENT (hidden until centre selected) ────────────── -->
+    <div id="hcContent" style="display:none;">
+
+      <!-- 4 stat cards -->
+      <div class="hc-stat-grid" id="hcStatGrid">
+        <div class="stat-card">
+          <div class="stat-icon">🍜</div>
+          <div class="stat-label">Total Stalls</div>
+          <div class="stat-value" id="hcTotalStalls">—</div>
+          <div class="stat-sub">food stalls</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">⭐</div>
+          <div class="stat-label">Avg. Rating</div>
+          <div class="stat-value" id="hcAvgRating">—</div>
+          <div class="stat-sub">across all stalls</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">💰</div>
+          <div class="stat-label">Avg. Price</div>
+          <div class="stat-value" id="hcAvgPrice">—</div>
+          <div class="stat-sub">per dish</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">🗺️</div>
+          <div class="stat-label">Area</div>
+          <div class="stat-value" id="hcArea" style="font-size:1.15rem; padding-top:0.25rem;">—</div>
+          <div class="stat-sub">region</div>
+        </div>
+      </div>
+
+      <!-- Cuisine treemap + Closures table -->
+      <div class="hc-chart-grid" id="hcChartGrid">
+
+        <!-- Cuisine breakdown treemap -->
+        <div class="chart-card">
+          <div class="chart-head">
+            <div class="chart-head-left">
+              <span class="chart-tag">Cuisine Mix</span>
+              <span class="chart-title">Cuisine Breakdown</span>
+            </div>
+            <span class="chart-badge">Treemap</span>
+          </div>
+          <div class="chart-body" style="height:280px;">
+            <canvas id="hcCuisineChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Closure dates table -->
+        <div class="chart-card">
+          <div class="chart-head">
+            <div class="chart-head-left">
+              <span class="chart-tag">Closures</span>
+              <span class="chart-title">Confirmed Closure Dates</span>
+            </div>
+            <span class="chart-badge">Schedule</span>
+          </div>
+          <div class="chart-body" style="min-height:280px; padding: 1.25rem 1.5rem;">
+            <table class="closures-table">
+              <thead>
+                <tr>
+                  <th>Quarter</th>
+                  <th>Dates</th>
+                </tr>
+              </thead>
+              <tbody id="hcClosureBody">
+                <tr><td colspan="2" style="color:var(--smoke); font-size:0.78rem; padding-top:1rem;">No closure data available.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Top rated stalls + Rating distribution -->
+      <div class="hc-chart-grid-bottom" id="hcChartGridBottom">
+
+        <!-- Top rated stalls horizontal bar -->
+        <div class="chart-card">
+          <div class="chart-head">
+            <div class="chart-head-left">
+              <span class="chart-tag">Top Stalls</span>
+              <span class="chart-title">Highest Rated Stalls</span>
+            </div>
+            <span class="chart-badge">Bar Chart</span>
+          </div>
+          <div class="chart-body" style="height:280px;">
+            <canvas id="hcTopStallsChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Price range distribution bar chart -->
+        <div class="chart-card">
+          <div class="chart-head">
+            <div class="chart-head-left">
+              <span class="chart-tag">Pricing</span>
+              <span class="chart-title">Price Range Distribution</span>
+            </div>
+            <span class="chart-badge">Bar Chart</span>
+          </div>
+          <div class="chart-body" style="height:280px;">
+            <canvas id="hcPriceChart"></canvas>
+          </div>
+        </div>
+
+      </div>
+
+    </div><!-- end #hcContent -->
+  </div><!-- end .hc-explorer-section -->
+
 </div><!-- end .dash-wrapper -->
 
 <!-- ── CHART.JS ──────────────────────────────────────────────────── -->
@@ -372,21 +705,29 @@
   Chart.defaults.borderColor  = BONE;
 
   // ── Jinja data injected from Flask ───────────────────────────────
-  // Bar: Price distribution
-  const priceLabels = {{ price_labels | tojson }};
-  const priceValues = {{ price_values | tojson }};
-
-  // Donut: Cuisine breakdown
+  const priceLabels   = {{ price_labels | tojson }};
+  const priceValues   = {{ price_values | tojson }};
   const cuisineLabels = {{ cuisine_labels | tojson }};
   const cuisineCounts = {{ cuisine_counts | tojson }};
+  const trendMonths   = {{ trend_months | tojson }};
+  const trendScores   = {{ trend_scores | tojson }};
+  const stallNames    = {{ top_stall_names  | tojson }};
+  const stallScores   = {{ top_stall_scores | tojson }};
 
-  // Line: monthly rating trend
-  const trendMonths = {{ trend_months | tojson }};
-  const trendScores = {{ trend_scores | tojson }};
+  // ── Treemap palette ──────────────────────────────────────────────
+  const treemapPalette = [
+    CHILI, TURMERIC, PANDAN,
+    '#8B2FC9', '#2563EB', '#C2410C',
+    '#0F766E', '#B45309', '#6D28D9', '#047857'
+  ];
 
-  // Horizontal bar: top-rated stalls
-  const stallNames  = {{ top_stall_names  | tojson }};
-  const stallScores = {{ top_stall_scores | tojson }};
+  // ── Shared tooltip style ─────────────────────────────────────────
+  const TT = {
+    backgroundColor: SOY,
+    titleColor: CREAM,
+    bodyColor: TURMERIC,
+    padding: 10,
+  };
 
   // ── 1. PRICE DISTRIBUTION BAR ────────────────────────────────────
   new Chart(document.getElementById('barChart'), {
@@ -408,32 +749,16 @@
       maintainAspectRatio: false,
       plugins: {
         legend: { display: false },
-        tooltip: {
-          backgroundColor: SOY,
-          titleColor: CREAM,
-          bodyColor: TURMERIC,
-          padding: 10,
-          callbacks: {
-            label: ctx => ` $${ctx.parsed.y.toFixed(2)}`
-          }
-        }
+        tooltip: { ...TT, callbacks: { label: ctx => ` $${ctx.parsed.y.toFixed(2)}` } }
       },
       scales: {
         x: {
-          ticks: {
-            maxRotation: 35,
-            font: { size: 9, family: "'DM Mono', monospace" },
-            color: SMOKE,
-            maxTicksLimit: 12,
-          },
+          ticks: { maxRotation: 35, font: { size: 9, family: "'DM Mono', monospace" }, color: SMOKE, maxTicksLimit: 12 },
           grid: { display: false },
         },
         y: {
           beginAtZero: true,
-          ticks: {
-            font: { size: 9, family: "'DM Mono', monospace" },
-            callback: v => '$' + v
-          },
+          ticks: { font: { size: 9, family: "'DM Mono', monospace" }, callback: v => '$' + v },
           grid: { color: BONE },
         }
       }
@@ -441,72 +766,60 @@
   });
 
   // ── 2. CUISINE TREEMAP ───────────────────────────────────────────
-const treemapPalette = [
-  CHILI, TURMERIC, PANDAN,
-  '#8B2FC9', '#2563EB', '#C2410C',
-  '#0F766E', '#B45309', '#6D28D9', '#047857'
-];
-const treemapData = cuisineLabels.map((label, i) => ({
-  label,
-  value: cuisineCounts[i],
-  color: treemapPalette[i % treemapPalette.length],
-}));
+  const treemapData = cuisineLabels.map((label, i) => ({
+    label, value: cuisineCounts[i],
+    color: treemapPalette[i % treemapPalette.length],
+  }));
 
-new Chart(document.getElementById('treemapChart'), {
-  type: 'treemap',
-  data: {
-    datasets: [{
-      label: 'Cuisines',
-      tree: treemapData,
-      key: 'value',
-      groups: ['label'],
-      backgroundColor(ctx) {
-        const item = treemapData[ctx.dataIndex];
-        return item ? item.color : CHILI;
-      },
-      borderColor: CREAM,
-      borderWidth: 2,
-      spacing: 2,
-      labels: {
-        display: true,
-        formatter(ctx) {
-          const d = ctx.raw._data;
-          return d ? [d.label, d.value + ' stalls'] : '';
+  new Chart(document.getElementById('treemapChart'), {
+    type: 'treemap',
+    data: {
+      datasets: [{
+        label: 'Cuisines',
+        tree: treemapData,
+        key: 'value',
+        groups: ['label'],
+        backgroundColor(ctx) {
+          const item = treemapData[ctx.dataIndex];
+          return item ? item.color : CHILI;
         },
-        color: CREAM,
-        font: [
-          { size: 11, weight: 'bold', family: "'Instrument Sans', sans-serif" },
-          { size: 9, family: "'DM Mono', monospace" },
-        ],
-      },
-    }]
-  },
-  options: {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: { display: false },
-      tooltip: {
-        backgroundColor: SOY,
-        titleColor: CREAM,
-        bodyColor: TURMERIC,
-        padding: 10,
-        callbacks: {
+        borderColor: CREAM,
+        borderWidth: 2,
+        spacing: 2,
+        labels: {
+          display: true,
+          formatter(ctx) {
+            const d = ctx.raw._data;
+            return d ? [d.label, d.value + ' stalls'] : '';
+          },
+          color: CREAM,
+          font: [
+            { size: 11, weight: 'bold', family: "'Instrument Sans', sans-serif" },
+            { size: 9, family: "'DM Mono', monospace" },
+          ],
+        },
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { ...TT, callbacks: {
           title: ctx => ctx[0].raw._data.label,
           label: ctx => ` ${ctx.raw._data.value} stalls`,
-        }
+        }}
       }
     }
-  }
-});
+  });
 
-  // ── 3. RATING TREND LINE ─────────────────────────────────────────
+  // ── 3. CLOSURES LINE ─────────────────────────────────────────────
   new Chart(document.getElementById('lineChart'), {
     type: 'line',
     data: {
       labels: trendMonths,
       datasets: [{
-        label: 'Avg. Rating',
+        label: 'Closures',
         data: trendScores,
         borderColor: CHILI,
         backgroundColor: 'rgba(216,58,31,0.08)',
@@ -523,82 +836,285 @@ new Chart(document.getElementById('treemapChart'), {
       maintainAspectRatio: false,
       plugins: {
         legend: { display: false },
-        tooltip: {
-          backgroundColor: SOY,
-          titleColor: CREAM,
-          bodyColor: TURMERIC,
-          padding: 10,
-          callbacks: { label: ctx => ` ${ctx.parsed.y} centres` }
-        }
+        tooltip: { ...TT, callbacks: { label: ctx => ` ${ctx.parsed.y} centres` } }
       },
       scales: {
-      x: {
-        ticks: { font: { size: 9, family: "'DM Mono', monospace" }, color: SMOKE },
-        grid: { display: false },
-      },
-      y: {
-        beginAtZero: true,          // ← remove the hardcoded min/max
-        ticks: {
-          font: { size: 9, family: "'DM Mono', monospace" },
-          callback: v => v + ' centres'
+        x: {
+          ticks: { font: { size: 9, family: "'DM Mono', monospace" }, color: SMOKE },
+          grid: { display: false },
         },
-        grid: { color: BONE },
+        y: {
+          beginAtZero: true,
+          ticks: { font: { size: 9, family: "'DM Mono', monospace" }, callback: v => v + ' centres' },
+          grid: { color: BONE },
+        }
       }
     }
-  }
-});
+  });
 
   // ── 4. TOP STALLS HORIZONTAL BAR ────────────────────────────────
-// ── 4. TOP STALLS HORIZONTAL BAR ────────────────────────────────
-new Chart(document.getElementById('topStallsChart'), {
-  type: 'bar',
-  data: {
-    labels: stallNames,
-    datasets: [{
-      label: 'Score',
-      data: stallScores,
-      backgroundColor: stallScores.map((_, i) =>
-        i < 3 ? CHILI : TURMERIC
-      ),
-      borderWidth: 0,
-      borderRadius: 2,
-    }]
-  },
-  options: {
-    indexAxis: 'y',
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: { display: false },
-      tooltip: {
-        backgroundColor: SOY,
-        titleColor: CREAM,
-        bodyColor: TURMERIC,
-        padding: 10,
-        callbacks: { label: ctx => ` ★ ${ctx.parsed.x.toFixed(1)}` }
-      }
+  new Chart(document.getElementById('topStallsChart'), {
+    type: 'bar',
+    data: {
+      labels: stallNames,
+      datasets: [{
+        label: 'Score',
+        data: stallScores,
+        backgroundColor: stallScores.map((_, i) => i < 3 ? CHILI : TURMERIC),
+        borderWidth: 0,
+        borderRadius: 2,
+      }]
     },
-    scales: {
-      x: {
-        min: 3.5,
-        max: 5,
-        ticks: {
-          font: { size: 9, family: "'DM Mono', monospace" },
-          callback: v => '★ ' + v
-        },
-        grid: { color: BONE },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { ...TT, callbacks: { label: ctx => ` ★ ${ctx.parsed.x.toFixed(1)}` } }
       },
-      y: {
-        ticks: {
-          font: { size: 9, family: "'DM Mono', monospace" },
-          color: SMOKE,
+      scales: {
+        x: {
+          min: 3.5, max: 5,
+          ticks: { font: { size: 9, family: "'DM Mono', monospace" }, callback: v => '★ ' + v },
+          grid: { color: BONE },
         },
-        grid: { display: false },
+        y: {
+          ticks: { font: { size: 9, family: "'DM Mono', monospace" }, color: SMOKE },
+          grid: { display: false },
+        }
       }
     }
-  }
-});
+  });
 
+  // ════════════════════════════════════════════════════════════════
+  // HAWKER CENTRE EXPLORER LOGIC
+  // ════════════════════════════════════════════════════════════════
+
+  let hcCuisineChart   = null;
+  let hcTopStallsChart = null;
+  let hcPriceChart     = null;
+
+  function destroyHCCharts() {
+    if (hcCuisineChart)   { hcCuisineChart.destroy();   hcCuisineChart = null; }
+    if (hcTopStallsChart) { hcTopStallsChart.destroy(); hcTopStallsChart = null; }
+    if (hcPriceChart)     { hcPriceChart.destroy();     hcPriceChart = null; }
+  }
+
+  function renderHCData(d) {
+    destroyHCCharts();
+
+    // ── Area pill ──────────────────────────────────────────────────
+    const pill = document.getElementById('hcAreaPill');
+    pill.textContent = '📍 ' + (d.area || 'Unknown Area');
+    pill.classList.add('visible');
+
+    // ── Stat cards ─────────────────────────────────────────────────
+    document.getElementById('hcTotalStalls').textContent = d.total_stalls ?? '—';
+    document.getElementById('hcAvgRating').innerHTML =
+      (d.avg_rating != null ? d.avg_rating : '—') + '<span>/5</span>';
+    document.getElementById('hcAvgPrice').innerHTML =
+      '<span>$</span>' + (d.avg_price != null ? d.avg_price : '—');
+    document.getElementById('hcArea').textContent = d.area || '—';
+
+    // ── Animate stat grid ─────────────────────────────────────────
+    const sg = document.getElementById('hcStatGrid');
+    sg.classList.remove('visible');
+    void sg.offsetWidth;
+    sg.classList.add('visible');
+
+    // ── Closure table ─────────────────────────────────────────────
+    const tbody = document.getElementById('hcClosureBody');
+    tbody.innerHTML = '';
+    const quarters = ['Q1 2026', 'Q2 2026', 'Q3 2026', 'Q4 2025'];
+    const keys     = ['q1', 'q2', 'q3', 'q4'];
+    let hasData = false;
+    keys.forEach((k, i) => {
+      const dates = d.closures[k] || [];
+      if (dates.length) hasData = true;
+      const tr = document.createElement('tr');
+      const tdQ = document.createElement('td');
+      tdQ.textContent = quarters[i];
+      const tdD = document.createElement('td');
+      if (!dates.length) {
+        tdD.innerHTML = '<span class="closure-badge tbc-badge">NIL / TBC</span>';
+      } else {
+        dates.forEach(dt => {
+          const span = document.createElement('span');
+          span.className = 'closure-badge';
+          span.textContent = dt;
+          tdD.appendChild(span);
+        });
+      }
+      tr.appendChild(tdQ);
+      tr.appendChild(tdD);
+      tbody.appendChild(tr);
+    });
+
+    // ── Cuisine treemap ───────────────────────────────────────────
+    const cuisData = (d.cuisine_labels || []).map((lbl, i) => ({
+      label: lbl,
+      value: d.cuisine_counts[i],
+      color: treemapPalette[i % treemapPalette.length],
+    }));
+    hcCuisineChart = new Chart(document.getElementById('hcCuisineChart'), {
+      type: 'treemap',
+      data: {
+        datasets: [{
+          label: 'Cuisines',
+          tree: cuisData,
+          key: 'value',
+          groups: ['label'],
+          backgroundColor(ctx) {
+            const item = cuisData[ctx.dataIndex];
+            return item ? item.color : CHILI;
+          },
+          borderColor: CREAM,
+          borderWidth: 2,
+          spacing: 2,
+          labels: {
+            display: true,
+            formatter(ctx) {
+              const dd = ctx.raw._data;
+              return dd ? [dd.label, dd.value + ' stalls'] : '';
+            },
+            color: CREAM,
+            font: [
+              { size: 10, weight: 'bold', family: "'Instrument Sans', sans-serif" },
+              { size: 8, family: "'DM Mono', monospace" },
+            ],
+          },
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: { ...TT, callbacks: {
+            title: ctx => ctx[0].raw._data.label,
+            label: ctx => ` ${ctx.raw._data.value} stalls`,
+          }}
+        }
+      }
+    });
+
+    // ── Top stalls horizontal bar ─────────────────────────────────
+    const tsNames  = d.top_stalls.map(s => s.name);
+    const tsScores = d.top_stalls.map(s => s.rating);
+    hcTopStallsChart = new Chart(document.getElementById('hcTopStallsChart'), {
+      type: 'bar',
+      data: {
+        labels: tsNames,
+        datasets: [{
+          label: 'Score',
+          data: tsScores,
+          backgroundColor: tsScores.map((_, i) => i < 3 ? CHILI : TURMERIC),
+          borderWidth: 0,
+          borderRadius: 2,
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: { ...TT, callbacks: { label: ctx => ` ★ ${ctx.parsed.x.toFixed(1)}` } }
+        },
+        scales: {
+          x: {
+            min: 3, max: 5,
+            ticks: { font: { size: 9, family: "'DM Mono', monospace" }, callback: v => '★ ' + v },
+            grid: { color: BONE },
+          },
+          y: {
+            ticks: { font: { size: 9, family: "'DM Mono', monospace" }, color: SMOKE },
+            grid: { display: false },
+          }
+        }
+      }
+    });
+
+    // ── Price range distribution bar ──────────────────────────────
+    hcPriceChart = new Chart(document.getElementById('hcPriceChart'), {
+      type: 'bar',
+      data: {
+        labels: d.price_range_labels,
+        datasets: [{
+          label: 'Items',
+          data: d.price_range_counts,
+          backgroundColor: d.price_range_counts.map((_, i) =>
+            i === 0 ? CHILI : `rgba(216,58,31,${0.6 - i * 0.08})`
+          ),
+          borderWidth: 0,
+          borderRadius: 2,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: { ...TT, callbacks: { label: ctx => ` ${ctx.parsed.y} items` } }
+        },
+        scales: {
+          x: {
+            ticks: { font: { size: 9, family: "'DM Mono', monospace" }, color: SMOKE },
+            grid: { display: false },
+          },
+          y: {
+            beginAtZero: true,
+            ticks: { font: { size: 9, family: "'DM Mono', monospace" }, callback: v => v + ' items' },
+            grid: { color: BONE },
+          }
+        }
+      }
+    });
+
+    // ── Animate chart grids ───────────────────────────────────────
+    ['hcChartGrid', 'hcChartGridBottom'].forEach((id, delay) => {
+      const el = document.getElementById(id);
+      el.classList.remove('visible');
+      void el.offsetWidth;
+      setTimeout(() => el.classList.add('visible'), delay * 100);
+    });
+  }
+
+  // ── Dropdown change handler ───────────────────────────────────────
+  document.getElementById('hcDropdown').addEventListener('change', function() {
+    const centreId = this.value;
+    const empty    = document.getElementById('hcEmptyState');
+    const content  = document.getElementById('hcContent');
+    const loading  = document.getElementById('hcLoading');
+    const pill     = document.getElementById('hcAreaPill');
+
+    if (!centreId) {
+      content.style.display = 'none';
+      empty.style.display   = 'block';
+      pill.classList.remove('visible');
+      destroyHCCharts();
+      return;
+    }
+
+    // Show loading
+    empty.style.display   = 'none';
+    content.style.display = 'none';
+    loading.classList.add('active');
+
+    fetch(`/api/hawker_centre_stats?center_id=${centreId}`)
+      .then(r => r.json())
+      .then(data => {
+        loading.classList.remove('active');
+        content.style.display = 'block';
+        renderHCData(data);
+      })
+      .catch(() => {
+        loading.classList.remove('active');
+        empty.style.display = 'block';
+        empty.querySelector('.hc-empty-text').textContent = 'Failed to load data. Please try again.';
+      });
+  });
 </script>
 
 {% endblock %}
