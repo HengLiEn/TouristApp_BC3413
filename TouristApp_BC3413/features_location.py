@@ -49,12 +49,12 @@ class LocationPlanner:
             return None
 
     @staticmethod
-    def get_coords(address_or_postal: str) -> Optional[Coord]:
+    def get_coords(address_or_postal: str, prompt_on_fail: bool = True) -> Optional[Coord]:
         address_or_postal = (address_or_postal or "").strip()
         if not address_or_postal:
             return None
         if requests is None:
-            return LocationPlanner._prompt_manual_coords(address_or_postal)
+            return LocationPlanner._prompt_manual_coords(address_or_postal) if prompt_on_fail else None
         try:
             url = (
                 "https://www.onemap.gov.sg/api/common/elastic/search"
@@ -66,10 +66,10 @@ class LocationPlanner:
                 r0 = data["results"][0]
                 return float(r0["LATITUDE"]), float(r0["LONGITUDE"])
             print(f"OneMap could not find: {address_or_postal}")
-            return LocationPlanner._prompt_manual_coords(address_or_postal)
+            return LocationPlanner._prompt_manual_coords(address_or_postal) if prompt_on_fail else None
         except Exception as e:
             print(f"OneMap error: {e}")
-            return LocationPlanner._prompt_manual_coords(address_or_postal)
+            return LocationPlanner._prompt_manual_coords(address_or_postal) if prompt_on_fail else None
 
     @staticmethod
     def _distance_km(start: Coord, end: Coord) -> float:

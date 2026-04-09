@@ -12,6 +12,32 @@ import pandas as pd
 from feature_onboarding import DB_FILE
 from features_location import Coord, haversine_km
 
+ALLERGEN_ALIASES = {
+    "eggs": ["egg"],
+    "egg": ["egg"],
+    "nuts": ["nut"],
+    "nut": ["nut"],
+    "seafood": ["fish", "shellfish"],
+    "shellfish": ["shellfish"],
+    "fish": ["fish"],
+    "dairy": ["dairy"],
+    "gluten": ["gluten"],
+    "soy": ["soy"],
+    "sesame": ["sesame"],
+    "pork": ["pork"],
+}
+
+def normalize_allergen_values(values: List[str]) -> List[str]:
+    normalized: List[str] = []
+    for value in values:
+        token = str(value).strip().lower()
+        if not token:
+            continue
+        for expanded in ALLERGEN_ALIASES.get(token, [token]):
+            if expanded not in normalized:
+                normalized.append(expanded)
+    return normalized
+
 @dataclass
 class CuisinePreferences:
     cuisines: List[str] | None = None
@@ -85,7 +111,7 @@ class CuisineFeatureHandler:
                 "UPDATE tourist_profiles SET preferred_cuisines = ?, allergens = ? WHERE username = ?;",
                 (
                     "|".join([x.strip() for x in prefs.cuisines if x.strip()]),
-                    "|".join([x.strip() for x in prefs.allergens_to_avoid if x.strip()]),
+                    "|".join([x.title() for x in normalize_allergen_values(prefs.allergens_to_avoid)]),
                     username,
                 ),
             )
@@ -122,8 +148,10 @@ class CuisineFeatureHandler:
             wanted = [c.lower() for c in prefs.cuisines]
             out = out[out["cuisine_type"].astype(str).str.lower().apply(lambda x: any(w in x for w in wanted))]
         if prefs.allergens_to_avoid and "allergens" in out.columns:
-            blocked = [a.lower() for a in prefs.allergens_to_avoid]
-            out = out[~out["allergens"].astype(str).str.lower().apply(lambda x: any(b in x for b in blocked))]
+            blocked = normalize_allergen_values(prefs.allergens_to_avoid)
+            out = out[~out["allergens"].astype(str).str.lower().apply(
+                lambda x: any(b in normalize_allergen_values(self._split_cell(x)) for b in blocked)
+            )]
         return out
 
     def _get_open_hawker_ids(self, trip_start: str | None, trip_end: str | None) -> set:
@@ -206,8 +234,10 @@ class CuisineFeatureHandler:
             out = out[out["cuisine_type"].astype(str).str.lower().apply(lambda x: any(w in x for w in wanted))]
 
         if prefs and prefs.allergens_to_avoid and "allergens" in out.columns:
-            blocked = [a.lower() for a in prefs.allergens_to_avoid]
-            out = out[~out["allergens"].astype(str).str.lower().apply(lambda x: any(b in x for b in blocked))]
+            blocked = normalize_allergen_values(prefs.allergens_to_avoid)
+            out = out[~out["allergens"].astype(str).str.lower().apply(
+                lambda x: any(b in normalize_allergen_values(self._split_cell(x)) for b in blocked)
+            )]
 
         if "price" in out.columns:
             out["price"] = pd.to_numeric(out["price"], errors="coerce")

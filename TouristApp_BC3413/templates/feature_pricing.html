@@ -316,11 +316,7 @@
       {% if back_params.allergens %}
         <span>free from:</span>
       {% endif %}
-      {% for key, icon, label in [
-        ('gluten','🌾','Gluten'),('dairy','🥛','Dairy'),('eggs','🥚','Eggs'),
-        ('nuts','🥜','Nuts'),('shellfish','🦐','Shellfish'),('seafood','🐟','Seafood'),
-        ('soy','🫘','Soy'),('pork','🐷','Pork')
-      ] %}
+      {% for key, icon, label in allergen_options %}
         {% if key in back_params.allergens %}
           <span class="a-tag">{{ icon }} {{ label }}</span>
         {% endif %}
@@ -358,7 +354,7 @@
               {% if item.allergens %}
                 <div class="allergen-tags">
                   {% for a in item.allergens %}
-                    <span class="a-tag">{{ a }}</span>
+                    <span class="a-tag">{{ a|replace('_', ' ')|title }}</span>
                   {% endfor %}
                 </div>
               {% else %}

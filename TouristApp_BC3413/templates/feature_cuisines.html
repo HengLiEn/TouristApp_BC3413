@@ -89,16 +89,6 @@
         <div class="panel-body" id="panel-allergen">
           <p class="allergen-note">Hide stalls that contain these allergens.</p>
           <div class="allergen-grid">
-            {% set allergen_options = [
-              ('gluten',    '🌾', 'Gluten'),
-              ('dairy',     '🥛', 'Dairy'),
-              ('eggs',      '🥚', 'Eggs'),
-              ('nuts',      '🥜', 'Nuts'),
-              ('shellfish', '🦐', 'Shellfish'),
-              ('seafood',   '🐟', 'Seafood'),
-              ('soy',       '🫘', 'Soy'),
-              ('pork',      '🐷', 'Pork'),
-            ] %}
             {% for key, icon, label in allergen_options %}
             <label class="allergen-chip {{ 'active' if key in (selected_allergens | default([])) }}">
               <input
@@ -212,11 +202,7 @@
       {% endif %}
       {% if selected_allergens %}
         <span class="allergen-active-label">⚠️ Excluding:</span>
-        {% for key, icon, label in [
-          ('gluten','🌾','Gluten'),('dairy','🥛','Dairy'),('eggs','🥚','Eggs'),
-          ('nuts','🥜','Nuts'),('shellfish','🦐','Shellfish'),('seafood','🐟','Seafood'),
-          ('soy','🫘','Soy'),('pork','🐷','Pork')
-        ] %}
+        {% for key, icon, label in allergen_options %}
           {% if key in selected_allergens %}
             <span class="allergen-tag">{{ icon }} {{ label }}</span>
           {% endif %}

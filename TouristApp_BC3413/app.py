@@ -1,3 +1,6 @@
+import warnings
+warnings.filterwarnings("ignore", message=".*urllib3 v2 only supports OpenSSL.*")
+
 from flask import Flask, render_template, request, redirect, url_for, session, flash, Response, jsonify
 from typing import Optional
 import re
@@ -9,9 +12,12 @@ from features_closure import HawkerClosureFeature
 from datetime import datetime, timedelta
 import pandas as pd,json
 import os
+import csv
 from collections import Counter
 import sqlite3
-from functools import wraps
+from functools import wraps, lru_cache
+import requests
+from urllib3.exceptions import NotOpenSSLWarning
 
 BASE_DIR     = os.path.dirname(os.path.abspath(__file__))
 CENTRES_CSV  = os.path.join(BASE_DIR, 'dataset', 'Hawker Centre Data', 'hawker_centers.csv')
@@ -40,6 +46,89 @@ def login_required(f):
             return redirect(url_for("login"))
         return f(*args, **kwargs)
     return decorated
+
+ALLERGEN_META = {
+    "gluten": ("🌾", "Gluten"),
+    "dairy": ("🥛", "Dairy"),
+    "egg": ("🥚", "Egg"),
+    "fish": ("🐟", "Fish"),
+    "shellfish": ("🦐", "Shellfish"),
+    "soy": ("🫘", "Soy"),
+    "nut": ("🥜", "Nut"),
+    "sesame": ("🌰", "Sesame"),
+    "pork": ("🐷", "Pork"),
+}
+ALLERGEN_ORDER = ["gluten", "dairy", "egg", "fish", "shellfish", "soy", "nut", "sesame", "pork"]
+ALLERGEN_ALIASES = {
+    "eggs": ["egg"],
+    "egg": ["egg"],
+    "nuts": ["nut"],
+    "nut": ["nut"],
+    "seafood": ["fish", "shellfish"],
+    "shellfish": ["shellfish"],
+    "fish": ["fish"],
+    "dairy": ["dairy"],
+    "gluten": ["gluten"],
+    "soy": ["soy"],
+    "sesame": ["sesame"],
+    "pork": ["pork"],
+}
+
+@lru_cache(maxsize=1)
+def get_allergen_options():
+    available = set()
+    with open(MENU_CSV, newline="", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            raw = (row.get("allergens") or "").strip()
+            for part in re.split(r"[,;|/]+", raw):
+                token = part.strip().lower()
+                if token and token not in {"none", "nan"}:
+                    available.add(token)
+
+    options = []
+    for key in ALLERGEN_ORDER:
+        if key in available:
+            icon, label = ALLERGEN_META[key]
+            options.append((key, icon, label))
+    for key in sorted(available):
+        if key not in ALLERGEN_META:
+            options.append((key, "⚠️", key.replace("_", " ").title()))
+    return options
+
+def get_allergen_labels():
+    return [label for _, _, label in get_allergen_options()]
+
+def normalize_allergen_values(values):
+    normalized = []
+    for value in values:
+        token = str(value).strip().lower()
+        if not token:
+            continue
+        expanded = ALLERGEN_ALIASES.get(token, [token])
+        for item in expanded:
+            if item not in normalized:
+                normalized.append(item)
+    return normalized
+
+def allergen_display_labels(values):
+    labels = []
+    for token in normalize_allergen_values(values):
+        if token in ALLERGEN_META:
+            labels.append(ALLERGEN_META[token][1])
+        else:
+            labels.append(token.replace("_", " ").title())
+    return labels
+
+def parse_coords_input(raw_value: str):
+    match = re.match(r"^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$", raw_value or "")
+    if not match:
+        return None
+    lat = float(match.group(1))
+    lng = float(match.group(2))
+    if -90 <= lat <= 90 and -180 <= lng <= 180:
+        return (lat, lng)
+    return None
 
 
 @app.route("/login", methods=["GET", "POST"])
@@ -330,7 +419,7 @@ def cuisines():
     selected_stars = request.args.get('stars', None)
     selected_sort = request.args.get('sort', 'score')
     search_query = request.args.get('q', '').strip().lower()
-    selected_allergens = request.args.getlist('allergens')  # e.g. ['gluten', 'dairy']
+    selected_allergens = normalize_allergen_values(request.args.getlist('allergens'))  # e.g. ['gluten', 'dairy']
     max_price = request.args.get('max_price', 15, type=float)  # slider: $1–$15, default = show all
 
     handler = CuisineFeatureHandler()
@@ -357,7 +446,7 @@ def cuisines():
 
     cuisines_list = handler.get_available_cuisines()
     onboarding_cuisines = [c.lower() for c in (profile.preferred_cuisines if profile else [])]
-    default_allergens = [a.lower() for a in (profile.allergens if profile else [])]
+    default_allergens = normalize_allergen_values(profile.allergens if profile else [])
     if not selected_allergens and default_allergens and "allergens" not in request.args:
         selected_allergens = default_allergens
 
@@ -437,6 +526,7 @@ def cuisines():
                 stall_allergens = [a.lower().strip() for a in raw]
             else:
                 stall_allergens = [a.lower().strip() for a in re.split(r'[,;|/]+', str(raw)) if a.strip()]
+            stall_allergens = normalize_allergen_values(stall_allergens)
             return not any(a in stall_allergens for a in selected_allergens)
 
         stalls_list = [s for s in stalls_list if stall_is_safe(s)]
@@ -478,6 +568,7 @@ def cuisines():
     return render_template('feature_cuisines.html',
                            stalls=stalls_list,
                            cuisines=cuisines_list,
+                           allergen_options=get_allergen_options(),
                            selected_cuisine=selected_cuisine,
                            selected_stars=selected_stars,
                            selected_sort=selected_sort,
@@ -537,10 +628,10 @@ def pricing():
         s = _safe_str(raw).lower()
         if not s or s in ('nan', 'none'):
             return []
-        return [a.strip() for a in re.split(r'[,;|/]+', s) if a.strip()]
+        return normalize_allergen_values([a.strip() for a in re.split(r'[,;|/]+', s) if a.strip()])
 
     # Allergens the user wants to avoid
-    blocked_allergens = [a.lower().strip() for a in request.args.getlist('allergens')]
+    blocked_allergens = normalize_allergen_values(request.args.getlist('allergens'))
 
     # Max price cap forwarded from the cuisines filters
     max_price = request.args.get('max_price', 15, type=float)
@@ -577,7 +668,7 @@ def pricing():
         'sort':      request.args.get('sort', ''),
         'q':         request.args.get('q', ''),
         'max_price': request.args.get('max_price', 15),
-        'allergens': request.args.getlist('allergens'),
+        'allergens': blocked_allergens,
         'from_page': request.args.get('from', ''),
         'back_stall_id': request.args.get('back_stall_id', ''),
     }
@@ -604,6 +695,7 @@ def pricing():
                            menu_items=menu_items,
                            error=None,
                            back_params=back_params,
+                           allergen_options=get_allergen_options(),
                            top_reviews=top_reviews,
                            review_sort=review_sort)
 
@@ -637,7 +729,9 @@ def location():
         "feature_location.html",
         active_page      = "location",
         current_coords   = current_coords,
-        current_address  = session.get("last_address"),   # remembered across request
+        current_address  = session.get("last_address") or (
+            f"{current_coords[0]:.5f}, {current_coords[1]:.5f}" if current_coords else None
+        ),
         current_radius   = float(profile.radius_km) if profile and profile.radius_km else 2.0,
         current_trip_start = profile.trip_start if profile else None,
         current_trip_end   = profile.trip_end   if profile else None,
@@ -663,7 +757,7 @@ def update_location():
         flash("Please enter a postal code or address.", "error")
         return redirect(url_for("location"))
 
-    coords = planner.get_coords(address)
+    coords = parse_coords_input(address) or planner.get_coords(address, prompt_on_fail=False)
 
     if not coords:
         flash(f"Could not find '{address}' on OneMap. Please try a different address or postal code.", "error")
@@ -1371,10 +1465,7 @@ def onboarding():
     return render_template(
         "feature_onboarding_edit.html",
         active_page="onboarding",
-        allergens=[
-            "Nuts", "Shellfish", "Dairy", "Gluten",
-            "Eggs", "Soy", "Fish", "Sesame"
-        ],
+        allergens=get_allergen_labels(),
         cuisines=[
             "Chinese", "Malay", "Indian", "Japanese", "Korean", "Thai",
             "Western", "Seafood", "Vegetables", "Beverage",
@@ -1427,10 +1518,7 @@ def preferences():
     return render_template(
         "feature_onboarding_edit.html",
         active_page="preferences",
-        allergens=[
-            "Nuts", "Shellfish", "Dairy", "Gluten",
-            "Eggs", "Soy", "Fish", "Sesame"
-        ],
+        allergens=get_allergen_labels(),
         cuisines=[
             "Chinese", "Malay", "Indian", "Japanese", "Korean", "Thai",
             "Western", "Seafood", "Vegetables", "Beverage",
@@ -1441,7 +1529,7 @@ def preferences():
             "lng": profile.location_lng if profile.location_lng is not None else 103.8198,
         },
         selected_cuisines=profile.preferred_cuisines,
-        selected_allergens=profile.allergens,
+        selected_allergens=allergen_display_labels(profile.allergens),
         prefill_name=profile.name,
         prefill_username=profile.username,
         current_trip_start=_ddmmyyyy_to_iso(profile.trip_start),
