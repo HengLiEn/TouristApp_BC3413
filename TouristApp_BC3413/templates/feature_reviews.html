@@ -503,7 +503,7 @@
 
       <!-- Back to stall link -->
       {% if back_stall_id %}
-      <a href="/pricing?stall_id={{ back_stall_id }}"
+      <a href="/pricing?stall_id={{ back_stall_id }}&from=reviews&back_stall_id={{ back_stall_id }}"
          style="display:inline-flex;align-items:center;gap:6px;font-family:'DM Mono',monospace;
                 font-size:0.65rem;letter-spacing:1.5px;text-transform:uppercase;
                 color:var(--chili);text-decoration:none;margin-bottom:1.25rem;">
@@ -595,7 +595,8 @@
         <span class="section-count">Share your experience</span>
       </div>
 
-      <form method="POST" action="/reviews/submit" class="write-form">
+      <form method="POST" action="/reviews/submit" class="write-form"
+            onsubmit="const btn=this.querySelector('.submit-btn'); btn.textContent='Submitting...'; btn.disabled=true;">
 
         <!-- Stall picker — pre-filled if coming from a stall page -->
         <div class="field-group">

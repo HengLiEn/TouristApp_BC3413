@@ -544,10 +544,15 @@
 <script>
   // ── Quick date range setter ───────────────────────────────────────────────
   function setDateRange(days) {
-    const today = new Date();
+    const today = new Date("{{ today_iso }}T00:00:00");
     const end   = new Date(today);
-    end.setDate(today.getDate() + days - 1);
-    const fmt = d => d.toISOString().split('T')[0];
+    end.setDate(end.getDate() + days - 1);
+    const fmt = d => {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    };
     document.getElementById('trip_start').value = fmt(today);
     document.getElementById('trip_end').value   = fmt(end);
   }

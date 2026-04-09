@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sqlite3
 from dataclasses import dataclass
 from datetime import datetime
@@ -22,6 +23,10 @@ class TouristProfile:
     radius_km: float = 2.0
     trip_start: Optional[str] = None
     trip_end: Optional[str] = None
+    stall_day_map: dict | None = None
+    route_orders: dict | None = None
+    country: str = "Singapore"
+    spice_level: int = 0
 
 class TouristProfileDA:
     REQUIRED_COLUMNS = {
@@ -38,6 +43,8 @@ class TouristProfileDA:
         "radius_km": "REAL",
         "trip_start": "TEXT",
         "trip_end": "TEXT",
+        "stall_day_map": "TEXT",
+        "route_orders": "TEXT",
     }
 
     def __init__(self, db_file: str = DB_FILE):
@@ -75,7 +82,9 @@ class TouristProfileDA:
             location_lng REAL,
             radius_km REAL DEFAULT 2.0,
             trip_start TEXT,
-            trip_end TEXT
+            trip_end TEXT,
+            stall_day_map TEXT,
+            route_orders TEXT
         );
         """
         with self._connect() as con:
@@ -100,6 +109,8 @@ class TouristProfileDA:
             "trip_end": " DEFAULT NULL",
             "location_lat": " DEFAULT NULL",
             "location_lng": " DEFAULT NULL",
+            "stall_day_map": " DEFAULT ''",
+            "route_orders": " DEFAULT ''",
         }
 
         with self._connect() as con:
@@ -150,32 +161,43 @@ class TouristProfileDA:
         return out
 
     def insert_profile(self, p: TouristProfile) -> None:
-        sql = """
-        INSERT INTO tourist_profiles (username, password, name, allergens, preferred_cuisines, created_at, saved_stalls, saved_hawker_center_ids, location_lat, location_lng, radius_km, trip_start, trip_end
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
-        """
-        data = (
-            p.username,
-            p.password,
-            p.name,
-            self._pack_list(p.allergens),
-            self._pack_list(p.preferred_cuisines),
-            p.created_at,
-            self._pack_ints(p.saved_stalls or []),
-            self._pack_ints(p.saved_hawker_center_ids or []),
-            p.location_lat,
-            p.location_lng,
-            float(p.radius_km if p.radius_km is not None else 2.0),
-            p.trip_start,
-            p.trip_end,
-        )
+        existing_columns = set(self._get_existing_columns())
+        payload = {
+            "username": p.username,
+            "password": p.password,
+            "name": p.name,
+            "allergens": self._pack_list(p.allergens),
+            "preferred_cuisines": self._pack_list(p.preferred_cuisines),
+            "created_at": p.created_at,
+            "saved_stalls": self._pack_ints(p.saved_stalls or []),
+            "saved_hawker_center_ids": self._pack_ints(p.saved_hawker_center_ids or []),
+            "location_lat": p.location_lat,
+            "location_lng": p.location_lng,
+            "radius_km": float(p.radius_km if p.radius_km is not None else 2.0),
+            "trip_start": p.trip_start,
+            "trip_end": p.trip_end,
+            "stall_day_map": json.dumps(p.stall_day_map or {}),
+            "route_orders": json.dumps(p.route_orders or {}),
+        }
+
+        # Older project schemas may still require these account fields.
+        if "country" in existing_columns:
+            payload["country"] = p.country or "Singapore"
+        if "spice_level" in existing_columns:
+            payload["spice_level"] = int(p.spice_level if p.spice_level is not None else 0)
+
+        insert_columns = [col for col in payload if col in existing_columns]
+        placeholders = ", ".join(["?"] * len(insert_columns))
+        columns_sql = ", ".join(insert_columns)
+        sql = f"INSERT INTO tourist_profiles ({columns_sql}) VALUES ({placeholders});"
+        data = tuple(payload[col] for col in insert_columns)
         with self._connect() as con:
             con.execute(sql, data)
             con.commit()
 
     def get_profile(self, username: str) -> Optional[TouristProfile]:
         sql = """
-        SELECT username, password, name, allergens, preferred_cuisines, created_at, saved_stalls, saved_hawker_center_ids, location_lat, location_lng, radius_km, trip_start, trip_end
+        SELECT username, password, name, allergens, preferred_cuisines, created_at, saved_stalls, saved_hawker_center_ids, location_lat, location_lng, radius_km, trip_start, trip_end, stall_day_map, route_orders
         FROM tourist_profiles
         WHERE username = ?;
         """
@@ -198,7 +220,21 @@ class TouristProfileDA:
             radius_km=float(row[10]) if row[10] is not None else 2.0,
             trip_start=row[11] if row[11] else None,
             trip_end=row[12] if row[12] else None,
+            stall_day_map=json.loads(row[13]) if row[13] else {},
+            route_orders=json.loads(row[14]) if row[14] else {},
         )
+
+    def update_preferences(self, username: str, allergens: List[str], preferred_cuisines: List[str]) -> None:
+        with self._connect() as con:
+            con.execute(
+                """
+                UPDATE tourist_profiles
+                SET allergens = ?, preferred_cuisines = ?
+                WHERE username = ?;
+                """,
+                (self._pack_list(allergens), self._pack_list(preferred_cuisines), username),
+            )
+            con.commit()
 
     def _update_int_list_column(self, username: str, column: str, values: List[int]) -> None:
         packed = self._pack_ints(self._unique_preserve([int(v) for v in values]))
@@ -221,7 +257,7 @@ class TouristProfileDA:
     def clear_saved_stalls(self, username: str) -> None:
         with self._connect() as con:
             con.execute(
-                "UPDATE tourist_profiles SET saved_stalls = '', saved_hawker_center_ids = '' WHERE username = ?;",
+                "UPDATE tourist_profiles SET saved_stalls = '', saved_hawker_center_ids = '', stall_day_map = '', route_orders = '' WHERE username = ?;",
                 (username,),
             )
             con.commit()
@@ -259,6 +295,40 @@ class TouristProfileDA:
                 WHERE username = ?;
                 """,
                 (lat, lng, float(radius_km), trip_start, trip_end, username),
+            )
+            con.commit()
+
+    def get_stall_day_map(self, username: str) -> dict:
+        with self._connect() as con:
+            row = con.execute(
+                "SELECT stall_day_map FROM tourist_profiles WHERE username = ?;",
+                (username,),
+            ).fetchone()
+        raw = row[0] if row else ""
+        return json.loads(raw) if raw else {}
+
+    def update_stall_day_map(self, username: str, mapping: dict) -> None:
+        with self._connect() as con:
+            con.execute(
+                "UPDATE tourist_profiles SET stall_day_map = ? WHERE username = ?;",
+                (json.dumps(mapping), username),
+            )
+            con.commit()
+
+    def get_route_orders(self, username: str) -> dict:
+        with self._connect() as con:
+            row = con.execute(
+                "SELECT route_orders FROM tourist_profiles WHERE username = ?;",
+                (username,),
+            ).fetchone()
+        raw = row[0] if row else ""
+        return json.loads(raw) if raw else {}
+
+    def update_route_orders(self, username: str, orders: dict) -> None:
+        with self._connect() as con:
+            con.execute(
+                "UPDATE tourist_profiles SET route_orders = ? WHERE username = ?;",
+                (json.dumps(orders), username),
             )
             con.commit()
 

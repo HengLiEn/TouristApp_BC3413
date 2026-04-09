@@ -9,7 +9,7 @@
   <div class="hero-inner">
     <p class="hero-eyebrow">Hawker Discovery Platform</p>
     <h1 class="hero-title">Find Your <em>Perfect</em><br/>Hawker Stall</h1>
-    <p class="hero-desc">Browse top-rated stalls filtered by cuisine.<br>Click any stall to expand its details.</p>
+    <p class="hero-desc">Browse top-rated stalls filtered by cuisine.<br>Click any stall to view its full details.</p>
   </div>
   <div class="hero-deco"></div>
 </section>
@@ -272,25 +272,6 @@
               <div class="dist-badge">{{ "%.1f"|format(stall.distance_km) }} km</div>
             {% endif %}
           </div>
-
-          <div class="stall-menu">
-            <div class="menu-title">Stall Details</div>
-            {% if stall.address_myenv is defined and stall.address_myenv %}
-              <p style="font-size:0.85rem;color:var(--smoke);margin-bottom:0.5rem;">
-                🏠 {{ stall.address_myenv }}
-              </p>
-            {% endif %}
-            {% if stall.allergens is defined and stall.allergens %}
-            <div class="stall-allergens">
-              <span class="stall-allergen-label">Contains:</span>
-              {% for a in stall.allergens %}
-                <span class="stall-allergen-tag">{{ a }}</span>
-              {% endfor %}
-            </div>
-            {% endif %}
-            <p class="menu-note">Click to view full menu and pricing.</p>
-          </div>
-
         </div>
         </a>
         {% endfor %}

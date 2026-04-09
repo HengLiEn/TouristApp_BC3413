@@ -329,7 +329,6 @@
     to   { opacity: 1; transform: translateY(0); }
   }
   .stall-card:hover { border-color: var(--chili); z-index: 2; transform: translateX(4px); }
-  .stall-card.expanded { border-color: var(--chili); }
   .stall-rank {
     background-color: var(--soy);
     color: var(--cream);
@@ -387,14 +386,6 @@
     padding: 0.25rem 0.6rem;
     border-radius: 100px;
   }
-  .stall-menu {
-    display: none;
-    grid-column: 1 / -1;
-    border-top: 2px solid var(--bone);
-    padding: 1.5rem;
-    background-color: var(--cream);
-  }
-  .stall-card.expanded .stall-menu { display: block; }
   .menu-title {
     font-family: 'DM Mono', monospace;
     font-size: 0.65rem;
@@ -501,6 +492,7 @@
       <a href="/itinerary" class="{{ 'active' if active_page == 'itinerary' }}">Itinerary</a>
       <a href="/location" class="{{ 'active' if active_page == 'location' }}">Location</a>
       <a href="/reviews"  class="{{ 'active' if active_page == 'reviews' }}">Reviews</a>
+      <a href="/preferences" class="{{ 'active' if active_page == 'preferences' }}">Preferences</a>
     </nav>
     <!-- Hamburger for mobile -->
     <button class="hamburger" id="hamburger" aria-label="Open menu" aria-expanded="false">
@@ -510,11 +502,12 @@
 
   <!-- Mobile nav drawer -->
   <div class="mobile-nav" id="mobile-nav" role="navigation" aria-label="Mobile navigation">
-    <a href="/"         class="{{ 'active' if active_page == 'dashboard' }}">Dashboard</a>
+    <a href="/dashboard" class="{{ 'active' if active_page == 'dashboard' }}">Dashboard</a>
     <a href="/cuisines" class="{{ 'active' if active_page == 'cuisines' }}">Cuisines</a>
     <a href="/itinerary" class="{{ 'active' if active_page == 'itinerary' }}">Itinerary</a>
     <a href="/location" class="{{ 'active' if active_page == 'location' }}">Location</a>
     <a href="/reviews"  class="{{ 'active' if active_page == 'reviews' }}">Reviews</a>
+    <a href="/preferences" class="{{ 'active' if active_page == 'preferences' }}">Preferences</a>
   </div>
 
   {% block content %}{% endblock %}

@@ -1255,7 +1255,7 @@
               <span class="meta-chip">🚶 <strong>{{ "%.1f"|format(stall.distance_km) }} km</strong></span>
               {% endif %}
               <div class="stall-actions">
-                <a href="/pricing?stall_id={{ stall.stall_id }}" class="btn-details">View Menu</a>
+                <a href="/pricing?stall_id={{ stall.stall_id }}&from=itinerary" class="btn-details">View Menu</a>
                 <a href="/itinerary/remove/{{ stall.stall_id }}" class="btn-remove"
                    onclick="return confirm('Remove {{ stall.stall_name }} from your itinerary?')">✕ Remove</a>
               </div>
@@ -1531,9 +1531,17 @@
           {% if day.stalls | length > 1 %}
             {% if route %}
             <a href="/itinerary/route-clear/{{ d_idx }}" class="btn-reset-route">↺ Reset Order</a>
+            {% if has_location %}
             <a href="/itinerary/optimise/{{ d_idx }}" class="btn-optimise active">✦ Re-optimise</a>
             {% else %}
+            <span class="btn-optimise active" style="opacity:.45; cursor:not-allowed;" title="Set your location first">✦ Re-optimise</span>
+            {% endif %}
+            {% else %}
+            {% if has_location %}
             <a href="/itinerary/optimise/{{ d_idx }}" class="btn-optimise">✦ Optimise Route</a>
+            {% else %}
+            <span class="btn-optimise" style="opacity:.45; cursor:not-allowed;" title="Set your location first">✦ Optimise Route</span>
+            {% endif %}
             {% endif %}
           {% endif %}
         </div>
@@ -1633,7 +1641,7 @@
                           onclick="toggleDayPicker('day-picker-{{ stall.stall_id }}', this)">
                     ✎ Change Day
                   </button>
-                  <a href="/pricing?stall_id={{ stall.stall_id }}" class="btn-details">View Menu</a>
+                  <a href="/pricing?stall_id={{ stall.stall_id }}&from=itinerary" class="btn-details">View Menu</a>
                   <a href="/itinerary/remove/{{ stall.stall_id }}" class="btn-remove"
                      onclick="return confirm('Remove {{ stall.stall_name }} from your itinerary?')">✕ Remove</a>
                 </div>
@@ -1707,7 +1715,7 @@
                 <span class="meta-chip">💬 <strong>{{ stall.n_reviews }}</strong> reviews</span>
                 {% endif %}
                 <div class="stall-actions">
-                  <a href="/pricing?stall_id={{ stall.stall_id }}" class="btn-details">View Menu</a>
+                  <a href="/pricing?stall_id={{ stall.stall_id }}&from=itinerary" class="btn-details">View Menu</a>
                   <a href="/itinerary/remove/{{ stall.stall_id }}" class="btn-remove"
                      onclick="return confirm('Remove {{ stall.stall_name }} from your itinerary?')">✕ Remove</a>
                 </div>

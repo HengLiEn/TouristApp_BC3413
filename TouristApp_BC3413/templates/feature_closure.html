@@ -1,0 +1,49 @@
+{% extends "base_layout.html" %}
+{% set active_page = "closure" %}
+
+{% block title %}Closures — Hawker Hunt{% endblock %}
+
+{% block content %}
+<section class="hero">
+  <div class="hero-inner">
+    <p class="hero-eyebrow">Hawker Closures</p>
+    <h1 class="hero-title">Planned <em>closure dates</em></h1>
+    <p class="hero-desc">Use this page to quickly check published closure data for hawker centres.</p>
+  </div>
+  <div class="hero-deco"></div>
+</section>
+
+<div class="main-wrapper" style="grid-template-columns: 1fr;">
+  <main>
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Latest Closure Data</span>
+      </div>
+      <div class="panel-body" style="overflow-x:auto;">
+        {% if closures %}
+        <table style="width:100%; border-collapse:collapse; font-size:0.85rem;">
+          <thead>
+            <tr>
+              {% for key in closures[0].keys() %}
+              <th style="text-align:left; padding:0.6rem; border-bottom:1px solid var(--bone);">{{ key }}</th>
+              {% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in closures %}
+            <tr>
+              {% for value in row.values() %}
+              <td style="padding:0.6rem; border-bottom:1px solid var(--bone); vertical-align:top;">{{ value or '—' }}</td>
+              {% endfor %}
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <p style="color:var(--smoke);">No closure data available.</p>
+        {% endif %}
+      </div>
+    </div>
+  </main>
+</div>
+{% endblock %}

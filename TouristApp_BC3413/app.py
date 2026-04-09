@@ -2,9 +2,10 @@ from flask import Flask, render_template, request, redirect, url_for, session, f
 from typing import Optional
 import re
 from feature_cuisines import CuisineFeatureHandler, CuisinePreferences
-from feature_onboarding import TouristProfileDA
-from features_location import LocationPlanner
+from feature_onboarding import TouristProfileDA, TouristProfile
+from features_location import LocationPlanner, haversine_km
 from features_reviews import ReviewFeature
+from features_closure import HawkerClosureFeature
 from datetime import datetime, timedelta
 import pandas as pd,json
 import os
@@ -333,6 +334,7 @@ def cuisines():
     max_price = request.args.get('max_price', 15, type=float)  # slider: $1–$15, default = show all
 
     handler = CuisineFeatureHandler()
+    profile = da.get_profile(session["username"])
 
     stalls_df = handler._stall_base()
     stalls_df = stalls_df.merge(handler._get_review_scores(), on='stall_id', how='left')
@@ -340,8 +342,24 @@ def cuisines():
     stalls_df['avg_rating'] = stalls_df['avg_rating'].fillna(0.0)
     stalls_df['bayes_score'] = stalls_df['bayes_score'].fillna(0.0)
 
+    coords = None
+    if profile and profile.location_lat is not None and profile.location_lng is not None:
+        coords = (float(profile.location_lat), float(profile.location_lng))
+
+    if coords and {"latitude_hc", "longitude_hc"}.issubset(stalls_df.columns):
+        stalls_df["distance_km"] = stalls_df.apply(
+            lambda r: haversine_km(coords[0], coords[1], float(r["latitude_hc"]), float(r["longitude_hc"]))
+            if pd.notna(r["latitude_hc"]) and pd.notna(r["longitude_hc"]) else None,
+            axis=1,
+        )
+    else:
+        stalls_df["distance_km"] = None
+
     cuisines_list = handler.get_available_cuisines()
-    onboarding_cuisines = [c.lower() for c in session.get("preferred_cuisines", [])]
+    onboarding_cuisines = [c.lower() for c in (profile.preferred_cuisines if profile else [])]
+    default_allergens = [a.lower() for a in (profile.allergens if profile else [])]
+    if not selected_allergens and default_allergens and "allergens" not in request.args:
+        selected_allergens = default_allergens
 
     # Build the default stall pool, hoisting onboarding-preferred cuisines to the top
     # when no explicit cuisine filter has been selected by the user.
@@ -471,6 +489,7 @@ def cuisines():
 
 # ------ PRICING -------
 @app.route("/pricing")
+@login_required
 def pricing():
     stall_id = request.args.get('stall_id', type=int)
 
@@ -559,6 +578,8 @@ def pricing():
         'q':         request.args.get('q', ''),
         'max_price': request.args.get('max_price', 15),
         'allergens': request.args.getlist('allergens'),
+        'from_page': request.args.get('from', ''),
+        'back_stall_id': request.args.get('back_stall_id', ''),
     }
 
     # Top 3 reviews for this stall (shown at bottom of pricing page)
@@ -610,6 +631,8 @@ def location():
     trip_start_iso = _ddmmyyyy_to_iso(profile.trip_start) if profile else None
     trip_end_iso   = _ddmmyyyy_to_iso(profile.trip_end)   if profile else None
 
+    today_iso = datetime.now().strftime("%Y-%m-%d")
+
     return render_template(
         "feature_location.html",
         active_page      = "location",
@@ -620,6 +643,7 @@ def location():
         current_trip_end   = profile.trip_end   if profile else None,
         trip_start_iso   = trip_start_iso,
         trip_end_iso     = trip_end_iso,
+        today_iso        = today_iso,
     )
 
 
@@ -732,26 +756,16 @@ def update_trip_dates():
 @login_required
 def itinerary_save(stall_id):
     da.add_saved_stall(session["username"], stall_id)
-
-    profile = da.get_profile(session["username"])
-    if not profile or not profile.trip_start or not profile.trip_end:
-        flash(
-            "Stall saved! Please set your trip dates so we can organise your itinerary by day.",
-            "info"
-        )
-        session["after_dates_redirect"] = url_for("itinerary")
-        return redirect(url_for("location"))
-
-    flash("Stall saved! Choose which day to visit it below.", "success")
+    flash("Stall saved to your itinerary.", "success")
     return redirect(url_for("itinerary"))
 
 
 @app.route("/itinerary/assign/<int:stall_id>/<int:day_index>")
 @login_required
 def itinerary_assign(stall_id, day_index):
-    day_map = session.get("stall_day_map", {})
+    day_map = da.get_stall_day_map(session["username"])
     day_map[str(stall_id)] = day_index
-    session["stall_day_map"] = day_map
+    da.update_stall_day_map(session["username"], day_map)
     return redirect(url_for("itinerary"))
 
 
@@ -810,7 +824,7 @@ def itinerary():
     trip_end = profile.trip_end if profile else None
 
     # stall_day_map: {str(stall_id): day_index} — user-chosen assignments in session
-    stall_day_map = session.get("stall_day_map", {})
+    stall_day_map = da.get_stall_day_map(session["username"])
 
     if trip_start and trip_end and itinerary_list:
         try:
@@ -871,7 +885,8 @@ def itinerary():
         cuisines_count=len(cuisine_counts),
         cuisine_breakdown=cuisine_breakdown,
         avg_rating=avg_rating,
-        route_orders=session.get("route_orders", {}),
+        route_orders=da.get_route_orders(session["username"]),
+        has_location=bool(profile and profile.location_lat is not None and profile.location_lng is not None),
     )
 
 
@@ -901,7 +916,7 @@ def itinerary_optimise(day_index):
         return redirect(url_for("itinerary"))
 
     # Find stalls assigned to this day
-    stall_day_map = session.get("stall_day_map", {})
+    stall_day_map = da.get_stall_day_map(session["username"])
     day_stall_ids = [int(sid) for sid, didx in stall_day_map.items() if didx == day_index]
     if not day_stall_ids:
         flash("No stalls assigned to that day yet.", "error")
@@ -922,7 +937,7 @@ def itinerary_optimise(day_index):
         return redirect(url_for("itinerary"))
 
     # Store optimised order + leg info in session keyed by day_index
-    route_orders = session.get("route_orders", {})
+    route_orders = da.get_route_orders(session["username"])
     route_orders[str(day_index)] = [
         {
             "stall_id": int(stop["stall_id"]),
@@ -931,7 +946,7 @@ def itinerary_optimise(day_index):
         }
         for stop in route
     ]
-    session["route_orders"] = route_orders
+    da.update_route_orders(session["username"], route_orders)
     flash(f"Route optimised — {total_km:.1f} km total walk (~{round(total_mins)} mins).", "success")
     return redirect(url_for("itinerary"))
 
@@ -941,7 +956,7 @@ def itinerary_optimise(day_index):
 def itinerary_reorder(day_index, stall_id, direction):
     """Move a stall up or down within the day, then recalculate leg distances
     using the same OneMap walking route API as the optimiser."""
-    route_orders = session.get("route_orders", {})
+    route_orders = da.get_route_orders(session["username"])
     key = str(day_index)
     order = route_orders.get(key, [])
     ids = [s["stall_id"] for s in order]
@@ -982,7 +997,7 @@ def itinerary_reorder(day_index, stall_id, direction):
             order[i]["leg_time_mins"] = None
 
     route_orders[key] = order
-    session["route_orders"] = route_orders
+    da.update_route_orders(session["username"], route_orders)
     return redirect(url_for("itinerary"))
 
 
@@ -990,9 +1005,9 @@ def itinerary_reorder(day_index, stall_id, direction):
 @login_required
 def itinerary_route_clear(day_index):
     """Reset the optimised route for a day back to default order."""
-    route_orders = session.get("route_orders", {})
+    route_orders = da.get_route_orders(session["username"])
     route_orders.pop(str(day_index), None)
-    session["route_orders"] = route_orders
+    da.update_route_orders(session["username"], route_orders)
     return redirect(url_for("itinerary"))
 
 @app.route("/itinerary/remove/<int:stall_id>")
@@ -1004,9 +1019,9 @@ def itinerary_remove(stall_id):
     for sid in kept:
         da.add_saved_stall(session["username"], sid)
     # Also clear the day assignment for this stall from the session
-    day_map = session.get("stall_day_map", {})
+    day_map = da.get_stall_day_map(session["username"])
     day_map.pop(str(stall_id), None)
-    session["stall_day_map"] = day_map
+    da.update_stall_day_map(session["username"], day_map)
     flash("Stall removed from your itinerary.", "success")
     return redirect(url_for("itinerary"))
 
@@ -1014,8 +1029,6 @@ def itinerary_remove(stall_id):
 @login_required
 def itinerary_clear():
     da.clear_saved_stalls(session["username"])
-    session.pop("stall_day_map", None)
-    session.pop("route_orders", None)
     flash("Itinerary cleared.", "success")
     return redirect(url_for("itinerary"))
 
@@ -1026,6 +1039,8 @@ def itinerary_export():
     profile = da.get_profile(session["username"])
     saved_ids = da.get_saved_stalls(session["username"])
     handler = CuisineFeatureHandler()
+    stall_day_map = da.get_stall_day_map(session["username"])
+    route_orders = da.get_route_orders(session["username"])
 
     lines = ["HAWKER HUNT — MY ITINERARY", "=" * 40]
     if profile and profile.trip_start:
@@ -1037,11 +1052,53 @@ def itinerary_export():
         scores_df = handler._get_review_scores()
         if not stalls_df.empty and not scores_df.empty:
             stalls_df = stalls_df.merge(scores_df, on='stall_id', how='left')
-        for i, (_, row) in enumerate(stalls_df.iterrows(), 1):
-            lines.append(f"[{i}] {row.get('stall_name', '?')}")
-            lines.append(f"    @ {row.get('hawker_name', '?')}")
-            lines.append(
-                f"    Cuisine: {row.get('cuisine_type', '?')}")
+        stall_lookup = {}
+        for _, row in stalls_df.iterrows():
+            stall_lookup[int(row["stall_id"])] = row
+
+        if profile and profile.trip_start and profile.trip_end:
+            start_dt = datetime.strptime(profile.trip_start, "%d/%m/%Y")
+            end_dt = datetime.strptime(profile.trip_end, "%d/%m/%Y")
+            for day_index in range((end_dt - start_dt).days + 1):
+                current_dt = start_dt + timedelta(days=day_index)
+                lines.append(f"DAY {day_index + 1} — {current_dt.strftime('%A %d %b %Y')}")
+
+                ordered_ids = [int(s["stall_id"]) for s in route_orders.get(str(day_index), [])]
+                assigned_ids = [
+                    int(stall_id) for stall_id, assigned_day in stall_day_map.items()
+                    if assigned_day == day_index and int(stall_id) in stall_lookup
+                ]
+                for sid in assigned_ids:
+                    if sid not in ordered_ids:
+                        ordered_ids.append(sid)
+
+                if not ordered_ids:
+                    lines.append("  No stalls scheduled.")
+                else:
+                    for sid in ordered_ids:
+                        row = stall_lookup.get(sid)
+                        if row is None:
+                            continue
+                        lines.append(f"  • {row.get('stall_name', '?')} @ {row.get('hawker_name', '?')}")
+                        lines.append(f"    Cuisine: {row.get('cuisine_type', '?')}")
+                        if pd.notna(row.get('address_myenv')):
+                            lines.append(f"    Address: {row.get('address_myenv')}")
+                        if pd.notna(row.get('avg_rating')):
+                            lines.append(f"    Rating: {float(row.get('avg_rating')):.1f}")
+                        if pd.notna(row.get('google_3d_view')):
+                            lines.append(f"    Maps: {row.get('google_3d_view')}")
+                lines.append("")
+
+        unscheduled_ids = [
+            int(stall_id) for stall_id in saved_ids
+            if str(stall_id) not in stall_day_map and int(stall_id) in stall_lookup
+        ]
+        if unscheduled_ids:
+            lines.append("UNSCHEDULED")
+            for sid in unscheduled_ids:
+                row = stall_lookup[sid]
+                lines.append(f"  • {row.get('stall_name', '?')} @ {row.get('hawker_name', '?')}")
+                lines.append(f"    Cuisine: {row.get('cuisine_type', '?')}")
             lines.append("")
 
     return Response(
@@ -1069,8 +1126,12 @@ def _ddmmyyyy_to_iso(ddmmyyyy_str) -> Optional[str]:
         return None
 
 @app.route("/closure")
+@login_required
 def closure():
-    return render_template('base_layout.html', active_page='closure')
+    feature = HawkerClosureFeature(project_root=BASE_DIR)
+    closures_df = feature.load_hawker_data().head(20)
+    records = closures_df.fillna("").to_dict(orient="records")
+    return render_template('feature_closure.html', active_page='closure', closures=records)
 
 # ── Reviews ───────────────────────────────────────────────────────────────────
 review_feature = ReviewFeature()
@@ -1215,11 +1276,17 @@ def reviews_helpful():
     stars = request.form.get("stars", "")
 
     if review_id:
-        try:
-            review_feature.mark_review_helpful(review_id)
-            flash("Marked as helpful!", "success")
-        except Exception as e:
-            flash(f"Could not update: {e}", "error")
+        voted = session.get("helpful_votes", [])
+        if review_id in voted:
+            flash("You already marked this review as helpful.", "info")
+        else:
+            try:
+                review_feature.mark_review_helpful(review_id)
+                voted.append(review_id)
+                session["helpful_votes"] = voted
+                flash("Marked as helpful!", "success")
+            except Exception as e:
+                flash(f"Could not update: {e}", "error")
 
     redirect_url = f"/reviews?stall_id={stall_id}&tab=read"
     if stars:
@@ -1247,19 +1314,59 @@ def reviews_search():
 @app.route("/onboarding", methods=["GET", "POST"])
 def onboarding():
     if request.method == "POST":
-        data = {
-            "allergens": request.form.getlist("allergens"),
-            "preferred_cuisines": request.form.getlist("preferred_cuisines"),
-            "location_lat": float(request.form.get("location_lat", 1.3521)),
-            "location_lng": float(request.form.get("location_lng", 103.8198)),
-            "radius_km": float(request.form.get("radius_km", 3)),
-            "trip_start": request.form.get("trip_start", ""),
-            "trip_end": request.form.get("trip_end", "")
-        }
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "").strip()
+        name = request.form.get("name", "").strip()
+        allergens = request.form.getlist("allergens")
+        preferred_cuisines = request.form.getlist("preferred_cuisines")
+        location_lat = float(request.form.get("location_lat", 1.3521))
+        location_lng = float(request.form.get("location_lng", 103.8198))
+        radius_km = float(request.form.get("radius_km", 3))
+        trip_start_raw = request.form.get("trip_start", "").strip()
+        trip_end_raw = request.form.get("trip_end", "").strip()
 
-        print(data)  # replace with DB save later
-        session["preferred_cuisines"] = data["preferred_cuisines"]
-        return redirect(url_for("cuisines"))
+        if not username or not password or not name:
+            flash("Please fill in your name, username, and password.", "error")
+            return redirect(url_for("onboarding"))
+
+        trip_start = _iso_to_ddmmyyyy(trip_start_raw) if trip_start_raw else None
+        trip_end = _iso_to_ddmmyyyy(trip_end_raw) if trip_end_raw else None
+
+        if trip_start and trip_end:
+            start_dt = datetime.strptime(trip_start, "%d/%m/%Y")
+            end_dt = datetime.strptime(trip_end, "%d/%m/%Y")
+            if start_dt > end_dt:
+                flash("Trip start must be before trip end.", "error")
+                return redirect(url_for("onboarding"))
+
+        profile = TouristProfile(
+            username=username,
+            password=password,
+            name=name,
+            allergens=allergens,
+            preferred_cuisines=preferred_cuisines,
+            created_at=datetime.now().isoformat(),
+            saved_stalls=[],
+            saved_hawker_center_ids=[],
+            location_lat=location_lat,
+            location_lng=location_lng,
+            radius_km=radius_km,
+            trip_start=trip_start,
+            trip_end=trip_end,
+            stall_day_map={},
+            route_orders={},
+        )
+
+        try:
+            da.insert_profile(profile)
+        except sqlite3.IntegrityError:
+            flash("That username already exists. Please choose another one.", "error")
+            return redirect(url_for("onboarding"))
+
+        session["username"] = username
+        session["preferred_cuisines"] = preferred_cuisines
+        flash("Account created successfully!", "success")
+        return redirect(url_for("dashboard"))
 
     return render_template(
         "feature_onboarding_edit.html",
@@ -1273,7 +1380,74 @@ def onboarding():
             "Western", "Seafood", "Vegetables", "Beverage",
             "Dessert", "Fruits", "Peranakan"
         ],
-        singapore_center={"lat": 1.3521, "lng": 103.8198}
+        singapore_center={"lat": 1.3521, "lng": 103.8198},
+        selected_cuisines=[],
+        selected_allergens=[],
+        prefill_name="",
+        prefill_username="",
+        current_trip_start=None,
+        current_trip_end=None,
+        current_radius=3,
+        hide_account_fields=False,
+    )
+
+@app.route("/preferences", methods=["GET", "POST"])
+@login_required
+def preferences():
+    profile = da.get_profile(session["username"])
+    if not profile:
+        flash("Profile not found.", "error")
+        return redirect(url_for("dashboard"))
+
+    if request.method == "POST":
+        allergens = request.form.getlist("allergens")
+        preferred_cuisines = request.form.getlist("preferred_cuisines")
+        trip_start_raw = request.form.get("trip_start", "").strip()
+        trip_end_raw = request.form.get("trip_end", "").strip()
+        radius_km = float(request.form.get("radius_km", profile.radius_km or 3))
+        coords = None
+        if profile.location_lat is not None and profile.location_lng is not None:
+            coords = (float(profile.location_lat), float(profile.location_lng))
+
+        trip_start = _iso_to_ddmmyyyy(trip_start_raw) if trip_start_raw else profile.trip_start
+        trip_end = _iso_to_ddmmyyyy(trip_end_raw) if trip_end_raw else profile.trip_end
+
+        if trip_start and trip_end:
+            start_dt = datetime.strptime(trip_start, "%d/%m/%Y")
+            end_dt = datetime.strptime(trip_end, "%d/%m/%Y")
+            if start_dt > end_dt:
+                flash("Trip start must be before trip end.", "error")
+                return redirect(url_for("preferences"))
+
+        da.update_preferences(session["username"], allergens, preferred_cuisines)
+        da.update_trip_context(session["username"], coords, radius_km, trip_start, trip_end)
+        flash("Preferences updated.", "success")
+        return redirect(url_for("preferences"))
+
+    return render_template(
+        "feature_onboarding_edit.html",
+        active_page="preferences",
+        allergens=[
+            "Nuts", "Shellfish", "Dairy", "Gluten",
+            "Eggs", "Soy", "Fish", "Sesame"
+        ],
+        cuisines=[
+            "Chinese", "Malay", "Indian", "Japanese", "Korean", "Thai",
+            "Western", "Seafood", "Vegetables", "Beverage",
+            "Dessert", "Fruits", "Peranakan"
+        ],
+        singapore_center={
+            "lat": profile.location_lat if profile.location_lat is not None else 1.3521,
+            "lng": profile.location_lng if profile.location_lng is not None else 103.8198,
+        },
+        selected_cuisines=profile.preferred_cuisines,
+        selected_allergens=profile.allergens,
+        prefill_name=profile.name,
+        prefill_username=profile.username,
+        current_trip_start=_ddmmyyyy_to_iso(profile.trip_start),
+        current_trip_end=_ddmmyyyy_to_iso(profile.trip_end),
+        current_radius=profile.radius_km,
+        hide_account_fields=True,
     )
 
 if __name__ == "__main__":

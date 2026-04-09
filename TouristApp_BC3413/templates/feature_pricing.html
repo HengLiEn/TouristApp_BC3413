@@ -251,8 +251,14 @@
   <!-- Back link  -->
   {% if back_params %}
     {% set bp = back_params %}
-    <a href="/cuisines?cuisine={{ bp.cuisine }}&stars={{ bp.stars }}&sort={{ bp.sort }}&q={{ bp.q }}&max_price={{ bp.max_price }}{% for a in bp.allergens %}&allergens={{ a }}{% endfor %}"
-       class="back-link">← Back to results</a>
+    {% if bp.from_page == 'itinerary' %}
+      <a href="/itinerary" class="back-link">← Back to itinerary</a>
+    {% elif bp.from_page == 'reviews' and bp.back_stall_id %}
+      <a href="/reviews?stall_id={{ bp.back_stall_id }}&tab=read" class="back-link">← Back to reviews</a>
+    {% else %}
+      <a href="/cuisines?cuisine={{ bp.cuisine }}&stars={{ bp.stars }}&sort={{ bp.sort }}&q={{ bp.q }}&max_price={{ bp.max_price }}{% for a in bp.allergens %}&allergens={{ a }}{% endfor %}"
+         class="back-link">← Back to results</a>
+    {% endif %}
   {% else %}
     <a href="/cuisines" class="back-link">← Back to results</a>
   {% endif %}
