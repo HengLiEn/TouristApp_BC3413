@@ -1,0 +1,68 @@
+{% extends "base_layout.html" %}
+{% set active_page = "login" %}
+
+{% block title %}Login — Hawker Hunt{% endblock %}
+
+{% block content %}
+<section class="hero">
+  <div class="hero-inner">
+    <p class="hero-eyebrow">Welcome Back</p>
+    <h1 class="hero-title">Login to <em>Hawker Hunt</em></h1>
+    <p class="hero-desc">Enter your username and password to continue your food journey.</p>
+  </div>
+  <div class="hero-deco"></div>
+</section>
+
+<div class="main-wrapper" style="grid-template-columns: 1fr; max-width: 720px;">
+  <main>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div style="margin-bottom: 1.5rem;">
+          {% for category, message in messages %}
+            <div style="padding: 0.9rem 1rem; margin-bottom: 0.75rem; border-left: 4px solid var(--chili); background: var(--cream); font-family: 'DM Mono', monospace; font-size: 0.72rem;">
+              {{ message }}
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Login</span>
+      </div>
+      <div class="panel-body">
+        <form method="POST" action="{{ url_for('login') }}">
+          <div style="margin-bottom: 1rem;">
+            <label for="username" style="display:block; margin-bottom: 0.4rem; font-family:'DM Mono', monospace; font-size:0.68rem; text-transform:uppercase; letter-spacing:2px;">Username</label>
+            <input
+              type="text"
+              id="username"
+              name="username"
+              required
+              style="width:100%; padding:0.8rem 1rem; border:1.5px solid var(--bone); background:#fff; font-size:0.9rem;"
+            >
+          </div>
+
+          <div style="margin-bottom: 1.25rem;">
+            <label for="password" style="display:block; margin-bottom: 0.4rem; font-family:'DM Mono', monospace; font-size:0.68rem; text-transform:uppercase; letter-spacing:2px;">Password</label>
+            <input
+              type="password"
+              id="password"
+              name="password"
+              required
+              style="width:100%; padding:0.8rem 1rem; border:1.5px solid var(--bone); background:#fff; font-size:0.9rem;"
+            >
+          </div>
+
+          <button type="submit" class="apply-btn">Login</button>
+        </form>
+
+        <p style="margin-top: 1rem; font-size: 0.85rem; color: var(--smoke);">
+          No account yet? <a href="{{ url_for('onboarding') }}" style="color: var(--chili);">Create one here</a>.
+        </p>
+      </div>
+    </div>
+  </main>
+</div>
+{% endblock %}

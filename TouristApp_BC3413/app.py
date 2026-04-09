@@ -9,6 +9,9 @@ from datetime import datetime, timedelta
 import pandas as pd,json
 import os
 from collections import Counter
+import sqlite3
+from functools import wraps
+
 BASE_DIR     = os.path.dirname(os.path.abspath(__file__))
 CENTRES_CSV  = os.path.join(BASE_DIR, 'dataset', 'Hawker Centre Data', 'hawker_centers.csv')
 CLOSURES_CSV = os.path.join(BASE_DIR, 'dataset', 'Hawker Centre Data', 'DatesofHawkerCentresClosure.csv')
@@ -21,53 +24,64 @@ STALLS_CSV = os.path.join(BASE_DIR, 'dataset', 'Multiple Stalls Menu and Data', 
 app = Flask(__name__, template_folder=os.path.join(os.path.dirname(os.path.abspath(__file__)), "templates"))
 app.secret_key = "bc3413-secret"
 
-# DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tourist_profiles.db")
+DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tourist_profiles.db")
 
-# def get_db():
-#     conn = sqlite3.connect(DB_PATH)
-#     conn.row_factory = sqlite3.Row
-#     return conn
+def get_db():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
 
-# def login_required(f):
-#     @wraps(f)
-#     def decorated(*args, **kwargs):
-#         if "username" not in session:
-#             flash("Please log in first.")
-#             return redirect(url_for("login"))
-#         return f(*args, **kwargs)
-#     return decorated
+def login_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if "username" not in session:
+            flash("Please log in first.", "error")
+            return redirect(url_for("login"))
+        return f(*args, **kwargs)
+    return decorated
 
-# @app.route("/", methods=["GET", "POST"])
-# @app.route("/login", methods=["GET", "POST"])
-# def login():
-#     if request.method == "POST":
-#         username = request.form["username"]
-#         password = request.form["password"]
-#         conn = get_db()
-#         user = conn.execute(
-#             "SELECT * FROM tourist_profiles WHERE username = ? AND password = ?",
-#             (username, password)
-#         ).fetchone()
-#         conn.close()
-#         if user:
-#             session["username"] = username
-#             return redirect(url_for("dashboard"))
-#         else:
-#             flash("Invalid username or password.")
-#     return render_template("login.html")
 
-# @app.route("/logout")
-# def logout():
-#     session.clear()
-#     return redirect(url_for("login"))
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "").strip()
+
+        if not username or not password:
+            flash("Please enter both username and password.", "error")
+            return redirect(url_for("login"))
+
+        conn = get_db()
+        user = conn.execute(
+            "SELECT * FROM tourist_profiles WHERE username = ? AND password = ?",
+            (username, password)
+        ).fetchone()
+        conn.close()
+
+        if user:
+            session["username"] = user["username"]
+            flash(f"Welcome back, {user['name']}!", "success")
+            return redirect(url_for("dashboard"))
+
+        flash("Invalid username or password.", "error")
+        return redirect(url_for("login"))
+
+    return render_template("login.html", active_page="login")
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    flash("You have been logged out.", "success")
+    return redirect(url_for("landing"))
 
 @app.route("/")
 def landing():
     return render_template("landing_page.html", active_page="landing")
 
 @app.route("/dashboard")
+@login_required
 def dashboard():
-    session["username"] = "test_user"
     hc   = pd.read_csv(CENTRES_CSV)
     cl   = pd.read_csv(CLOSURES_CSV)
     menu = pd.read_csv(MENU_CSV)
@@ -309,6 +323,7 @@ def hawker_centre_stats():
 
 # ── Cuisines (ACTIVE) ─────────────────────────────────────────────────────────
 @app.route('/cuisines')
+@login_required
 def cuisines():
     selected_cuisine = request.args.get('cuisine', None)
     selected_stars = request.args.get('stars', None)
@@ -581,24 +596,8 @@ planner = LocationPlanner()       # one shared instance
     pre-filled.
     """
 @app.route("/location")
+@login_required
 def location():
-    # TEMPORARY — remove this block once Saachee's login is ready
-    session["username"] = "test_user"
-
-    # TEMPORARY — create a dummy profile if it doesn't exist
-    if not da.get_profile("test_user"):
-        from feature_onboarding import TouristProfile
-        da.insert_profile(TouristProfile(
-            username="test_user", password="test",
-            name="Test",
-            allergens=[], preferred_cuisines=[],
-            created_at=datetime.now().isoformat()
-        ))
-
-    # if "username" not in session:
-    #     flash("Please log in first.", "error")
-    #     return redirect(url_for("login"))
-
     profile = da.get_profile(session["username"])
 
     # Coordinates — tuple or None
@@ -625,6 +624,7 @@ def location():
 
 
 @app.route("/location/update-location", methods=["POST"])
+@login_required
 def update_location():
     """
     Handles the Update Location form submission.
@@ -632,10 +632,6 @@ def update_location():
     - Saves updated coords + radius to the DB
     - Redirects back to /location
     """
-    if "username" not in session:
-        flash("Please log in first.", "error")
-        return redirect(url_for("login"))
-
     address   = request.form.get("address", "").strip()
     radius_km = float(request.form.get("radius_km", 2.0))
 
@@ -665,11 +661,12 @@ def update_location():
         trip_end   = trip_end,
     )
 
-    flash(f"Location updated to ({coords[0]:.5f}, {coords[1]:.5f}).", "success")
+    flash(f"Location set to: {address} ({coords[0]:.5f}, {coords[1]:.5f}).", "success")
     return redirect(url_for("location"))
 
 
 @app.route("/location/update-dates", methods=["POST"])
+@login_required
 def update_trip_dates():
     """
     Handles the Update Trip Dates form submission.
@@ -677,10 +674,6 @@ def update_trip_dates():
       format used everywhere else in the project (hawker_filter, main.py, etc.)
     - Saves updated dates to the DB without touching coords/radius
     """
-    if "username" not in session:
-        flash("Please log in first.", "error")
-        return redirect(url_for("login"))
-
     start_iso = request.form.get("trip_start", "").strip()
     end_iso   = request.form.get("trip_end",   "").strip()
 
@@ -736,8 +729,8 @@ def update_trip_dates():
 #   handler.get_stalls_by_ids(stall_ids, ...) → DataFrame
 
 @app.route("/itinerary/save/<int:stall_id>")
+@login_required
 def itinerary_save(stall_id):
-    session["username"] = "test_user"  # TEMP
     da.add_saved_stall(session["username"], stall_id)
 
     profile = da.get_profile(session["username"])
@@ -754,9 +747,8 @@ def itinerary_save(stall_id):
 
 
 @app.route("/itinerary/assign/<int:stall_id>/<int:day_index>")
+@login_required
 def itinerary_assign(stall_id, day_index):
-    """Store the user's chosen day for a stall in the session."""
-    session["username"] = "test_user"  # TEMP
     day_map = session.get("stall_day_map", {})
     day_map[str(stall_id)] = day_index
     session["stall_day_map"] = day_map
@@ -764,10 +756,8 @@ def itinerary_assign(stall_id, day_index):
 
 
 @app.route("/itinerary")
+@login_required
 def itinerary():
-    # TEMPORARY — remove once login is ready
-    session["username"] = "test_user"
-
     profile = da.get_profile(session["username"])
     saved_ids = da.get_saved_stalls(session["username"])
 
@@ -886,8 +876,8 @@ def itinerary():
 
 
 @app.route("/itinerary/optimise/<int:day_index>")
+@login_required
 def itinerary_optimise(day_index):
-    session["username"] = "test_user"
     profile = da.get_profile(session["username"])
 
     coords = None
@@ -947,10 +937,10 @@ def itinerary_optimise(day_index):
 
 
 @app.route("/itinerary/reorder/<int:day_index>/<int:stall_id>/<direction>")
+@login_required
 def itinerary_reorder(day_index, stall_id, direction):
     """Move a stall up or down within the day, then recalculate leg distances
     using the same OneMap walking route API as the optimiser."""
-    session["username"] = "test_user"
     route_orders = session.get("route_orders", {})
     key = str(day_index)
     order = route_orders.get(key, [])
@@ -997,18 +987,17 @@ def itinerary_reorder(day_index, stall_id, direction):
 
 
 @app.route("/itinerary/route-clear/<int:day_index>")
+@login_required
 def itinerary_route_clear(day_index):
     """Reset the optimised route for a day back to default order."""
-    session["username"] = "test_user"
     route_orders = session.get("route_orders", {})
     route_orders.pop(str(day_index), None)
     session["route_orders"] = route_orders
     return redirect(url_for("itinerary"))
 
-
 @app.route("/itinerary/remove/<int:stall_id>")
+@login_required
 def itinerary_remove(stall_id):
-    session["username"] = "test_user"
     current = da.get_saved_stalls(session["username"])
     kept = [sid for sid in current if sid != stall_id]
     da.clear_saved_stalls(session["username"])
@@ -1021,22 +1010,19 @@ def itinerary_remove(stall_id):
     flash("Stall removed from your itinerary.", "success")
     return redirect(url_for("itinerary"))
 
-
 @app.route("/itinerary/clear")
+@login_required
 def itinerary_clear():
-    session["username"] = "test_user"  # TEMP
     da.clear_saved_stalls(session["username"])
     session.pop("stall_day_map", None)
     session.pop("route_orders", None)
     flash("Itinerary cleared.", "success")
     return redirect(url_for("itinerary"))
 
-
 @app.route("/itinerary/export")
+@login_required
 def itinerary_export():
     """Simple plain-text export of saved stalls."""
-    session["username"] = "test_user"  # TEMP
-
     profile = da.get_profile(session["username"])
     saved_ids = da.get_saved_stalls(session["username"])
     handler = CuisineFeatureHandler()
@@ -1090,9 +1076,8 @@ def closure():
 review_feature = ReviewFeature()
 
 @app.route("/reviews")
+@login_required
 def reviews():
-    session["username"] = "test_user"  # TEMP
-
     profile = da.get_profile(session["username"])
     active_tab = request.args.get("tab", "read")
     stall_id = request.args.get("stall_id", None, type=int)
@@ -1183,8 +1168,8 @@ def reviews():
     )
 
 @app.route("/reviews/submit", methods=["POST"])
+@login_required
 def reviews_submit():
-    session["username"] = "test_user"  # TEMP
 
     stall_id = request.form.get("stall_id", type=int)
     rating_raw = request.form.get("rating", "").strip()
