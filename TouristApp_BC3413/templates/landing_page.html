@@ -5,6 +5,11 @@
 {% block content %}
 
 <style>
+    header nav,
+    .mobile-nav,
+    .hamburger {
+      display: none !important;
+    }
   .landing-hero {
     background-color: var(--soy);
     padding: 5rem 2.5rem 4rem;
@@ -165,11 +170,15 @@
 <section class="cta-section">
   <h2 class="cta-title">Start your food journey</h2>
   <p class="cta-desc">
-    Log in to personalise your experience and unlock curated hawker trails.
+    Log in or create an account to personalise your experience and unlock curated hawker trails.
   </p>
+  <div class="cta-buttons">
   <a href="/login">
     <button class="cta-btn">Login</button>
   </a>
-</section>
+  <a href="/onboarding">
+    <button class="cta-btn">Create Account</button>
+  </a>
+</div>
 
 {% endblock %}
