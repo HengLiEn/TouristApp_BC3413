@@ -61,6 +61,9 @@ app.secret_key = "bc3413-secret"
 #     session.clear()
 #     return redirect(url_for("login"))
 
+@app.route("/")
+def landing():
+    return render_template("landing_page.html", active_page="landing")
 
 @app.route("/dashboard")
 def dashboard():

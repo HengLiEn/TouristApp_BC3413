@@ -1,0 +1,175 @@
+{% extends "base_layout.html" %}
+
+{% block title %}Hawker Hunt | Discover Singapore{% endblock %}
+
+{% block content %}
+
+<style>
+  .landing-hero {
+    background-color: var(--soy);
+    padding: 5rem 2.5rem 4rem;
+    position: relative;
+    overflow: hidden;
+    text-align: left;
+  }
+
+  .landing-inner {
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+
+  .landing-eyebrow {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    color: var(--turmeric);
+    margin-bottom: 1rem;
+  }
+
+  .landing-title {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(2.8rem, 5vw, 4.5rem);
+    font-weight: 900;
+    line-height: 0.95;
+    color: var(--cream);
+    margin-bottom: 1.2rem;
+  }
+
+  .landing-title em {
+    color: var(--turmeric);
+    font-style: italic;
+  }
+
+  .landing-desc {
+    max-width: 520px;
+    color: var(--smoke);
+    font-size: 0.95rem;
+    line-height: 1.7;
+  }
+
+  .landing-section {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 3.5rem 2.5rem;
+  }
+
+  .landing-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 2rem;
+  }
+
+  .landing-card {
+    background: white;
+    border: 2px solid var(--bone);
+    padding: 1.8rem;
+    transition: all 0.2s ease;
+  }
+
+  .landing-card:hover {
+    border-color: var(--chili);
+    transform: translateY(-3px);
+  }
+
+  .landing-card h3 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.2rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .landing-card p {
+    font-size: 0.85rem;
+    color: var(--smoke);
+    line-height: 1.6;
+  }
+
+  .cta-section {
+    text-align: center;
+    padding: 3rem 2rem 4rem;
+  }
+
+  .cta-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 2rem;
+    margin-bottom: 1rem;
+  }
+
+  .cta-desc {
+    color: var(--smoke);
+    margin-bottom: 1.5rem;
+  }
+
+  .cta-btn {
+    background-color: var(--chili);
+    color: white;
+    border: none;
+    padding: 1rem 2rem;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: 0.2s ease;
+  }
+
+  .cta-btn:hover {
+    background-color: var(--soy);
+  }
+</style>
+
+<!-- HERO -->
+<section class="landing-hero">
+  <div class="landing-inner">
+    <div class="landing-eyebrow">Singapore Food Discovery</div>
+    <h1 class="landing-title">
+      Discover the soul of <em>hawker culture</em>
+    </h1>
+    <p class="landing-desc">
+      Hawker Hunt helps you explore Singapore’s most authentic food spots —
+      from hidden gems to legendary stalls. Personalised recommendations,
+      smart filters, and curated experiences tailored to your taste.
+    </p>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section class="landing-section">
+  <div class="landing-grid">
+    <div class="landing-card">
+      <h3>🍜 Personalised Picks</h3>
+      <p>
+        Get recommendations based on your cuisine preferences, spice tolerance,
+        and dietary needs.
+      </p>
+    </div>
+
+    <div class="landing-card">
+      <h3>📍 Smart Location</h3>
+      <p>
+        Discover the best hawker stalls near you with distance-based filtering
+        and travel radius.
+      </p>
+    </div>
+
+    <div class="landing-card">
+      <h3>⭐ Trusted Reviews</h3>
+      <p>
+        Explore stalls ranked by real reviews, ratings, and local favourites.
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-section">
+  <h2 class="cta-title">Start your food journey</h2>
+  <p class="cta-desc">
+    Log in to personalise your experience and unlock curated hawker trails.
+  </p>
+  <a href="/login">
+    <button class="cta-btn">Login</button>
+  </a>
+</section>
+
+{% endblock %}
