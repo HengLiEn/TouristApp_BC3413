@@ -790,10 +790,8 @@ def itinerary():
             trip_start=trip_start,
             trip_end=trip_end,
         )
-        scores_df = handler._get_review_scores()
-        if not stalls_df.empty and not scores_df.empty:
-            stalls_df = stalls_df.merge(scores_df, on='stall_id', how='left')
-
+        # avg_rating and n_reviews are already included by get_stalls_by_ids
+        # via _aggregate_stalls → _get_review_scores — no extra merge needed
         stalls_df['n_reviews'] = stalls_df['n_reviews'].fillna(0).astype(int) if 'n_reviews' in stalls_df.columns else 0
         stalls_df['avg_rating'] = stalls_df['avg_rating'].fillna(0.0) if 'avg_rating' in stalls_df.columns else 0.0
 
