@@ -433,22 +433,24 @@
         {% if not hide_account_fields %}
         <div class="form-grid-2" style="margin-top:1.5rem;">
           <div class="field-block">
-            <label for="name">Name</label>
-            <input type="text" id="name" name="name" value="{{ prefill_name | default('') }}" required>
+            <label for="email">Email</label>
+            <input type="email" id="email" name="email" value="{{ prefill_email | default('') }}" required maxlength="120" title="Please enter a valid email address.">
           </div>
           <div class="field-block">
             <label for="username">Username</label>
-            <input type="text" id="username" name="username" value="{{ prefill_username | default('') }}" required>
+            <input type="text" id="username" name="username" value="{{ prefill_username | default('') }}" required minlength="3" maxlength="30" pattern="[A-Za-z0-9_]+" title="Use 3-30 letters, numbers, or underscores.">
           </div>
         </div>
-        <div class="field-block">
-          <label for="password">Password</label>
-          <input type="password" id="password" name="password" required>
+        <div class="form-grid-2">
+          <div class="field-block">
+            <label for="password">Password</label>
+            <input type="password" id="password" name="password" required minlength="6" title="Password must be at least 6 characters long.">
+          </div>
         </div>
         {% else %}
         <div class="field-block" style="margin-top:1.5rem;">
-          <label>Name</label>
-          <input type="text" value="{{ prefill_name | default('') }}" disabled>
+          <label>Username</label>
+          <input type="text" value="{{ prefill_username | default('') }}" disabled>
         </div>
         {% endif %}
       </section>
@@ -457,7 +459,7 @@
       <section class="step">
         <h2>Any allergens to avoid?</h2>
         <p class="step-sub">
-          Select anything we should watch out for. Leave blank if there are no restrictions.
+          Select all that apply. Leave blank if there are no restrictions.
         </p>
 
         <div class="tag-wrap">
@@ -475,7 +477,7 @@
       <section class="step">
         <h2>Which cuisines do you prefer?</h2>
         <p class="step-sub">
-          Pick your favourites so Hawker Hunt can surface stalls you’re more likely to love.
+          Pick all your favourites so Hawker Hunt can surface stalls you’re more likely to love.
         </p>
 
         <div class="tag-wrap">
@@ -535,12 +537,13 @@
     <div class="onboard-actions">
       <button type="button" id="backBtn" class="onboard-btn back" disabled>← Back</button>
       <button type="button" id="nextBtn" class="onboard-btn next">Next →</button>
-      <button type="submit" id="finishBtn" class="onboard-btn finish hidden">Finish ✓</button>
+          <button type="submit" id="finishBtn" class="onboard-btn finish hidden">Finish ✓</button>
     </div>
   </form>
 </div>
 
 <script>
+  const onboardingForm = document.getElementById("onboardingForm");
   const steps = document.querySelectorAll(".step");
   const progressSteps = document.querySelectorAll(".onboard-progress-step");
   const backBtn = document.getElementById("backBtn");
@@ -570,9 +573,22 @@
   }
 
   nextBtn.addEventListener("click", () => {
-    if (currentStep < steps.length - 1) {
-      currentStep++;
-      updateSteps();
+    const currentInputs = steps[currentStep].querySelectorAll("input");
+    for (const input of currentInputs) {
+      input.setCustomValidity("");
+    }
+
+    if (currentInputs.length === 0 || steps[currentStep].querySelector(":invalid") === null) {
+      if (currentStep < steps.length - 1) {
+        currentStep++;
+        updateSteps();
+      }
+      return;
+    }
+
+    const firstInvalid = steps[currentStep].querySelector(":invalid");
+    if (firstInvalid) {
+      firstInvalid.reportValidity();
     }
   });
 
@@ -591,10 +607,38 @@
   });
 
   document.querySelectorAll(".tag-pill input").forEach(input => {
+    input.parentElement.classList.toggle("selected", input.checked);
     input.addEventListener("change", () => {
       input.parentElement.classList.toggle("selected", input.checked);
     });
   });
+
+  if (onboardingForm) {
+    onboardingForm.addEventListener("submit", (event) => {
+      const start = document.getElementById("trip_start");
+      const end = document.getElementById("trip_end");
+      const password = document.getElementById("password");
+
+      if (start) start.setCustomValidity("");
+      if (end) end.setCustomValidity("");
+      if (password) password.setCustomValidity("");
+
+      if (start && end) {
+        if ((start.value && !end.value) || (!start.value && end.value)) {
+          const message = "Please set both trip dates, or leave both blank.";
+          start.setCustomValidity(message);
+          end.setCustomValidity(message);
+        } else if (start.value && end.value && start.value > end.value) {
+          end.setCustomValidity("Trip end must be on or after trip start.");
+        }
+      }
+
+      if (!onboardingForm.checkValidity()) {
+        event.preventDefault();
+        onboardingForm.reportValidity();
+      }
+    });
+  }
 
   updateSteps();
 </script>
