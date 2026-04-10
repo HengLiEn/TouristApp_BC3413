@@ -31,91 +31,27 @@
 }
 
 /* ── Hero ───────────────────────────────────────────────────────────────── */
-.itin-hero {
-  background: var(--ink);
-  color: #fff;
-  padding: 3.5rem 2rem 3rem;
-  position: relative;
-  overflow: hidden;
-}
-.itin-hero::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background:
-    radial-gradient(ellipse 60% 80% at 90% 50%, rgba(224,92,42,0.18) 0%, transparent 70%),
-    repeating-linear-gradient(
-      0deg,
-      transparent,
-      transparent 39px,
-      rgba(255,255,255,0.03) 39px,
-      rgba(255,255,255,0.03) 40px
-    );
-  pointer-events: none;
-}
-.itin-hero-inner {
-  max-width: 1100px;
-  margin: 0 auto;
-  position: relative;
-  z-index: 1;
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 2rem;
-  flex-wrap: wrap;
-}
-.hero-text-block { flex: 1; min-width: 260px; }
-.hero-eyebrow {
-  font-family: var(--mono);
-  font-size: 0.75rem;
-  letter-spacing: 0.08em;
-  color: var(--accent);
-  margin: 0 0 0.75rem;
-  text-transform: uppercase;
-}
-.hero-title {
-  font-family: var(--serif);
-  font-size: clamp(2rem, 4vw, 3rem);
-  font-weight: 700;
-  line-height: 1.15;
-  margin: 0 0 0.6rem;
-  color: #fff;
-}
-.hero-title em { font-style: italic; color: var(--accent); }
-.hero-sub {
-  font-family: var(--mono);
-  font-size: 0.8rem;
-  color: rgba(255,255,255,0.5);
-  margin: 0;
-  line-height: 1.6;
-}
-.hero-meta-block {
-  display: flex;
-  gap: 1.25rem;
-  flex-wrap: wrap;
-  align-items: flex-end;
-}
-.hero-stat {
+.itin-stat {
   text-align: center;
   background: rgba(255,255,255,0.06);
   border: 1px solid rgba(255,255,255,0.1);
   border-radius: 10px;
   padding: 0.85rem 1.25rem;
-  min-width: 100px;
+  min-width: 90px;
 }
-.hero-stat-num {
+.itin-stat-num {
   display: block;
-  font-family: var(--serif);
+  font-family: 'Playfair Display', serif;
   font-size: 2rem;
-  font-weight: 700;
-  color: var(--accent);
+  font-weight: 900;
+  color: var(--turmeric);
   line-height: 1;
 }
-.hero-stat-lbl {
+.itin-stat-lbl {
   display: block;
-  font-family: var(--mono);
-  font-size: 0.68rem;
-  color: rgba(255,255,255,0.45);
+  font-family: 'DM Mono', monospace;
+  font-size: 0.65rem;
+  color: rgba(255,255,255,0.5);
   text-transform: uppercase;
   letter-spacing: 0.07em;
   margin-top: 0.3rem;
@@ -1132,31 +1068,31 @@
 </style>
 
 <!-- ── HERO ──────────────────────────────────────────────────────────────── -->
-<section class="itin-hero">
-  <div class="itin-hero-inner">
-    <div class="hero-text-block">
+<section class="hero">
+  <div class="hero-inner" style="display:flex;align-items:flex-end;justify-content:space-between;gap:2rem;flex-wrap:wrap;">
+    <div>
       <p class="hero-eyebrow">Hawker Hunt — Itinerary Planner</p>
       <h1 class="hero-title">Your <em>Saved</em><br/>Hawker Journey</h1>
-      <p class="hero-sub">Your curated list of stalls, organised by day.<br>
-      Plan, visit, devour.</p>
+      <p class="hero-desc">Your curated list of stalls, organised by day. Plan, visit, devour.</p>
     </div>
-    <div class="hero-meta-block">
-      <div class="hero-stat">
-        <span class="hero-stat-num">{{ itinerary | length }}</span>
-        <span class="hero-stat-lbl">Saved Stalls</span>
+    <div style="display:flex;gap:1rem;flex-wrap:wrap;align-items:flex-end;flex-shrink:0;">
+      <div class="itin-stat">
+        <span class="itin-stat-num">{{ itinerary | length }}</span>
+        <span class="itin-stat-lbl">Saved Stalls</span>
       </div>
       {% if trip_start and trip_end %}
-      <div class="hero-stat">
-        <span class="hero-stat-num">{{ days_count }}</span>
-        <span class="hero-stat-lbl">Trip Days</span>
+      <div class="itin-stat">
+        <span class="itin-stat-num">{{ days_count }}</span>
+        <span class="itin-stat-lbl">Trip Days</span>
       </div>
       {% endif %}
-      <div class="hero-stat">
-        <span class="hero-stat-num">{{ cuisines_count }}</span>
-        <span class="hero-stat-lbl">Cuisines</span>
+      <div class="itin-stat">
+        <span class="itin-stat-num">{{ cuisines_count }}</span>
+        <span class="itin-stat-lbl">Cuisines</span>
       </div>
     </div>
   </div>
+  <div class="hero-deco"></div>
 </section>
 
 <!-- ── TRIP DATES BAR ─────────────────────────────────────────────────────── -->

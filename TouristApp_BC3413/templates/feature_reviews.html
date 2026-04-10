@@ -425,7 +425,7 @@
 
   </aside>
 
-  <!-- ═══ MAIN ═══════════════════════════════════════════════════ -->
+ <!-- ═══ MAIN ═══════════════════════════════════════════════════ -->
   <main>
 
     <!-- Flash messages -->
@@ -440,15 +440,18 @@
     <!-- Tab bar -->
     <div class="tab-bar">
       <button class="tab-btn {{ 'active' if active_tab != 'write' }}"
-              onclick="switchTab('read')">💬 Reviews{% if reviews_list %} ({{ reviews_list|length }}){% endif %}</button>
+              onclick="switchTab('read')">💬 Reviews{% if my_reviews and not selected_stall_id %} ({{ my_reviews|length }}){% elif reviews_list %} ({{ reviews_list|length }}){% endif %}</button>
       <button class="tab-btn {{ 'active' if active_tab == 'write' }}"
               onclick="switchTab('write')">✍️ Write a Review</button>
     </div>
 
     <!-- ══ TAB 1: READ REVIEWS ══════════════════════════════════ -->
-    <div class="tab-pane {{ 'active' if active_tab != 'write' }}" id="tab-mine">
+    <div class="tab-pane {{ 'active' if active_tab != 'write' }}" id="tab-read">
 
-      <!-- Stall banner (shown when arriving from a specific stall) -->
+      {% if selected_stall_id %}
+      {# ── STALL-SPECIFIC VIEW (arrived from pricing page) ── #}
+
+      <!-- Stall banner -->
       {% if selected_stall_name %}
       <div class="stall-banner">
         <div>
@@ -512,14 +515,8 @@
       {% endif %}
 
       <div class="section-header">
-        <h2 class="section-title">
-          {{ selected_stall_name if selected_stall_name else 'Reviews' }}
-        </h2>
-        <span class="section-count">
-          {% if reviews_list %}
-            {{ reviews_list|length }} review{{ 's' if reviews_list|length != 1 }}
-          {% endif %}
-        </span>
+        <h2 class="section-title">{{ selected_stall_name if selected_stall_name else 'Reviews' }}</h2>
+        <span class="section-count">{% if reviews_list %}{{ reviews_list|length }} review{{ 's' if reviews_list|length != 1 }}{% endif %}</span>
       </div>
 
       {% if reviews_list %}
@@ -544,61 +541,97 @@
               </div>
               <span class="rating-big">{{ "%.1f"|format(rev.rating) }}</span>
             </div>
-
             <p class="review-text">{{ rev.review }}</p>
-
             <div class="review-footer">
               <span class="helpful-count">👍 {{ rev.helpful_count }} found helpful</span>
               <form method="POST" action="/reviews/helpful" style="display:inline;"
                     id="helpful-form-{{ rev.review_id }}"
                     onsubmit="markHelpful(event, {{ rev.review_id }})">
-                <input type="hidden" name="review_id"  value="{{ rev.review_id }}">
-                <input type="hidden" name="stall_id"   value="{{ selected_stall_id }}">
-                <input type="hidden" name="stars"      value="{{ selected_stars | default('') }}">
-                <button type="submit"
-                        class="helpful-btn"
-                        id="helpful-btn-{{ rev.review_id }}">
-                  Mark Helpful
-                </button>
+                <input type="hidden" name="review_id" value="{{ rev.review_id }}">
+                <input type="hidden" name="stall_id"  value="{{ selected_stall_id }}">
+                <input type="hidden" name="stars"     value="{{ selected_stars | default('') }}">
+                <button type="submit" class="helpful-btn" id="helpful-btn-{{ rev.review_id }}">Mark Helpful</button>
               </form>
             </div>
           </div>
           {% endfor %}
         </div>
-
       {% else %}
         <div class="empty-state">
           <span style="font-size:2.5rem;display:block;margin-bottom:0.75rem;">💬</span>
-          <h3>
-            {% if selected_stars %}
-              No {{ selected_stars }}★ reviews yet
-            {% else %}
-              No reviews yet
-            {% endif %}
-          </h3>
-          <p>Write your first review!</p>
-          <button class="apply-btn"
-                  style="width:auto;margin-top:1rem;padding:0.75rem 1.5rem;border:none;"
-                  onclick="switchTab('write')">
-            ✍️ Write a Review
-          </button>
+          <h3>No reviews yet for this stall</h3>
+          <p>Be the first to share your experience!</p>
+          <button class="apply-btn" style="width:auto;margin-top:1rem;padding:0.75rem 1.5rem;border:none;"
+                  onclick="switchTab('write')">✍️ Write a Review</button>
         </div>
       {% endif %}
 
-    </div><!-- /tab-mine -->
+      {% else %}
+      {# ── MY REVIEWS VIEW (default when no stall_id) ── #}
+
+      <div class="section-header">
+        <h2 class="section-title">My Reviews</h2>
+        <span class="section-count">{% if my_reviews %}{{ my_reviews|length }} review{{ 's' if my_reviews|length != 1 }}{% endif %}</span>
+      </div>
+
+      {% if my_reviews %}
+        <div class="review-cards">
+          {% for rev in my_reviews %}
+          <div class="review-card" style="animation-delay:{{ loop.index0 * 0.05 }}s;">
+            <div class="review-top">
+              <div>
+                <div class="reviewer-name">{{ rev.stall_name }}</div>
+                <div class="review-meta">
+                  <div class="review-stars">
+                    {% set r = rev.rating | round | int %}
+                    {% for i in range(1,6) %}
+                      <span class="{{ 'star' if i <= r else 'star-empty' }}">★</span>
+                    {% endfor %}
+                  </div>
+                  <span class="review-date">{{ rev.date }}</span>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;gap:0.75rem;">
+                <span class="rating-big">{{ "%.1f"|format(rev.rating) }}</span>
+                <button class="helpful-btn"
+                        onclick="startEdit({{ rev.review_id }}, {{ rev.rating }}, `{{ rev.review | replace('`', "'") }}`, '{{ rev.stall_name | replace("'", "\\'") }}')">
+                  ✏️ Edit
+                </button>
+              </div>
+            </div>
+            <p class="review-text">{{ rev.review }}</p>
+          </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="empty-state">
+          <span style="font-size:2.5rem;display:block;margin-bottom:0.75rem;">📝</span>
+          <h3>No reviews yet</h3>
+          <p>Share your hawker experience — write your first review!</p>
+          <button class="apply-btn" style="width:auto;margin-top:1rem;padding:0.75rem 1.5rem;border:none;"
+                  onclick="switchTab('write')">✍️ Write a Review</button>
+        </div>
+      {% endif %}
+
+      {% endif %}
+
+    </div><!-- /tab-read -->
 
     <!-- ══ TAB 2: WRITE REVIEW ══════════════════════════════════ -->
     <div class="tab-pane {{ 'active' if active_tab == 'write' }}" id="tab-write">
 
       <div class="section-header">
-        <h2 class="section-title">Write a Review</h2>
-        <span class="section-count">Share your experience</span>
+        <h2 class="section-title" id="writeFormTitle">Write a Review</h2>
+        <span class="section-count" id="writeFormSubtitle">Share your experience</span>
       </div>
 
-      <form method="POST" action="/reviews/submit" class="write-form"
+      <form method="POST" action="/reviews/submit" id="reviewForm" class="write-form"
             onsubmit="const btn=this.querySelector('.submit-btn'); btn.textContent='Submitting...'; btn.disabled=true;">
 
-        <!-- Stall picker — pre-filled if coming from a stall page -->
+        <!-- Hidden field for edit mode -->
+        <input type="hidden" name="review_id" id="editReviewId" value="">
+
+        <!-- Stall picker — pre-filled if coming from a stall page or edit -->
         <div class="field-group">
           <label class="field-label">Stall Name</label>
           <div class="stall-search-wrapper">
@@ -610,7 +643,9 @@
             <div class="write-stall-results" id="writeResults"></div>
           </div>
           {% if write_stall_name %}
-            <div class="selected-stall-tag">✓ {{ write_stall_name }}</div>
+            <div class="selected-stall-tag" id="selectedStallTag">✓ {{ write_stall_name }}</div>
+          {% else %}
+            <div class="selected-stall-tag" id="selectedStallTag" style="display:none;"></div>
           {% endif %}
           <input type="hidden" name="stall_id"   id="writeStallId"
                  value="{{ write_stall_id | default('') }}">
@@ -647,10 +682,14 @@
                  value="{{ username | default('') }}">
         </div>
 
-        <!-- Pass back stall info so after submit we return to the right stall -->
         <input type="hidden" name="back_stall_id" value="{{ selected_stall_id | default('') }}">
 
-        <button type="submit" class="submit-btn">Submit Review →</button>
+        <div style="display:flex;gap:0.75rem;">
+          <button type="submit" class="submit-btn" id="submitBtn">Submit Review →</button>
+          <button type="button" class="submit-btn" id="cancelEditBtn"
+                  style="display:none;background:var(--smoke);"
+                  onclick="cancelEdit()">Cancel</button>
+        </div>
       </form>
 
     </div><!-- /tab-write -->
@@ -677,6 +716,60 @@ function switchTab(name) {
   const t = new URLSearchParams(window.location.search).get('tab');
   if (t && ['read','write'].includes(t)) switchTab(t);
 })();
+
+/* ══ EDIT REVIEW ════════════════════════════════════════════════ */
+function startEdit(reviewId, rating, reviewText, stallName) {
+  // Switch to write tab
+  switchTab('write');
+
+  // Update form title
+  document.getElementById('writeFormTitle').textContent = 'Edit Your Review';
+  document.getElementById('writeFormSubtitle').textContent = stallName;
+
+  // Set form action to edit endpoint
+  document.getElementById('reviewForm').action = '/reviews/edit';
+
+  // Fill in the review_id hidden field
+  document.getElementById('editReviewId').value = reviewId;
+
+  // Fill in review text
+  document.getElementById('reviewText').value = reviewText;
+
+  // Fill in stall name (read-only in edit mode)
+  document.getElementById('writeStallSearch').value = stallName;
+  document.getElementById('writeStallSearch').readOnly = true;
+  const tag = document.getElementById('selectedStallTag');
+  tag.textContent = '✓ ' + stallName;
+  tag.style.display = 'inline-flex';
+
+  // Fill in star rating
+  setRating(Math.round(rating));
+
+  // Show cancel button, update submit label
+  document.getElementById('submitBtn').textContent = 'Save Changes →';
+  document.getElementById('cancelEditBtn').style.display = 'block';
+
+  // Scroll to form
+  document.getElementById('reviewForm').scrollIntoView({ behavior: 'smooth' });
+}
+
+function cancelEdit() {
+  document.getElementById('writeFormTitle').textContent = 'Write a Review';
+  document.getElementById('writeFormSubtitle').textContent = 'Share your experience';
+  document.getElementById('reviewForm').action = '/reviews/submit';
+  document.getElementById('editReviewId').value = '';
+  document.getElementById('reviewText').value = '';
+  document.getElementById('writeStallSearch').value = '';
+  document.getElementById('writeStallSearch').readOnly = false;
+  document.getElementById('writeStallId').value = '';
+  document.getElementById('writeStallName').value = '';
+  document.getElementById('selectedStallTag').style.display = 'none';
+  document.getElementById('ratingInput').value = '';
+  document.getElementById('ratingHint').textContent = 'Click to rate';
+  document.querySelectorAll('.star-pick').forEach(s => { s.classList.remove('lit'); s.style.color = ''; });
+  document.getElementById('submitBtn').textContent = 'Submit Review →';
+  document.getElementById('cancelEditBtn').style.display = 'none';
+}
 
 /* ══ LIVE STALL SEARCH ══════════════════════════════════════════ */
 let searchTimer;

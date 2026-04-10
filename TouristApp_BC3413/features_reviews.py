@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import sqlite3
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -13,12 +14,31 @@ class ReviewFeature:
         menu_dir = os.path.join(self.project_root, "dataset", "Multiple Stalls Menu and Data")
         self.stalls_path = os.path.join(menu_dir, "stalls.csv")
         self.reviews_path = os.path.join(menu_dir, "reviews.csv")
+        self.db_path = os.path.join(self.project_root, "tourist_profiles.db")
 
         self.stalls_df = pd.read_csv(self.stalls_path)
         self.reviews_df = pd.read_csv(self.reviews_path)
 
         self._detect_columns()
         self._normalize_reviews_df()
+        self._init_db()
+
+    def _init_db(self) -> None:
+        conn = sqlite3.connect(self.db_path)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS reviews (
+                review_id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                stall_id             INTEGER NOT NULL,
+                user_name            TEXT    NOT NULL,
+                rating               REAL    NOT NULL,
+                review_text          TEXT    NOT NULL,
+                review_date          TEXT    NOT NULL,
+                helpful_count        INTEGER NOT NULL DEFAULT 0,
+                is_verified_purchase INTEGER NOT NULL DEFAULT 0
+            )
+        """)
+        conn.commit()
+        conn.close()
 
     def _detect_columns(self) -> None:
         review_cols = set(self.reviews_df.columns)
@@ -82,9 +102,26 @@ class ReviewFeature:
         self.stalls_df[self.stall_name_col] = self.stalls_df[self.stall_name_col].astype(str)
         self.stalls_df[self.stall_id_col] = pd.to_numeric(self.stalls_df[self.stall_id_col], errors="coerce")
 
-    def save_reviews_csv(self) -> None:
-        out = self.reviews_df.copy()
-        out.to_csv(self.reviews_path, index=False)
+    def _db_rows_to_df(self, rows: list) -> pd.DataFrame:
+        if not rows:
+            return pd.DataFrame(columns=[
+                self.review_id_col, self.review_stall_id_col, self.user_col,
+                self.rating_col, self.text_col, self.date_col,
+                self.helpful_col, self.verified_col
+            ])
+        records = []
+        for r in rows:
+            records.append({
+                self.review_id_col:       r["review_id"],
+                self.review_stall_id_col: r["stall_id"],
+                self.user_col:            r["user_name"],
+                self.rating_col:          r["rating"],
+                self.text_col:            r["review_text"],
+                self.date_col:            r["review_date"],
+                self.helpful_col:         r["helpful_count"],
+                self.verified_col:        bool(r["is_verified_purchase"]),
+            })
+        return pd.DataFrame(records)
 
     def search_stalls(self, keyword: str, limit: int = 15) -> pd.DataFrame:
         keyword = (keyword or "").strip().lower()
@@ -98,8 +135,18 @@ class ReviewFeature:
         out = pd.concat([exact, partial], ignore_index=True).drop_duplicates(subset=[self.stall_id_col])
         return out.head(limit).drop(columns=["_name_lc"], errors="ignore").reset_index(drop=True)
 
-    def get_reviews_for_stall(self, stall_id: int, limit: int = 15) -> pd.DataFrame:
-        df = self.reviews_df[self.reviews_df[self.review_stall_id_col] == int(stall_id)].copy()
+    def get_reviews_for_stall(self, stall_id: int, limit: int = 200) -> pd.DataFrame:
+        csv_df = self.reviews_df[self.reviews_df[self.review_stall_id_col] == int(stall_id)].copy()
+
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            "SELECT * FROM reviews WHERE stall_id = ?", (int(stall_id),)
+        ).fetchall()
+        conn.close()
+        db_df = self._db_rows_to_df(rows)
+
+        df = pd.concat([csv_df, db_df], ignore_index=True)
         if df.empty:
             return df
 
@@ -114,11 +161,22 @@ class ReviewFeature:
         return df.drop(columns=["_date_sort"], errors="ignore")
 
     def get_reviews_by_user(self, username: str) -> pd.DataFrame:
-        df = self.reviews_df[
+        csv_df = self.reviews_df[
             self.reviews_df[self.user_col].astype(str).str.lower() == username.lower()
-            ].copy()
+        ].copy()
+
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            "SELECT * FROM reviews WHERE LOWER(user_name) = LOWER(?)", (username,)
+        ).fetchall()
+        conn.close()
+        db_df = self._db_rows_to_df(rows)
+
+        df = pd.concat([csv_df, db_df], ignore_index=True)
         if df.empty:
             return df
+
         df["_date_sort"] = pd.to_datetime(df[self.date_col], errors="coerce")
         df = df.sort_values("_date_sort", ascending=False).reset_index(drop=True)
         df = df.merge(
@@ -133,37 +191,36 @@ class ReviewFeature:
         rating_f = float(rating)
         if not 0.0 <= rating_f <= 5.0:
             raise ValueError("Rating must be between 0 and 5")
-
         if not str(review_text).strip():
             raise ValueError("Review text cannot be empty")
 
-        next_id = 1
-        if len(self.reviews_df) and self.review_id_col in self.reviews_df.columns:
-            nums = pd.to_numeric(self.reviews_df[self.review_id_col], errors="coerce")
-            if nums.notna().any():
-                next_id = int(nums.max()) + 1
-
-        new_row = {c: None for c in self.reviews_df.columns}
-        new_row[self.review_id_col] = next_id
-        new_row[self.review_stall_id_col] = int(stall_id)
-        new_row[self.user_col] = user_name or "Anonymous"
-        new_row[self.rating_col] = rating_f
-        new_row[self.text_col] = str(review_text).strip()
-        new_row[self.helpful_col] = 0
-        new_row[self.verified_col] = False
-        new_row[self.date_col] = datetime.now(timezone.utc).date().isoformat()
-
-        self.reviews_df = pd.concat([self.reviews_df, pd.DataFrame([new_row])], ignore_index=True)
-        self._normalize_reviews_df()
-        self.save_reviews_csv()
-        return next_id
+        review_date = datetime.now(timezone.utc).date().isoformat()
+        conn = sqlite3.connect(self.db_path)
+        cur = conn.execute(
+            """INSERT INTO reviews (stall_id, user_name, rating, review_text, review_date, helpful_count, is_verified_purchase)
+               VALUES (?, ?, ?, ?, ?, 0, 0)""",
+            (int(stall_id), user_name or "Anonymous", rating_f, str(review_text).strip(), review_date)
+        )
+        new_id = cur.lastrowid
+        conn.commit()
+        conn.close()
+        return new_id
 
     def mark_review_helpful(self, review_id: int) -> None:
+        conn = sqlite3.connect(self.db_path)
+        cur = conn.execute(
+            "UPDATE reviews SET helpful_count = helpful_count + 1 WHERE review_id = ?",
+            (int(review_id),)
+        )
+        conn.commit()
+        conn.close()
+        if cur.rowcount > 0:
+            return
+
         mask = pd.to_numeric(self.reviews_df[self.review_id_col], errors="coerce") == int(review_id)
         if not mask.any():
             raise ValueError("Review not found")
         self.reviews_df.loc[mask, self.helpful_col] = self.reviews_df.loc[mask, self.helpful_col].astype(int) + 1
-        self.save_reviews_csv()
 
     def get_display_rows(self, df: pd.DataFrame) -> list[dict]:
         rows: list[dict] = []
