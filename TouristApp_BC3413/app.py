@@ -1359,9 +1359,52 @@ def reviews_submit():
     except Exception as e:
         flash(f"Could not save review: {e}", "error")
 
-    redirect_url = f"/reviews?stall_id={stall_id}&tab=read" if stall_id else url_for("reviews")
+    redirect_url = url_for("reviews") + "?tab=read"
 
     return redirect(redirect_url)
+
+
+@app.route("/reviews/edit", methods=["POST"])
+@login_required
+def reviews_edit():
+    review_id = request.form.get("review_id", type=int)
+    rating_raw = request.form.get("rating", "").strip()
+    review_text = request.form.get("review_text", "").strip()
+    username = session.get("username", "")
+
+    if not review_id:
+        flash("Invalid review.", "error")
+        return redirect(url_for("reviews") + "?tab=read")
+
+    try:
+        rating = float(rating_raw)
+        if not 0 <= rating <= 5:
+            raise ValueError
+    except (ValueError, TypeError):
+        flash("Please select a rating between 0 and 5.", "error")
+        return redirect(url_for("reviews") + "?tab=write")
+
+    if not review_text:
+        flash("Review text cannot be empty.", "error")
+        return redirect(url_for("reviews") + "?tab=write")
+
+    try:
+        conn = get_db()
+        # Only allow editing your own reviews
+        result = conn.execute(
+            "UPDATE reviews SET rating = ?, review_text = ? WHERE review_id = ? AND LOWER(user_name) = LOWER(?)",
+            (rating, review_text.strip(), review_id, username)
+        )
+        conn.commit()
+        conn.close()
+        if result.rowcount == 0:
+            flash("Review not found", "error")
+        else:
+            flash("Your review has been updated!", "success")
+    except Exception as e:
+        flash(f"Could not update review: {e}", "error")
+
+    return redirect(url_for("reviews") + "?tab=read")
 
 @app.route("/reviews/helpful", methods = ["POST"])
 def reviews_helpful():
