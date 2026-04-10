@@ -17,13 +17,14 @@ from collections import Counter
 import sqlite3
 from functools import wraps, lru_cache
 import requests
-from urllib3.exceptions import NotOpenSSLWarning
+# from urllib3.exceptions import NotOpenSSLWarning
 
 BASE_DIR     = os.path.dirname(os.path.abspath(__file__))
 CENTRES_CSV  = os.path.join(BASE_DIR, 'dataset', 'Hawker Centre Data', 'hawker_centers.csv')
 CLOSURES_CSV = os.path.join(BASE_DIR, 'dataset', 'Hawker Centre Data', 'DatesofHawkerCentresClosure.csv')
 MENU_CSV     = os.path.join(BASE_DIR, 'dataset', 'Multiple Stalls Menu and Data', 'menu_items.csv')
 REVIEWS_CSV  = os.path.join(BASE_DIR, 'dataset', 'Multiple Stalls Menu and Data', 'reviews.csv')
+REVIEWS_COMPRESSED_CSV = os.path.join(BASE_DIR, 'dataset', 'Multiple Stalls Menu and Data', 'reviews_compressed.csv')
 STALLS_JSON  = os.path.join(BASE_DIR, 'dataset', 'Multiple Stalls Menu and Data', 'stalls.json')
 STALLS_CSV = os.path.join(BASE_DIR, 'dataset', 'Multiple Stalls Menu and Data', 'stalls.csv')
 
@@ -169,247 +170,328 @@ def logout():
 def landing():
     return render_template("landing_page.html", active_page="landing")
 
-@app.route("/dashboard")
-@login_required
-def dashboard():
-    hc   = pd.read_csv(CENTRES_CSV)
-    cl   = pd.read_csv(CLOSURES_CSV)
-    menu = pd.read_csv(MENU_CSV)
-    rev  = pd.read_csv(REVIEWS_CSV)
-
-    STALLS_CSV = os.path.join(BASE_DIR, 'dataset', 'Multiple Stalls Menu and Data', 'stalls.csv')
-    stalls = pd.read_csv(STALLS_CSV)
-
-    # Filter to food stalls only (exclude market types)
-    MARKET_TYPES = {'Dry Goods', 'Hardware', 'Fruits', 'Seafood', 'Sundries',
-                    'Poultry', 'Vegetables', 'Wet Market'}
-    food_stalls = stalls[~stalls['cuisine_type'].isin(MARKET_TYPES)]
-
-    # ── Stat cards ─────────────────────────────────────────────────
-    total_stalls  = len(food_stalls)
-    total_centres = len(cl)
-    avg_price     = round(menu['price'].mean(), 2)
-    avg_rating    = round(rev['rating'].mean(), 2)
-    total_reviews = len(rev)
-
-    # ── Bar: avg price per hawker centre (top 10) ──────────────────
-    menu_stalls = menu.merge(stalls[['stall_id', 'hawker_center_id']], on='stall_id')
-    menu_hc = menu_stalls.merge(
-        hc[['center_id', 'center_name']],
-        left_on='hawker_center_id', right_on='center_id'
-    )
-    price_by_centre = (
-        menu_hc.groupby('center_name')['price']
-        .mean().round(2)
-        .sort_values(ascending=False)
-        .head(10)
-    )
-    price_labels = price_by_centre.index.str.split('(').str[0].str.strip().tolist()
-    price_values = price_by_centre.values.tolist()
-
-    # ── Donut: food cuisine breakdown only ─────────────────────────
-    cuisine_counts_s = food_stalls['cuisine_type'].value_counts().head(8)
-    cuisine_labels   = cuisine_counts_s.index.tolist()
-    cuisine_counts   = cuisine_counts_s.values.tolist()
-
-    # ── Line: quarterly closure counts ────────────────────────────
-    quarter_labels = ['Q1 2026', 'Q2 2026', 'Q3 2026', 'Q4 2025']
-    quarter_cols   = ['q1_cleaningstartdate', 'q2_cleaningstartdate',
-                      'q3_cleaningstartdate', 'q4_cleaningstartdate']
-    closure_counts = []
-    for col in quarter_cols:
-        valid = cl[col].notna() & (~cl[col].str.upper().isin(['TBC', 'NIL', 'NA']))
-        closure_counts.append(int(valid.sum()))
-
-    # ── Horizontal bar: top 8 stalls by avg review rating ──────────
-    stall_avg = (
-        rev.groupby('stall_id')['rating']
-        .mean().round(2)
-        .reset_index()
-        .rename(columns={'rating': 'avg_rating'})
-    )
-    top8 = (
-        stall_avg.merge(food_stalls[['stall_id', 'stall_name']], on='stall_id')
-        .nlargest(8, 'avg_rating')[['stall_name', 'avg_rating']]
-    )
-    stall_names  = top8['stall_name'].tolist()
-    stall_scores = top8['avg_rating'].tolist()
-
-# ── Hawker Centre Explorer dropdown list ──────────────────────
-    all_centres = (
-             hc[['center_id', 'center_name']]
-             .sort_values('center_name')
-             .to_dict(orient='records')
-          )
-
-    return render_template(
-        "dashboard.html",
-        username       = session["username"],
-        active_page    = "dashboard",
-        total_stalls   = f"{total_stalls:,}",
-        total_centres  = total_centres,
-        avg_rating     = avg_rating,
-        total_reviews  = f"{total_reviews:,}",
-        avg_price      = avg_price,
-        price_labels   = price_labels,
-        price_values   = price_values,
-        cuisine_labels = cuisine_labels,
-        cuisine_counts = cuisine_counts,
-        trend_months   = quarter_labels,
-        trend_scores   = closure_counts,
-        top_stall_names  = stall_names,
-        top_stall_scores = stall_scores,
-        all_centres=all_centres,
-    )
+MARKET_TYPES = {
+    'Dry Goods', 'Hardware', 'Fruits', 'Seafood',
+    'Sundries', 'Poultry', 'Vegetables', 'Wet Market'
+}
 
 
-@app.route("/api/hawker_centre_stats")
-def hawker_centre_stats():
+def _load_closures_csv():
     """
-    Returns JSON with all stats for a single hawker centre.
-    Query param: ?center_id=<int>
+    Load the closures CSV forcing all columns to strings so dates like
+    '9/3/2026' are never silently parsed as floats by pandas.
     """
-    center_id = request.args.get("center_id", type=int)
-    if center_id is None:
-        return jsonify({"error": "center_id required"}), 400
+    cl = pd.read_csv(CLOSURES_CSV, dtype=str)
+    cl = cl.apply(lambda col: col.str.strip() if col.dtype == object else col)
+    return cl
 
-    # ── Load data ────────────────────────────────────────────────────
-    hc = pd.read_csv(CENTRES_CSV)
-    cl = pd.read_csv(CLOSURES_CSV)
-    menu = pd.read_csv(MENU_CSV)
-    rev = pd.read_csv(REVIEWS_CSV)
-    stalls = pd.read_csv(STALLS_CSV)
 
-    MARKET_TYPES = {
-        'Dry Goods', 'Hardware', 'Fruits', 'Seafood',
-        'Sundries', 'Poultry', 'Vegetables', 'Wet Market'
-    }
+# ── Helpers ───────────────────────────────────────────────────────────────────
 
-    # ── Validate centre ──────────────────────────────────────────────
+def _build_closure_date_range(row, q_num):
+    """
+    Return a human-readable date range string for a given quarter, e.g. '9/3/2026 - 10/3/2026'.
+    Returns None if both columns are NIL / TBC / empty / NaN.
+    """
+    start_col = f'q{q_num}_cleaningstartdate'
+    end_col   = f'q{q_num}_cleaningenddate'
+    nil_vals  = {'TBC', 'NIL', 'NA', 'NAN', 'NONE', '', 'NAT'}
+
+    start_val = str(row[start_col]).strip() if start_col in row.index else ''
+    end_val   = str(row[end_col]).strip()   if end_col   in row.index else ''
+
+    start_ok = start_val.upper() not in nil_vals
+    end_ok   = end_val.upper()   not in nil_vals
+
+    if start_ok and end_ok:
+        return f"{start_val} - {end_val}"
+    if start_ok:
+        return start_val
+    if end_ok:
+        return end_val
+    return None
+
+
+def _build_sentiment_trend(stall_ids):
+    """
+    Return quarterly avg-rating data for 2023-2024 from reviews_compressed.csv.
+    Result: {'labels': [...], 'values': [...]}  (values may contain None for missing quarters)
+    """
+    quarters_ordered = [
+        'Q1 2023', 'Q2 2023', 'Q3 2023', 'Q4 2023',
+        'Q1 2024', 'Q2 2024', 'Q3 2024', 'Q4 2024',
+    ]
+    empty = {'labels': quarters_ordered, 'values': [None] * 8}
+
+    try:
+        rc = pd.read_csv(REVIEWS_COMPRESSED_CSV)
+    except Exception:
+        return empty
+
+    if stall_ids:
+        rc = rc[rc['stall_id'].isin(stall_ids)]
+    if rc.empty:
+        return empty
+
+    rc = rc.copy()
+    rc['review_date'] = pd.to_datetime(rc['review_date'], errors='coerce')
+    rc = rc.dropna(subset=['review_date'])
+    rc = rc[rc['review_date'].dt.year.isin([2023, 2024])]
+    if rc.empty:
+        return empty
+
+    def to_qlabel(dt):
+        return f'Q{(dt.month - 1) // 3 + 1} {dt.year}'
+
+    rc['ql'] = rc['review_date'].apply(to_qlabel)
+    agg = rc.groupby('ql')['rating'].mean().round(2)
+
+    values = [
+        round(float(agg[ql]), 2) if ql in agg.index and pd.notna(agg[ql]) else None
+        for ql in quarters_ordered
+    ]
+    return {'labels': quarters_ordered, 'values': values}
+
+
+def _get_hc_explorer_data(center_id, hc, cl, menu, rev, stalls):
+    """
+    Compute all Hawker Centre Explorer data for a given center_id.
+    Returns a dict ready to unpack into render_template kwargs, or None if centre not found.
+    """
     centre_row = hc[hc['center_id'] == center_id]
     if centre_row.empty:
-        return jsonify({"error": "centre not found"}), 404
+        return None
     centre_info = centre_row.iloc[0]
 
-    # ── Stalls in this centre (food stalls only) ─────────────────────
+    # Stalls (food only)
     hc_stalls = stalls[
         (stalls['hawker_center_id'] == center_id) &
         (~stalls['cuisine_type'].isin(MARKET_TYPES))
         ]
-
-    total_stalls = len(hc_stalls)
-
-    # ── Average rating ────────────────────────────────────────────────
     stall_ids = hc_stalls['stall_id'].tolist()
+
+    # Reviews & ratings
     hc_reviews = rev[rev['stall_id'].isin(stall_ids)]
     avg_rating = (
         round(float(hc_reviews['rating'].mean()), 2)
         if not hc_reviews.empty else None
     )
 
-    # ── Average price ─────────────────────────────────────────────────
+    # Menu & price
     hc_menu = menu[menu['stall_id'].isin(stall_ids)]
     avg_price = (
         round(float(hc_menu['price'].mean()), 2)
         if not hc_menu.empty else None
     )
 
-    # ── Area / region ─────────────────────────────────────────────────
-    # Try common column names; adapt if your CSV uses a different one.
-    area = None
-    for col in ['area', 'region', 'location_area', 'town', 'zone']:
+    # Lat / Lng
+    lat = lng = None
+    for col in ['latitude', 'lat', 'latitude_hc']:
         if col in centre_info.index and pd.notna(centre_info[col]):
-            area = str(centre_info[col])
+            try:
+                lat = float(centre_info[col])
+            except (ValueError, TypeError):
+                pass
             break
-    if area is None:
-        area = "Central"  # sensible fallback
+    for col in ['longitude', 'lng', 'longitude_hc']:
+        if col in centre_info.index and pd.notna(centre_info[col]):
+            try:
+                lng = float(centre_info[col])
+            except (ValueError, TypeError):
+                pass
+            break
+    if (lat is None or lng is None) and not hc_stalls.empty:
+        for lcol, lstore in [('latitude_hc', 'lat'), ('longitude_hc', 'lng')]:
+            if lcol in hc_stalls.columns:
+                vals = pd.to_numeric(hc_stalls[lcol], errors='coerce').dropna()
+                if not vals.empty:
+                    if lstore == 'lat':
+                        lat = float(vals.iloc[0])
+                    else:
+                        lng = float(vals.iloc[0])
 
-    # ── Cuisine breakdown ─────────────────────────────────────────────
-    cuisine_series = (
-        hc_stalls['cuisine_type']
-            .value_counts()
-            .head(10)
-    )
-    cuisine_labels = cuisine_series.index.tolist()
-    cuisine_counts = [int(v) for v in cuisine_series.values]
+    # OneMap embed + full-map URLs (built server-side, no JS needed)
+    zoom = 16
+    if lat is not None and lng is not None:
+        map_embed_url = (
+            f"https://www.onemap.gov.sg/minimap/minimap.html"
+            f"?mapStyle=Default&zoomLevel={zoom}&latLng={lat},{lng}"
+            f"&popupWidth=200&popupHeight=100&showPopup=true"
+        )
+        map_full_url = f"https://www.onemap.gov.sg/main/v2/?lat={lat}&lng={lng}&zoom={zoom}"
+    else:
+        map_embed_url = None
+        map_full_url = None
 
-    # ── Closure dates for this centre ─────────────────────────────────
-    # The closures CSV matches on centre name; adapt key if needed.
-    closures_dict = {"q1": [], "q2": [], "q3": [], "q4": []}
+    # Cuisine breakdown
+    cuisine_series = hc_stalls['cuisine_type'].value_counts().head(10)
+    hc_cuisine_labels = cuisine_series.index.tolist()
+    hc_cuisine_counts = [int(v) for v in cuisine_series.values]
 
-    # Try matching by center_id first, then by name
-    cl_row = cl[cl.get('center_id', pd.Series(dtype=int)) == center_id] if 'center_id' in cl.columns else pd.DataFrame()
+    # Closure dates
+    closures = {'q1': None, 'q2': None, 'q3': None, 'q4': None}
+    cl_row = pd.DataFrame()
+    if 'center_id' in cl.columns:
+        cl_row = cl[cl['center_id'] == center_id]
     if cl_row.empty:
-        # Fuzzy-ish name match (strip anything in parentheses)
         cname = str(centre_info.get('center_name', '')).split('(')[0].strip().lower()
-        cl['_name_clean'] = cl.iloc[:, 0].astype(str).str.split('(').str[0].str.strip().str.lower()
-        cl_row = cl[cl['_name_clean'] == cname]
-
+        cl['_nc'] = cl['name'].astype(str).str.split('(').str[0].str.strip().str.lower()
+        cl_row = cl[cl['_nc'] == cname]
     if not cl_row.empty:
         row = cl_row.iloc[0]
-        quarter_cols = {
-            'q1': 'q1_cleaningstartdate',
-            'q2': 'q2_cleaningstartdate',
-            'q3': 'q3_cleaningstartdate',
-            'q4': 'q4_cleaningstartdate',
-        }
-        for qkey, col in quarter_cols.items():
-            if col in row.index:
-                val = str(row[col]).strip()
-                if val and val.upper() not in ('TBC', 'NIL', 'NA', 'NAN', ''):
-                    # May be comma-separated date ranges
-                    dates = [d.strip() for d in val.split(',') if d.strip()]
-                    closures_dict[qkey] = dates
+        for q_num, qkey in enumerate(['q1', 'q2', 'q3', 'q4'], start=1):
+            closures[qkey] = _build_closure_date_range(row, q_num)
 
-    # ── Top-rated stalls (up to 8) ────────────────────────────────────
+    # Top stalls
+    top_stalls = []
     if not hc_reviews.empty:
         stall_avg = (
             hc_reviews.groupby('stall_id')['rating']
-                .mean().round(2)
-                .reset_index()
+                .mean().round(2).reset_index()
                 .rename(columns={'rating': 'avg_rating'})
         )
         top8 = (
-            stall_avg
-                .merge(hc_stalls[['stall_id', 'stall_name']], on='stall_id')
-                .nlargest(8, 'avg_rating')[['stall_name', 'avg_rating']]
+            stall_avg.merge(hc_stalls[['stall_id', 'stall_name']], on='stall_id')
+                .nlargest(8, 'avg_rating')
         )
         top_stalls = [
-            {"name": str(r['stall_name']), "rating": round(float(r['avg_rating']), 2)}
+            {'name': str(r['stall_name']), 'rating': round(float(r['avg_rating']), 2)}
             for _, r in top8.iterrows()
         ]
-    else:
-        top_stalls = []
 
-    # ── Price range distribution (for the bar chart) ──────────────────
+    # Price range distribution
     if not hc_menu.empty:
         bins = [0, 3, 5, 8, 10, 15, float('inf')]
-        labels = ['<$3', '$3–5', '$5–8', '$8–10', '$10–15', '>$15']
+        labels = ['<$3', '$3-5', '$5-8', '$8-10', '$10-15', '>$15']
         hc_menu = hc_menu.copy()
-        hc_menu['price_band'] = pd.cut(
-            hc_menu['price'], bins=bins, labels=labels, right=True
-        )
+        hc_menu['price_band'] = pd.cut(hc_menu['price'], bins=bins, labels=labels, right=True)
         band_counts = hc_menu['price_band'].value_counts().reindex(labels, fill_value=0)
-        price_range_labels = labels
-        price_range_counts = [int(v) for v in band_counts.values]
+        hc_price_range_labels = labels
+        hc_price_range_counts = [int(v) for v in band_counts.values]
     else:
-        price_range_labels = []
-        price_range_counts = []
+        hc_price_range_labels = []
+        hc_price_range_counts = []
 
-    return jsonify({
-        "center_id": center_id,
-        "center_name": str(centre_info.get('center_name', '')),
-        "area": area,
-        "total_stalls": total_stalls,
-        "avg_rating": avg_rating,
-        "avg_price": avg_price,
-        "cuisine_labels": cuisine_labels,
-        "cuisine_counts": cuisine_counts,
-        "closures": closures_dict,
-        "top_stalls": top_stalls,
-        "price_range_labels": price_range_labels,
-        "price_range_counts": price_range_counts,
-    })
+    # Sentiment trend
+    sentiment = _build_sentiment_trend(stall_ids)
+
+    return {
+        'hc_selected_id': center_id,
+        'hc_center_name': str(centre_info.get('center_name', '')),
+        'hc_total_stalls': len(hc_stalls),
+        'hc_avg_rating': avg_rating,
+        'hc_avg_price': avg_price,
+        'hc_map_embed_url': map_embed_url,
+        'hc_map_full_url': map_full_url,
+        'hc_cuisine_labels': hc_cuisine_labels,
+        'hc_cuisine_counts': hc_cuisine_counts,
+        'hc_closures': closures,
+        'hc_top_stalls': top_stalls,
+        'hc_price_range_labels': hc_price_range_labels,
+        'hc_price_range_counts': hc_price_range_counts,
+        'hc_sentiment_labels': sentiment['labels'],
+        'hc_sentiment_values': sentiment['values'],
+    }
+
+
+# ── Dashboard ─────────────────────────────────────────────────────────────────
+
+@app.route("/dashboard")
+@login_required
+def dashboard():
+    hc     = pd.read_csv(CENTRES_CSV)
+    cl     = _load_closures_csv()
+    menu   = pd.read_csv(MENU_CSV)
+    rev    = pd.read_csv(REVIEWS_CSV)
+    stalls = pd.read_csv(STALLS_CSV)
+
+    food_stalls = stalls[~stalls['cuisine_type'].isin(MARKET_TYPES)]
+
+    # ── Stat cards ──────────────────────────────────────────────────
+    total_stalls  = len(food_stalls)
+    total_centres = len(cl)
+    avg_price     = round(menu['price'].mean(), 2)
+    avg_rating    = round(rev['rating'].mean(), 2)
+    total_reviews = len(rev)
+
+    # ── Bar: avg price per hawker centre (top 10) ───────────────────
+    menu_stalls = menu.merge(stalls[['stall_id', 'hawker_center_id']], on='stall_id')
+    menu_hc = menu_stalls.merge(
+        hc[['center_id', 'center_name']], left_on='hawker_center_id', right_on='center_id'
+    )
+    price_by_centre = (
+        menu_hc.groupby('center_name')['price']
+            .mean().round(2).sort_values(ascending=False).head(10)
+    )
+    price_labels = price_by_centre.index.str.split('(').str[0].str.strip().tolist()
+    price_values = price_by_centre.values.tolist()
+
+    # ── Treemap: cuisine breakdown ───────────────────────────────────
+    cuisine_counts_s = food_stalls['cuisine_type'].value_counts().head(8)
+    cuisine_labels   = cuisine_counts_s.index.tolist()
+    cuisine_counts   = cuisine_counts_s.values.tolist()
+
+    # ── Line: quarterly closure counts ──────────────────────────────
+    quarter_labels = ['Q1 2026', 'Q2 2026', 'Q3 2026', 'Q4 2026']
+    quarter_cols   = ['q1_cleaningstartdate', 'q2_cleaningstartdate',
+                      'q3_cleaningstartdate', 'q4_cleaningstartdate']
+    nil_set = {'TBC', 'NIL', 'NA', 'NAN', 'NONE', '', 'NAT'}
+    closure_counts = []
+    for col in quarter_cols:
+        if col in cl.columns:
+            valid = cl[col].fillna('').str.strip().str.upper().apply(lambda v: v not in nil_set)
+            closure_counts.append(int(valid.sum()))
+        else:
+            closure_counts.append(0)
+
+    # ── Horizontal bar: top 8 stalls by avg rating ──────────────────
+    stall_avg = (
+        rev.groupby('stall_id')['rating'].mean().round(2)
+            .reset_index().rename(columns={'rating': 'avg_rating'})
+    )
+    top8 = (
+        stall_avg.merge(food_stalls[['stall_id', 'stall_name']], on='stall_id')
+            .nlargest(8, 'avg_rating')[['stall_name', 'avg_rating']]
+    )
+    stall_names  = top8['stall_name'].tolist()
+    stall_scores = top8['avg_rating'].tolist()
+
+    # ── Hawker Centre Explorer dropdown list ─────────────────────────
+    all_centres = (
+        hc[['center_id', 'center_name']]
+            .sort_values('center_name')
+            .to_dict(orient='records')
+    )
+
+    # ── HC Explorer: resolve selected centre from ?center_id= ────────
+    hc_data = {}
+    selected_center_id = request.args.get('center_id', type=int)
+    if selected_center_id:
+        result = _get_hc_explorer_data(selected_center_id, hc, cl, menu, rev, stalls)
+        if result:
+            hc_data = result
+
+    return render_template(
+        "dashboard.html",
+        username=session["username"],
+        active_page="dashboard",
+        total_stalls=f"{total_stalls:,}",
+        total_centres=total_centres,
+        avg_rating=avg_rating,
+        total_reviews=f"{total_reviews:,}",
+        avg_price=avg_price,
+        price_labels=price_labels,
+        price_values=price_values,
+        cuisine_labels=cuisine_labels,
+        cuisine_counts=cuisine_counts,
+        trend_months=quarter_labels,
+        trend_scores=closure_counts,
+        top_stall_names=stall_names,
+        top_stall_scores=stall_scores,
+        all_centres=all_centres,
+        **hc_data,
+    )
+
 
 # ── Cuisines (ACTIVE) ─────────────────────────────────────────────────────────
 @app.route('/cuisines')
