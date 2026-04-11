@@ -186,17 +186,3 @@
   .allergen-grid { grid-template-columns: 1fr; }
 }
 
-/* Active = user explicitly clicked this filter */
-.chip.active {
-  background: var(--soy);
-  color: var(--cream);
-  border-color: var(--soy);
-}
-
-/* Preferred = matches onboarding preference, but not actively filtered */
-.chip.preferred {
-  background: transparent;
-  color: var(--chili);
-  border-color: var(--chili);
-  font-weight: 600;
-}

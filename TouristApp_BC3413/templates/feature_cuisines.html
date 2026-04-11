@@ -36,12 +36,12 @@
         </button>
         <div class="panel-body" id="panel-cuisine">
           <div class="chips-grid">
-           {% for c in cuisines %}
-            <button type="submit" name="cuisine" value="{{ c|lower }}"
-              class="chip {% if selected_cuisine == c|lower %}active{% elif not selected_cuisine and c|lower in (onboarding_cuisines | default([])) %}preferred{% endif %}">
-              {{ c }}
-            </button>
-            {% endfor %}
+          {% for c in cuisines %}
+        <button type="submit" name="cuisine" value="{{ c|lower }}"
+          class="chip {% if selected_cuisine == c|lower %}active{% elif not selected_cuisine and c|lower in onboarding_cuisines %}preferred{% endif %}">
+          {{ c }}
+        </button>
+        {% endfor %}
           </div>
         </div>
       </div>
@@ -274,7 +274,20 @@
 
 <!-- ── Styles (page-specific) ────────────────────────────────────────────── -->
 <style>
+/* Active = user explicitly clicked this filter */
+.chip.active {
+  background: var(--soy);
+  color: var(--cream);
+  border-color: var(--soy);
+}
 
+/* Preferred = matches onboarding preference, but not actively filtered */
+button.chip.preferred {
+  background: transparent !important;
+  color: var(--chili) !important;
+  border-color: var(--chili) !important;
+  font-weight: 600 !important;
+}
 /* ── Collapsible panel body ─────────────────────────────────────────────── */
 .panel-header.panel-toggle {
   width: 100%;

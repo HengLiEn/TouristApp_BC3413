@@ -533,7 +533,11 @@ def cuisines():
         stalls_df["distance_km"] = None
 
     cuisines_list = handler.get_available_cuisines()
-    onboarding_cuisines = [c.lower() for c in (profile.preferred_cuisines if profile else [])]
+    raw = profile.preferred_cuisines if profile else []
+    if isinstance(raw, str):
+        onboarding_cuisines = [c.strip().lower() for c in raw.split('|') if c.strip()]
+    else:
+        onboarding_cuisines = [c.lower() for c in raw]
     default_allergens = normalize_allergen_values(profile.allergens if profile else [])
     if not selected_allergens and default_allergens and "allergens" not in request.args:
         selected_allergens = default_allergens
