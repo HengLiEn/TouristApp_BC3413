@@ -289,7 +289,6 @@
   .field-block input:focus {
     border-color: var(--chili);
   }
-
   .step-note {
     margin-top: 0.5rem;
     color: var(--smoke);
@@ -431,7 +430,7 @@
         </p>
 
         {% if not hide_account_fields %}
-        <div class="form-grid-2" style="margin-top:1.5rem;">
+        <div style="margin-top:1.5rem;">
           <div class="field-block">
             <label for="email">Email</label>
             <input type="email" id="email" name="email" value="{{ prefill_email | default('') }}" required maxlength="120" title="Please enter a valid email address.">
@@ -440,8 +439,6 @@
             <label for="username">Username</label>
             <input type="text" id="username" name="username" value="{{ prefill_username | default('') }}" required minlength="3" maxlength="30" pattern="[A-Za-z0-9_]+" title="Use 3-30 letters, numbers, or underscores.">
           </div>
-        </div>
-        <div class="form-grid-2">
           <div class="field-block">
             <label for="password">Password</label>
             <input type="password" id="password" name="password" required minlength="6" title="Password must be at least 6 characters long.">
@@ -511,6 +508,12 @@
         </div>
 
         <div class="field-block">
+          <label for="location_query">Postcode or Address</label>
+          <input type="text" id="location_query" name="location_query" placeholder="e.g. 570235 or Orchard Road" minlength="3" title="Enter a postcode, address, or coordinates.">
+          <div class="field-help">We will use this as your base location for distance-based recommendations.</div>
+        </div>
+
+        <div class="field-block">
           <label for="radius_km">Search Radius</label>
           <div class="slider-block">
             <div class="slider-head">
@@ -526,11 +529,8 @@
         </div>
 
         <p class="step-note">
-          We’ll use Singapore as the default map centre unless you update your live location later.
+          Entering a postcode or address here helps Hawker Hunt tailor stalls to the area you actually plan to explore.
         </p>
-
-        <input type="hidden" name="location_lat" value="{{ singapore_center.lat }}">
-        <input type="hidden" name="location_lng" value="{{ singapore_center.lng }}">
       </section>
     </div>
 
@@ -549,6 +549,8 @@
   const backBtn = document.getElementById("backBtn");
   const nextBtn = document.getElementById("nextBtn");
   const finishBtn = document.getElementById("finishBtn");
+  const usernameInput = document.getElementById("username");
+  const emailInput = document.getElementById("email");
 
   let currentStep = 0;
 
@@ -613,15 +615,65 @@
     });
   });
 
+  async function checkAvailability(field, value) {
+    const params = new URLSearchParams();
+    params.set(field, value);
+    const response = await fetch(`/auth/check-availability?${params.toString()}`);
+    if (!response.ok) throw new Error('availability check failed');
+    return response.json();
+  }
+
+  function setAvailabilityState(input, takenMessage, taken) {
+    input.setCustomValidity(taken ? takenMessage : '');
+  }
+
+  if (usernameInput) {
+    usernameInput.addEventListener("blur", async () => {
+      const value = usernameInput.value.trim();
+      usernameInput.setCustomValidity('');
+      if (value.length < 3 || !/^[A-Za-z0-9_]+$/.test(value)) return;
+      try {
+        const data = await checkAvailability("username", value);
+        setAvailabilityState(
+          usernameInput,
+          'This username is already taken.',
+          Boolean(data.username_taken)
+        );
+      } catch (error) {
+        usernameInput.setCustomValidity('');
+      }
+    });
+  }
+
+  if (emailInput) {
+    emailInput.addEventListener("blur", async () => {
+      const value = emailInput.value.trim();
+      emailInput.setCustomValidity('');
+      if (!value || !emailInput.checkValidity()) return;
+      try {
+        const data = await checkAvailability("email", value);
+        setAvailabilityState(
+          emailInput,
+          'This email is already registered.',
+          Boolean(data.email_taken)
+        );
+      } catch (error) {
+        emailInput.setCustomValidity('');
+      }
+    });
+  }
+
   if (onboardingForm) {
     onboardingForm.addEventListener("submit", (event) => {
       const start = document.getElementById("trip_start");
       const end = document.getElementById("trip_end");
       const password = document.getElementById("password");
+      const location = document.getElementById("location_query");
 
       if (start) start.setCustomValidity("");
       if (end) end.setCustomValidity("");
       if (password) password.setCustomValidity("");
+      if (location) location.setCustomValidity("");
 
       if (start && end) {
         if ((start.value && !end.value) || (!start.value && end.value)) {
@@ -630,6 +682,14 @@
           end.setCustomValidity(message);
         } else if (start.value && end.value && start.value > end.value) {
           end.setCustomValidity("Trip end must be on or after trip start.");
+        }
+      }
+
+      if (location) {
+        const value = location.value.trim();
+        const coordsPattern = /^\s*-?\d+(?:\.\d+)?\s*,\s*-?\d+(?:\.\d+)?\s*$/;
+        if (value && !coordsPattern.test(value) && value.length < 3) {
+          location.setCustomValidity("Please enter a valid postcode, address, or coordinates.");
         }
       }
 

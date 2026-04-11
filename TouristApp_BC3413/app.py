@@ -1561,6 +1561,31 @@ def reviews_search():
     except Exception:
         return jsonify([])
 
+@app.route("/auth/check-availability")
+def check_auth_availability():
+    username = request.args.get("username", "").strip().lower()
+    email = request.args.get("email", "").strip().lower()
+
+    conn = get_db()
+    response = {"username_taken": False, "email_taken": False}
+
+    if username:
+        row = conn.execute(
+            "SELECT 1 FROM tourist_profiles WHERE LOWER(username) = ? LIMIT 1",
+            (username,),
+        ).fetchone()
+        response["username_taken"] = row is not None
+
+    if email:
+        row = conn.execute(
+            "SELECT 1 FROM tourist_profiles WHERE LOWER(email) = ? LIMIT 1",
+            (email,),
+        ).fetchone()
+        response["email_taken"] = row is not None
+
+    conn.close()
+    return jsonify(response)
+
 @app.route("/onboarding", methods=["GET", "POST"])
 def onboarding():
     if request.method == "POST":
@@ -1569,8 +1594,7 @@ def onboarding():
         email = request.form.get("email", "").strip()
         allergens = request.form.getlist("allergens")
         preferred_cuisines = request.form.getlist("preferred_cuisines")
-        location_lat = float(request.form.get("location_lat", 1.3521))
-        location_lng = float(request.form.get("location_lng", 103.8198))
+        location_query = request.form.get("location_query", "").strip()
         radius_km = float(request.form.get("radius_km", 3))
         trip_start_raw = request.form.get("trip_start", "").strip()
         trip_end_raw = request.form.get("trip_end", "").strip()
@@ -1588,8 +1612,29 @@ def onboarding():
         if len(password) < 6:
             flash("Password must be at least 6 characters long.", "error")
             return redirect(url_for("onboarding"))
+        if location_query and not parse_coords_input(location_query) and len(location_query) < 3:
+            flash("Please enter a more specific postcode or address.", "error")
+            return redirect(url_for("onboarding"))
         if radius_km < 0.5 or radius_km > 10:
             flash("Search radius must be between 0.5 km and 10 km.", "error")
+            return redirect(url_for("onboarding"))
+
+        conn = get_db()
+        existing = conn.execute(
+            """
+            SELECT username, email
+            FROM tourist_profiles
+            WHERE LOWER(username) = ? OR LOWER(email) = ?
+            LIMIT 1
+            """,
+            (username.lower(), email.lower()),
+        ).fetchone()
+        conn.close()
+        if existing:
+            if str(existing["username"]).lower() == username.lower():
+                flash("That username is already taken. Please choose another one.", "error")
+            else:
+                flash("That email is already registered. Please use another one.", "error")
             return redirect(url_for("onboarding"))
 
         trip_start = _iso_to_ddmmyyyy(trip_start_raw) if trip_start_raw else None
@@ -1601,6 +1646,15 @@ def onboarding():
             if start_dt > end_dt:
                 flash("Trip start must be before trip end.", "error")
                 return redirect(url_for("onboarding"))
+
+        if location_query:
+            coords = parse_coords_input(location_query) or planner.get_coords(location_query, prompt_on_fail=False)
+            if not coords:
+                flash(f"Could not find '{location_query}' on OneMap. Please try a different postcode or address.", "error")
+                return redirect(url_for("onboarding"))
+            location_lat, location_lng = coords
+        else:
+            location_lat, location_lng = 1.3521, 103.8198
 
         profile = TouristProfile(
             username=username,
@@ -1629,6 +1683,8 @@ def onboarding():
 
         session["username"] = username
         session["preferred_cuisines"] = preferred_cuisines
+        if location_query:
+            session["last_address"] = location_query
         flash("Account created successfully!", "success")
         return redirect(url_for("cuisines"))
 
