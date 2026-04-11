@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 from dataclasses import dataclass
 from datetime import datetime
 from typing import List, Optional
 
-DB_FILE = "tourist_profiles.db"
+DB_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tourist_profiles.db")
 
 @dataclass
 class TouristProfile:
