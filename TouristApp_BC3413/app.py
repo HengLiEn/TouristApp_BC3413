@@ -1154,7 +1154,7 @@ def itinerary_optimise(day_index):
         for stop in route
     ]
     da.update_route_orders(session["username"], route_orders)
-    flash(f"Route optimised — {total_km:.1f} km total walk (~{round(total_mins)} mins).", "success")
+    flash(f"Route optimised — {total_km:.1f} km.", "success")
     return redirect(url_for("itinerary"))
 
 
