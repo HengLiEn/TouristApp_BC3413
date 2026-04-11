@@ -8,13 +8,17 @@
   .profile-hero {
     background: var(--soy);
     color: var(--cream);
-    padding: 3.5rem 2.5rem 3rem;
+    padding: 4rem 2.5rem 3rem;
+    min-height: 300px;
+    display: flex;
+    align-items: center;
     position: relative;
     overflow: hidden;
   }
   .profile-hero-inner {
     max-width: 1200px;
     margin: 0 auto;
+    width: 100%;
     position: relative;
     z-index: 1;
   }
@@ -191,7 +195,7 @@
   }
   @media (max-width: 900px) {
     .profile-layout { grid-template-columns: 1fr; padding: 1.5rem 1rem 3rem; }
-    .profile-hero { padding: 2.75rem 1rem 2.2rem; }
+    .profile-hero { padding: 2.5rem 1rem 2rem; min-height: 240px; }
     .flash-stack { padding: 1rem 1rem 0; }
     .field-grid { grid-template-columns: 1fr; }
   }

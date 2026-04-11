@@ -154,28 +154,36 @@
   .hero {
     background-color: var(--soy);
     padding: 4rem 2.5rem 3rem;
+    min-height: 300px;
+    display: flex;
+    align-items: center;
     position: relative;
     overflow: hidden;
   }
-  .hero-inner { max-width: 1200px; margin: 0 auto; }
+  .hero-inner { max-width: 1200px; margin: 0 auto; width: 100%; position: relative; z-index: 1; }
   .hero-eyebrow {
     font-family: 'DM Mono', monospace;
-    font-size: 0.65rem;
+    font-size: 0.68rem;
     letter-spacing: 4px;
     text-transform: uppercase;
     color: var(--turmeric);
-    margin-bottom: 1rem;
+    margin-bottom: 0.85rem;
   }
   .hero-title {
     font-family: 'Playfair Display', serif;
     font-weight: 900;
-    font-size: clamp(2rem, 5vw, 4rem);
-    line-height: 0.95;
+    font-size: clamp(2.2rem, 5vw, 4.2rem);
+    line-height: 0.96;
     color: var(--cream);
-    margin-bottom: 1rem;
+    margin-bottom: 0.85rem;
   }
   .hero-title em { font-style: italic; color: var(--turmeric); }
-  .hero-desc { color: var(--smoke); font-size: 0.9rem; line-height: 1.7; max-width: 500px; }
+  .hero-desc {
+    color: var(--smoke);
+    font-size: 0.96rem;
+    line-height: 1.45;
+    max-width: 980px;
+  }
   .hero-deco {
     position: absolute; right: -60px; bottom: -60px;
     width: 320px; height: 320px; border-radius: 50%;
@@ -443,8 +451,9 @@
 
     /* Hero */
     .hero { padding: 2.5rem 1rem 2rem; }
+    .hero { min-height: 240px; }
     .hero-title { font-size: clamp(1.8rem, 7vw, 2.5rem); }
-    .hero-desc { font-size: 0.85rem; }
+    .hero-desc { font-size: 0.85rem; line-height: 1.6; max-width: 100%; }
 
     /* Layout: stack sidebar above content */
     .main-wrapper {

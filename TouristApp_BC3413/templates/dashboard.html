@@ -9,33 +9,36 @@
   /* Hero */
   .dash-hero {
     background-color: var(--soy);
-    padding: 3.5rem 2.5rem 2.5rem;
+    padding: 4rem 2.5rem 3rem;
+    min-height: 300px;
+    display: flex;
+    align-items: center;
     position: relative;
     overflow: hidden;
   }
-  .dash-hero-inner { max-width: 1200px; margin: 0 auto; }
+  .dash-hero-inner { max-width: 1200px; margin: 0 auto; width: 100%; position: relative; z-index: 1; }
   .dash-eyebrow {
     font-family: 'DM Mono', monospace;
-    font-size: 0.62rem;
+    font-size: 0.68rem;
     letter-spacing: 4px;
     text-transform: uppercase;
     color: var(--turmeric);
-    margin-bottom: 0.75rem;
+    margin-bottom: 0.85rem;
   }
   .dash-title {
     font-family: 'Playfair Display', serif;
     font-weight: 900;
-    font-size: clamp(2rem, 4.5vw, 3.5rem);
-    line-height: 1;
+    font-size: clamp(2.2rem, 5vw, 4.2rem);
+    line-height: 0.96;
     color: var(--cream);
-    margin-bottom: 0.75rem;
+    margin-bottom: 0.85rem;
   }
   .dash-title em { font-style: italic; color: var(--turmeric); }
   .dash-sub {
     color: var(--smoke);
-    font-size: 0.85rem;
-    line-height: 1.7;
-    max-width: 480px;
+    font-size: 0.96rem;
+    line-height: 1.45;
+    max-width: 980px;
   }
   .dash-live-pill {
     display: inline-flex;
@@ -440,7 +443,7 @@
   }
   @media (max-width: 768px) {
     .dash-wrapper { padding: 1.5rem 1rem 3rem; }
-    .dash-hero { padding: 2.5rem 1rem 2rem; }
+    .dash-hero { padding: 2.5rem 1rem 2rem; min-height: 240px; }
     .chart-grid-bottom { grid-template-columns: 1fr; }
     .stat-grid { grid-template-columns: repeat(2, 1fr); }
     .hc-stat-grid { grid-template-columns: repeat(3, 1fr); }

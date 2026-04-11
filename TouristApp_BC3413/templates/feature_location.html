@@ -8,29 +8,32 @@
   /* ── Page-level overrides ── */
   .loc-hero {
     background-color: var(--soy);
-    padding: 3rem 2.5rem 2.5rem;
+    padding: 4rem 2.5rem 3rem;
+    min-height: 300px;
+    display: flex;
+    align-items: center;
     position: relative;
     overflow: hidden;
   }
-  .loc-hero-inner { max-width: 1200px; margin: 0 auto; }
+  .loc-hero-inner { max-width: 1200px; margin: 0 auto; width: 100%; position: relative; z-index: 1; }
   .loc-eyebrow {
     font-family: 'DM Mono', monospace;
-    font-size: 0.65rem;
+    font-size: 0.68rem;
     letter-spacing: 4px;
     text-transform: uppercase;
     color: var(--turmeric);
-    margin-bottom: 0.75rem;
+    margin-bottom: 0.85rem;
   }
   .loc-title {
     font-family: 'Playfair Display', serif;
     font-weight: 900;
-    font-size: clamp(2rem, 4vw, 3rem);
+    font-size: clamp(2.2rem, 5vw, 4.2rem);
     color: var(--cream);
-    line-height: 1;
-    margin-bottom: 0.6rem;
+    line-height: 0.96;
+    margin-bottom: 0.85rem;
   }
   .loc-title em { font-style: italic; color: var(--turmeric); }
-  .loc-desc { color: var(--smoke); font-size: 0.85rem; line-height: 1.7; max-width: 480px; }
+  .loc-desc { color: var(--smoke); font-size: 0.96rem; line-height: 1.45; max-width: 980px; }
   .loc-deco {
     position: absolute; right: -40px; top: -40px;
     width: 260px; height: 260px; border-radius: 50%;
@@ -79,7 +82,8 @@
   .status-dot.unset { background-color: var(--smoke); opacity: 0.4; }
 
   /* ── Main layout ── */
-  .loc-wrapper {
+    .loc-hero { padding: 2.5rem 1rem 2rem; min-height: 240px; }
+    .loc-wrapper {
     max-width: 1200px;
     margin: 0 auto;
     padding: 2.5rem 2.5rem;
@@ -345,7 +349,7 @@
 <div class="loc-hero">
   <div class="loc-hero-inner">
     <p class="loc-eyebrow">Trip Setup</p>
-    <h1 class="loc-title">Update <em>Location</em><br>&amp; Dates</h1>
+    <h1 class="loc-title">Update <em>Location</em> &amp; Dates</h1>
     <p class="loc-desc">Set your base location and trip window so we can show you only hawker centres that are open during your visit.</p>
   </div>
   <div class="loc-deco"></div>
