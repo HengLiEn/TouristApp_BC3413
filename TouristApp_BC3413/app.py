@@ -17,6 +17,7 @@ import sqlite3
 from functools import wraps, lru_cache
 import requests
 # from urllib3.exceptions import NotOpenSSLWarning
+import math
 
 BASE_DIR     = os.path.dirname(os.path.abspath(__file__))
 CENTRES_CSV  = os.path.join(BASE_DIR, 'dataset', 'Hawker Centre Data', 'hawker_centers.csv')
@@ -170,6 +171,8 @@ def logout():
 
 @app.route("/")
 def landing():
+    if "username" in session:
+        return redirect(url_for("cuisines"))
     return render_template("landing_page.html", active_page="landing")
 
 MARKET_TYPES = {
@@ -515,9 +518,13 @@ def cuisines():
 
     stalls_df = handler._stall_base()
     stalls_df = stalls_df.merge(handler._get_review_scores(), on='stall_id', how='left')
+    stalls_df = stalls_df.drop(columns=['average_rating'], errors='ignore')
     stalls_df['n_reviews'] = stalls_df['n_reviews'].fillna(0).astype(int)
     stalls_df['avg_rating'] = stalls_df['avg_rating'].fillna(0.0)
     stalls_df['bayes_score'] = stalls_df['bayes_score'].fillna(0.0)
+
+    # Filter the one without a review
+    stalls_df = stalls_df[stalls_df['n_reviews'] > 0]
 
     coords = None
     if profile and profile.location_lat is not None and profile.location_lng is not None:
@@ -555,20 +562,19 @@ def cuisines():
         # so all chosen cuisines appear evenly rather than one dominating.
         cuisine_buckets = [
             stalls_df[stalls_df['cuisine_type'].str.lower() == c]
-            .sort_values('bayes_score', ascending=False)
-            .to_dict(orient='records')
+                .sort_values('bayes_score', ascending=False)
+                .to_dict(orient='records')
             for c in onboarding_cuisines
         ]
         interleaved = []
         i = 0
-        while len(interleaved) < 50 and any(cuisine_buckets):
+        while any(cuisine_buckets):
             bucket = cuisine_buckets[i % len(cuisine_buckets)]
             if bucket:
                 interleaved.append(bucket.pop(0))
             i += 1
 
-        slots_left = max(0, 50 - len(interleaved))
-        filler_records = other_df.head(slots_left).to_dict(orient='records')
+        filler_records = other_df.to_dict(orient='records')
         varied = pd.DataFrame(interleaved + filler_records)
     else:
         per_cuisine = (
@@ -579,8 +585,6 @@ def cuisines():
             stalls_df[~stalls_df['stall_id'].isin(per_cuisine['stall_id'])]
             .sort_values('bayes_score', ascending=False)
         )
-        slots_left = max(0, 50 - len(per_cuisine))
-        filler = remaining.head(slots_left)
         varied = pd.concat([per_cuisine, filler]).sample(frac=1, random_state=42).head(50)
 
     stalls_list = varied.to_dict(orient='records')
@@ -594,10 +598,12 @@ def cuisines():
 
     # Filter by stars
     if selected_stars:
-        min_stars = float(selected_stars)
+        _min = float(selected_stars)
+        _max = _min + 1.0
         stalls_list = [
             s for s in stalls_list
-            if s.get('avg_rating', 0) >= min_stars
+            if _min <= s.get('avg_rating', 0) < _max
+               and s.get('n_reviews', 0) >= 5
         ]
 
     # Filter by search query (stall name or hawker centre name)
@@ -1371,19 +1377,21 @@ def reviews():
             selected_stall_hawker = str(stall_row.iloc[0].get("hawker_name", ""))
 
         # Get ALL reviews for this stall (no limit)
+        avg_rating = review_feature.get_avg_rating(stall_id)
+        total_review_count = review_feature.get_total_review_count(stall_id)
+
+        # Get display rows
         rev_df = review_feature.get_reviews_for_stall(stall_id, limit=200)
         all_rows = review_feature.get_display_rows(rev_df)
-        total_review_count = len(all_rows)
-
-        # Average rating across all reviews
-        if all_rows:
-            avg_rating = sum(r["rating"] for r in all_rows) / len(all_rows)
 
         # Apply star filter
         if selected_stars:
             try:
                 star_val = int(selected_stars)
-                all_rows = [r for r in all_rows if round(r["rating"]) == star_val]
+                if star_val == 5:
+                    all_rows = [r for r in all_rows if r["rating"] == 5]
+                else:
+                    all_rows = [r for r in all_rows if star_val <= r["rating"] < star_val + 1]
             except ValueError:
                 pass
 
@@ -1550,13 +1558,25 @@ def reviews_search():
         return jsonify([])
     try:
         matches = review_feature.search_stalls(q, limit=8)
+        hc = pd.read_csv(CENTRES_CSV)[["center_id", "center_name"]]
+        merged = matches.merge(hc, left_on="hawker_center_id", right_on="center_id", how="left")
         results = []
-        for _, row in matches.iterrows():
+        seen = set()
+        for _, row in merged.iterrows():
+            stall_id = int(row["stall_id"])
+            stall_name = str(row["stall_name"])
+            hawker_name = str(row.get("center_name", "") or "")
+            key = (stall_name.lower(), hawker_name.lower())
+            if key in seen:
+                continue
+            seen.add(key)
             results.append({
-                "stall_id":   int(row["stall_id"]),
-                "stall_name": str(row["stall_name"]),
-                "hawker_name": "",
+                "stall_id": stall_id,
+                "stall_name": stall_name,
+                "hawker_name": hawker_name,
             })
+            if len(results) >= 8:
+                break
         return jsonify(results)
     except Exception:
         return jsonify([])

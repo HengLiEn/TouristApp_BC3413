@@ -359,6 +359,14 @@
 
           <button type="submit" class="profile-submit">Save Profile Preferences</button>
         </form>
+        <a href="{{ url_for('logout') }}"
+           style="display:block;margin-top:0.75rem;text-align:center;
+                  font-family:'DM Mono',monospace;font-size:0.72rem;letter-spacing:2px;
+                  text-transform:uppercase;color:var(--cream);background:var(--chili);
+                  padding:0.95rem 1.2rem;text-decoration:none;transition:opacity 0.2s;"
+           onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">
+          Log Out →
+        </a>
       </div>
     </div>
   </main>
