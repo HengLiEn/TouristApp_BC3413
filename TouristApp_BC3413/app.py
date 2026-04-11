@@ -154,7 +154,7 @@ def login():
         if user:
             session["username"] = user["username"]
             flash(f"Welcome back, {user['name']}!", "success")
-            return redirect(url_for("dashboard"))
+            return redirect(url_for("cuisines"))
 
         flash("Invalid username or password.", "error")
         return redirect(url_for("login"))
@@ -1611,7 +1611,7 @@ def onboarding():
         session["username"] = username
         session["preferred_cuisines"] = preferred_cuisines
         flash("Account created successfully!", "success")
-        return redirect(url_for("dashboard"))
+        return redirect(url_for("cuisines"))
 
     return render_template(
         "feature_onboarding_edit.html",
