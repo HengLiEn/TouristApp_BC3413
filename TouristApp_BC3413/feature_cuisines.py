@@ -131,7 +131,7 @@ class CuisineFeatureHandler:
         except Exception:
             return None
 
-    def _get_review_scores(self, m: float = 20.0) -> pd.DataFrame:
+    def _get_review_scores(self, m: float = 5.0) -> pd.DataFrame:
         if self.reviews_df.empty:
             return pd.DataFrame(columns=["stall_id", "n_reviews", "avg_rating", "bayes_score"])
         global_mean = self.reviews_df["rating"].mean()
@@ -218,7 +218,7 @@ class CuisineFeatureHandler:
         coords: Coord | None,
         radius_km: float = 2.0,
         top_n: int = 5,
-        m: float = 20.0,
+        m: float = 5.0,
         trip_start: str | None = None,
         trip_end: str | None = None,
     ) -> pd.DataFrame:

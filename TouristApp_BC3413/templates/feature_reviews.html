@@ -350,7 +350,7 @@
                     class="chip {{ 'active' if not selected_stars }}">
               All
             </button>
-            {% for val, label in [('5','★★★★★ 5'),('4','★★★★☆ 4+'),('3','★★★☆☆ 3+'),('2','★★☆☆☆ 2+'),('1','★☆☆☆☆ 1+')] %}
+            {% for val, label in [('5','★★★★★ 5'),('4','★★★★☆ 4'),('3','★★★☆☆ 3'),('2','★★☆☆☆ 2'),('1','★☆☆☆☆ 1')] %}
               <button type="submit" name="stars" value="{{ val }}"
                       class="chip {{ 'active' if selected_stars == val }}">
                 {{ label }}
@@ -439,14 +439,14 @@
 
     <!-- Tab bar -->
     <div class="tab-bar">
-      <button class="tab-btn {{ 'active' if active_tab != 'write' }}"
-              onclick="switchTab('read')">💬 Reviews{% if my_reviews and not selected_stall_id %} ({{ my_reviews|length }}){% elif reviews_list %} ({{ reviews_list|length }}){% endif %}</button>
-      <button class="tab-btn {{ 'active' if active_tab == 'write' }}"
+      <button class="tab-btn {{ 'active' if active_tab == 'read' }}"
+              onclick="switchTab('read')">💬 {% if selected_stall_id %}Reviews ({{ reviews_list|length if reviews_list else 0 }}) {% else %}My Reviews{% if my_reviews %} ({{ my_reviews|length }}){% endif %}{% endif %}</button>
+      <button class="tab-btn {{ 'active' if active_tab != 'read' }}"
               onclick="switchTab('write')">✍️ Write a Review</button>
     </div>
 
     <!-- ══ TAB 1: READ REVIEWS ══════════════════════════════════ -->
-    <div class="tab-pane {{ 'active' if active_tab != 'write' }}" id="tab-read">
+    <div class="tab-pane {{ 'active' if active_tab == 'read' }}" id="tab-read">
 
       {% if selected_stall_id %}
       {# ── STALL-SPECIFIC VIEW (arrived from pricing page) ── #}
@@ -466,9 +466,9 @@
         </div>
         <div style="text-align:right;">
           {% if avg_rating %}
-            <div class="stall-banner-rating">{{ "%.1f"|format(avg_rating) }}</div>
+            <div class="stall-banner-rating">{{ "%.1f"|format(avg_rating | float | truncate_1dp) }}</div>
             <div class="stall-banner-stars">
-              {% set r = avg_rating | round | int %}
+              {% set r = avg_rating | int %}
               {% for i in range(1,6) %}
                 <span class="{{ 'star' if i <= r else 'star-empty' }}">★</span>
               {% endfor %}
@@ -528,7 +528,7 @@
                 <div class="reviewer-name">{{ rev.reviewer_name }}</div>
                 <div class="review-meta">
                   <div class="review-stars">
-                    {% set r = rev.rating | round | int %}
+                    {% set r = rev.rating | int %}
                     {% for i in range(1,6) %}
                       <span class="{{ 'star' if i <= r else 'star-empty' }}">★</span>
                     {% endfor %}
@@ -539,7 +539,7 @@
                   {% endif %}
                 </div>
               </div>
-              <span class="rating-big">{{ "%.1f"|format(rev.rating) }}</span>
+              <span class="rating-big">{{ "%.1f"|format(rev.rating | float | truncate_1dp) }}</span>
             </div>
             <p class="review-text">{{ rev.review }}</p>
             <div class="review-footer">
@@ -557,13 +557,25 @@
           {% endfor %}
         </div>
       {% else %}
-        <div class="empty-state">
-          <span style="font-size:2.5rem;display:block;margin-bottom:0.75rem;">💬</span>
-          <h3>No reviews yet for this stall</h3>
-          <p>Be the first to share your experience!</p>
-          <button class="apply-btn" style="width:auto;margin-top:1rem;padding:0.75rem 1.5rem;border:none;"
-                  onclick="switchTab('write')">✍️ Write a Review</button>
-        </div>
+        {% if selected_stars %}
+          <div class="empty-state">
+            <span style="font-size:2.5rem;display:block;margin-bottom:0.75rem;">🔍</span>
+            <h3>No relevant reviews found</h3>
+            <p>There are no {{ selected_stars }}★ reviews for this stall yet.</p>
+            <a href="/reviews?stall_id={{ selected_stall_id }}&tab=read"
+               class="apply-btn" style="width:auto;margin-top:1rem;padding:0.75rem 1.5rem;display:inline-block;text-decoration:none;">
+              ✕ Clear Filter
+            </a>
+          </div>
+        {% else %}
+          <div class="empty-state">
+            <span style="font-size:2.5rem;display:block;margin-bottom:0.75rem;">💬</span>
+            <h3>No reviews yet for this stall</h3>
+            <p>Be the first to share your experience!</p>
+            <button class="apply-btn" style="width:auto;margin-top:1rem;padding:0.75rem 1.5rem;border:none;"
+                    onclick="switchTab('write')">✍️ Write a Review</button>
+          </div>
+        {% endif %}
       {% endif %}
 
       {% else %}
@@ -575,7 +587,11 @@
       </div>
 
       {% if my_reviews %}
-        <div class="review-cards">
+        <div class="sort-bar" style="margin-bottom:1rem;">
+          <button class="sort-btn active" id="sort-newest" onclick="sortMyReviews('newest')">Newest</button>
+          <button class="sort-btn" id="sort-highest" onclick="sortMyReviews('highest')">Highest</button>
+        </div>
+        <div class="review-cards" id="my-reviews-list">
           {% for rev in my_reviews %}
           <div class="review-card" style="animation-delay:{{ loop.index0 * 0.05 }}s;">
             <div class="review-top">
@@ -583,7 +599,7 @@
                 <div class="reviewer-name">{{ rev.stall_name }}</div>
                 <div class="review-meta">
                   <div class="review-stars">
-                    {% set r = rev.rating | round | int %}
+                    {% set r = rev.rating | int %}
                     {% for i in range(1,6) %}
                       <span class="{{ 'star' if i <= r else 'star-empty' }}">★</span>
                     {% endfor %}
@@ -592,7 +608,7 @@
                 </div>
               </div>
               <div style="display:flex;align-items:center;gap:0.75rem;">
-                <span class="rating-big">{{ "%.1f"|format(rev.rating) }}</span>
+                <span class="rating-big">{{ "%.1f"|format(rev.rating | float | truncate_1dp) }}</span>
                 <button class="helpful-btn"
                         onclick="startEdit({{ rev.review_id }}, {{ rev.rating }}, `{{ rev.review | replace('`', "'") }}`, '{{ rev.stall_name | replace("'", "\\'") }}')">
                   ✏️ Edit
@@ -618,7 +634,7 @@
     </div><!-- /tab-read -->
 
     <!-- ══ TAB 2: WRITE REVIEW ══════════════════════════════════ -->
-    <div class="tab-pane {{ 'active' if active_tab == 'write' }}" id="tab-write">
+    <div class="tab-pane {{ 'active' if active_tab != 'read' }}" id="tab-write">
 
       <div class="section-header">
         <h2 class="section-title" id="writeFormTitle">Write a Review</h2>
@@ -713,9 +729,40 @@ function switchTab(name) {
 
 /* Honour ?tab= on load */
 (function() {
-  const t = new URLSearchParams(window.location.search).get('tab');
-  if (t && ['read','write'].includes(t)) switchTab(t);
+  const params = new URLSearchParams(window.location.search);
+  const t = params.get('tab');
+  if (t && ['read','write'].includes(t)) {
+    switchTab(t);
+  } else if (params.get('stall_id')) {
+    switchTab('read');
+  } else {
+    switchTab('write');
+  }
 })();
+
+/* ══ SORT MY REVIEWS ════════════════════════════════════════════ */
+function sortMyReviews(mode) {
+  document.getElementById('sort-newest').classList.toggle('active', mode === 'newest');
+  document.getElementById('sort-highest').classList.toggle('active', mode === 'highest');
+
+  const list = document.getElementById('my-reviews-list');
+  if (!list) return;
+  const cards = Array.from(list.querySelectorAll('.review-card'));
+
+  cards.sort((a, b) => {
+    if (mode === 'newest') {
+      const dateA = a.querySelector('.review-date')?.textContent.trim() || '';
+      const dateB = b.querySelector('.review-date')?.textContent.trim() || '';
+      return dateB.localeCompare(dateA);
+    } else {
+      const ratingA = parseFloat(a.querySelector('.rating-big')?.textContent) || 0;
+      const ratingB = parseFloat(b.querySelector('.rating-big')?.textContent) || 0;
+      return ratingB - ratingA;
+    }
+  });
+
+  cards.forEach(card => list.appendChild(card));
+}
 
 /* ══ EDIT REVIEW ════════════════════════════════════════════════ */
 function startEdit(reviewId, rating, reviewText, stallName) {

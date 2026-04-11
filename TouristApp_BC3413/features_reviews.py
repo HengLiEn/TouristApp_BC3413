@@ -222,6 +222,36 @@ class ReviewFeature:
             raise ValueError("Review not found")
         self.reviews_df.loc[mask, self.helpful_col] = self.reviews_df.loc[mask, self.helpful_col].astype(int) + 1
 
+    def get_avg_rating(self, stall_id: int) -> float | None:
+        csv_ratings = pd.to_numeric(
+            self.reviews_df.loc[
+                self.reviews_df[self.review_stall_id_col] == int(stall_id),
+                self.rating_col,
+            ],
+            errors="coerce",
+        ).dropna().tolist()
+
+        conn = sqlite3.connect(self.db_path)
+        db_rows = conn.execute(
+            "SELECT rating FROM reviews WHERE stall_id = ?", (int(stall_id),)
+        ).fetchall()
+        conn.close()
+        db_ratings = [float(r["rating"]) for r in db_rows]
+
+        all_ratings = csv_ratings + db_ratings
+        return sum(all_ratings) / len(all_ratings) if all_ratings else None
+
+    def get_total_review_count(self, stall_id: int) -> int:
+        csv_count = int((self.reviews_df[self.review_stall_id_col] == int(stall_id)).sum())
+
+        conn = sqlite3.connect(self.db_path)
+        db_count = conn.execute(
+            "SELECT COUNT(*) FROM reviews WHERE stall_id = ?", (int(stall_id),)
+        ).fetchone()[0]
+        conn.close()
+
+        return csv_count + db_count
+
     def get_display_rows(self, df: pd.DataFrame) -> list[dict]:
         rows: list[dict] = []
         for _, row in df.iterrows():
@@ -238,3 +268,5 @@ class ReviewFeature:
                 }
             )
         return rows
+
+
