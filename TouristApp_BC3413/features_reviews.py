@@ -95,7 +95,7 @@ class ReviewFeature:
         self.reviews_df[self.verified_col] = (
             self.reviews_df[self.verified_col].astype(str).str.strip().str.lower().isin(["true", "1", "yes", "y"])
         )
-        dt = pd.to_datetime(self.reviews_df[self.date_col], errors="coerce", utc=True)
+        dt = pd.to_datetime(self.reviews_df[self.date_col], format="%Y-%m-%d", errors="coerce", utc=True)
         dt = dt.fillna(pd.Timestamp.now(tz="UTC"))
         self.reviews_df[self.date_col] = dt.dt.strftime("%Y-%m-%d")
 
