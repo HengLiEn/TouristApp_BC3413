@@ -171,8 +171,6 @@ def logout():
 
 @app.route("/")
 def landing():
-    if "username" in session:
-        return redirect(url_for("cuisines"))
     return render_template("landing_page.html", active_page="landing")
 
 MARKET_TYPES = {
@@ -182,10 +180,6 @@ MARKET_TYPES = {
 
 
 def _load_closures_csv():
-    """
-    Load the closures CSV forcing all columns to strings so dates like
-    '9/3/2026' are never silently parsed as floats by pandas.
-    """
     cl = pd.read_csv(CLOSURES_CSV, dtype=str)
     cl = cl.apply(lambda col: col.str.strip() if col.dtype == object else col)
     return cl
