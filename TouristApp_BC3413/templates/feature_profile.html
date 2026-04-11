@@ -1,0 +1,388 @@
+{% extends "base_layout.html" %}
+{% set active_page = "profile" %}
+
+{% block title %}Profile — Hawker Hunt{% endblock %}
+
+{% block content %}
+<style>
+  .profile-hero {
+    background: var(--soy);
+    color: var(--cream);
+    padding: 3.5rem 2.5rem 3rem;
+    position: relative;
+    overflow: hidden;
+  }
+  .profile-hero-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    position: relative;
+    z-index: 1;
+  }
+  .profile-layout {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem 2.5rem 4rem;
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    gap: 2rem;
+    align-items: start;
+  }
+  .profile-card {
+    background: var(--cream);
+    border: 2px solid var(--bone);
+    margin-bottom: 1.25rem;
+  }
+  .profile-card-header {
+    background: var(--soy);
+    color: var(--cream);
+    padding: 1rem 1.25rem;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.68rem;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+  .profile-card-body { padding: 1.25rem; }
+  .summary-line {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.6rem 0;
+    border-bottom: 1px solid var(--bone);
+    font-size: 0.88rem;
+  }
+  .summary-line:last-child { border-bottom: none; }
+  .summary-label {
+    color: var(--smoke);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.68rem;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .summary-value { text-align: right; }
+  .summary-tags {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.4rem;
+  }
+  .summary-chip {
+    border: 1px solid var(--bone);
+    background: white;
+    padding: 0.25rem 0.55rem;
+    font-size: 0.72rem;
+    color: var(--soy);
+  }
+  .saved-stall-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  .saved-stall-item {
+    background: white;
+    border: 1px solid var(--bone);
+    padding: 0.9rem 1rem;
+  }
+  .saved-stall-name {
+    font-family: 'Playfair Display', serif;
+    font-size: 1rem;
+    font-weight: 700;
+    margin-bottom: 0.2rem;
+  }
+  .saved-stall-meta {
+    font-size: 0.8rem;
+    color: var(--smoke);
+  }
+  .field-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+  .field-block { margin-bottom: 1rem; }
+  .field-block label {
+    display: block;
+    margin-bottom: 0.4rem;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--smoke);
+  }
+  .field-block input {
+    width: 100%;
+    border: 1.5px solid var(--bone);
+    background: white;
+    padding: 0.8rem 0.9rem;
+    font-size: 0.92rem;
+  }
+  .check-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 0.65rem;
+    margin-top: 0.5rem;
+  }
+  .check-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    border: 1.5px solid var(--bone);
+    background: white;
+    padding: 0.7rem 0.85rem;
+    cursor: pointer;
+    font-size: 0.82rem;
+  }
+  .check-pill input { accent-color: var(--chili); }
+  .profile-submit {
+    background: var(--soy);
+    color: var(--cream);
+    border: none;
+    padding: 0.95rem 1.2rem;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.72rem;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    cursor: pointer;
+    width: 100%;
+  }
+  .profile-submit:hover { background: var(--chili); }
+  .cta-link {
+    display: inline-block;
+    margin-top: 1rem;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.72rem;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--chili);
+    text-decoration: none;
+  }
+  .inline-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.65rem;
+    margin-top: 1rem;
+  }
+  .inline-action {
+    display: inline-block;
+    border: 1.5px solid var(--bone);
+    background: white;
+    color: var(--soy);
+    text-decoration: none;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.68rem;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 0.7rem 0.85rem;
+  }
+  .inline-action:hover {
+    border-color: var(--chili);
+    color: var(--chili);
+  }
+  .flash-stack {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 1rem 2.5rem 0;
+  }
+  .flash-msg {
+    padding: 0.85rem 1rem;
+    margin-bottom: 0.75rem;
+    border-left: 4px solid var(--chili);
+    background: var(--cream);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.72rem;
+  }
+  @media (max-width: 900px) {
+    .profile-layout { grid-template-columns: 1fr; padding: 1.5rem 1rem 3rem; }
+    .profile-hero { padding: 2.75rem 1rem 2.2rem; }
+    .flash-stack { padding: 1rem 1rem 0; }
+    .field-grid { grid-template-columns: 1fr; }
+  }
+</style>
+
+<section class="profile-hero">
+  <div class="profile-hero-inner">
+    <p class="hero-eyebrow">Your Account</p>
+    <h1 class="hero-title">{{ profile.name }}’s <em>Profile</em></h1>
+    <p class="hero-desc">See your current setup, saved stalls, and preferences in one place.</p>
+  </div>
+  <div class="hero-deco"></div>
+</section>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+  <div class="flash-stack">
+    {% for category, message in messages %}
+      <div class="flash-msg">{{ message }}</div>
+    {% endfor %}
+  </div>
+  {% endif %}
+{% endwith %}
+
+<div class="profile-layout">
+  <aside>
+    <div class="profile-card">
+      <div class="profile-card-header">Profile Snapshot</div>
+      <div class="profile-card-body">
+        <div class="summary-line">
+          <span class="summary-label">Name</span>
+          <span class="summary-value">{{ profile.name }}</span>
+        </div>
+        <div class="summary-line">
+          <span class="summary-label">Username</span>
+          <span class="summary-value">{{ profile.username }}</span>
+        </div>
+        <div class="summary-line">
+          <span class="summary-label">Saved Stalls</span>
+          <span class="summary-value">{{ saved_stall_count }}</span>
+        </div>
+        <div class="summary-line">
+          <span class="summary-label">Location</span>
+          <span class="summary-value">
+            {% if has_location %}
+              {{ "%.4f"|format(profile.location_lat) }}, {{ "%.4f"|format(profile.location_lng) }}
+            {% else %}
+              Not set
+            {% endif %}
+          </span>
+        </div>
+        <div class="summary-line">
+          <span class="summary-label">Trip Dates</span>
+          <span class="summary-value">
+            {% if profile.trip_start and profile.trip_end %}
+              {{ profile.trip_start }} → {{ profile.trip_end }}
+            {% else %}
+              Not set
+            {% endif %}
+          </span>
+        </div>
+        <div class="summary-line">
+          <span class="summary-label">Radius</span>
+          <span class="summary-value">{{ current_radius }} km</span>
+        </div>
+        <div class="summary-line">
+          <span class="summary-label">Allergens</span>
+          <span class="summary-value">
+            {% if selected_allergens %}
+            <span class="summary-tags">
+              {% for allergen in selected_allergens %}
+              <span class="summary-chip">{{ allergen }}</span>
+              {% endfor %}
+            </span>
+            {% else %}
+              None selected
+            {% endif %}
+          </span>
+        </div>
+        <div class="summary-line">
+          <span class="summary-label">Cuisines</span>
+          <span class="summary-value">
+            {% if selected_cuisines %}
+            <span class="summary-tags">
+              {% for cuisine in selected_cuisines %}
+              <span class="summary-chip">{{ cuisine }}</span>
+              {% endfor %}
+            </span>
+            {% else %}
+              No favourites yet
+            {% endif %}
+          </span>
+        </div>
+        <div class="inline-actions">
+          <a href="{{ url_for('itinerary') }}" class="inline-action">Open Itinerary</a>
+          <a href="{{ url_for('location') }}" class="inline-action">Update Location</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="profile-card">
+      <div class="profile-card-header">Saved Stalls</div>
+      <div class="profile-card-body">
+        {% if saved_stalls %}
+        <div class="saved-stall-list">
+          {% for stall in saved_stalls %}
+          <div class="saved-stall-item">
+            <div class="saved-stall-name">{{ stall.stall_name }}</div>
+            <div class="saved-stall-meta">{{ stall.hawker_name }}{% if stall.cuisine_type %} · {{ stall.cuisine_type }}{% endif %}</div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p style="color:var(--smoke); font-size:0.88rem;">No stalls saved yet. Start browsing and add some to your itinerary.</p>
+        {% endif %}
+      </div>
+    </div>
+  </aside>
+
+  <main>
+    <div class="profile-card">
+      <div class="profile-card-header">Update Preferences</div>
+      <div class="profile-card-body">
+        <form method="POST" action="{{ url_for('preferences') }}" id="profilePreferencesForm">
+          <div class="field-grid">
+            <div class="field-block">
+              <label for="trip_start">Trip Start</label>
+              <input type="date" id="trip_start" name="trip_start" value="{{ current_trip_start or '' }}">
+            </div>
+            <div class="field-block">
+              <label for="trip_end">Trip End</label>
+              <input type="date" id="trip_end" name="trip_end" value="{{ current_trip_end or '' }}">
+            </div>
+          </div>
+
+          <div class="field-block">
+            <label>Allergens to Avoid</label>
+            <div class="check-grid">
+              {% for allergen in allergens %}
+              <label class="check-pill">
+                <input type="checkbox" name="allergens" value="{{ allergen }}"
+                       {{ 'checked' if allergen in (selected_allergens | default([])) }}>
+                <span>{{ allergen }}</span>
+              </label>
+              {% endfor %}
+            </div>
+          </div>
+
+          <div class="field-block">
+            <label>Preferred Cuisines</label>
+            <div class="check-grid">
+              {% for cuisine in cuisines %}
+              <label class="check-pill">
+                <input type="checkbox" name="preferred_cuisines" value="{{ cuisine }}"
+                       {{ 'checked' if cuisine in (selected_cuisines | default([])) }}>
+                <span>{{ cuisine }}</span>
+              </label>
+              {% endfor %}
+            </div>
+          </div>
+
+          <button type="submit" class="profile-submit">Save Profile Preferences</button>
+        </form>
+      </div>
+    </div>
+  </main>
+</div>
+<script>
+  (function () {
+    const form = document.getElementById('profilePreferencesForm');
+    if (!form) return;
+
+    form.addEventListener('submit', function (event) {
+      const start = document.getElementById('trip_start');
+      const end = document.getElementById('trip_end');
+      start.setCustomValidity('');
+      end.setCustomValidity('');
+
+      if ((start.value && !end.value) || (!start.value && end.value)) {
+        const message = 'Please set both trip dates, or leave both blank.';
+        start.setCustomValidity(message);
+        end.setCustomValidity(message);
+      } else if (start.value && end.value && start.value > end.value) {
+        end.setCustomValidity('Trip end must be on or after trip start.');
+      }
+
+      if (!form.checkValidity()) {
+        event.preventDefault();
+        form.reportValidity();
+      }
+    });
+  })();
+</script>
+{% endblock %}

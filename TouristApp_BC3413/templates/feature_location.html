@@ -406,7 +406,7 @@
       <span class="loc-card-title">Update Location</span>
     </div>
     <div class="loc-card-body">
-      <form method="POST" action="{{ url_for('update_location') }}">
+      <form method="POST" action="{{ url_for('update_location') }}" id="locationForm">
         <!-- GPS auto-locate -->
         <button type="button" class="gps-btn" id="gps-btn" onclick="useMyLocation()">
           <span class="gps-icon">📡</span>
@@ -425,6 +425,9 @@
             placeholder="e.g. 049483 or 1 Raffles Place"
             value="{{ current_address or '' }}"
             autocomplete="off"
+            required
+            minlength="3"
+            title="Enter a Singapore postal code, address, or latitude/longitude pair."
           />
           <p class="field-hint">We'll use OneMap to find your coordinates, or click above to auto-detect.</p>
         </div>
@@ -460,7 +463,7 @@
       <span class="loc-card-title">Update Trip Dates</span>
     </div>
     <div class="loc-card-body">
-      <form method="POST" action="{{ url_for('update_trip_dates') }}">
+      <form method="POST" action="{{ url_for('update_trip_dates') }}" id="tripDatesForm">
         <div class="field-row">
           <div class="field-group">
             <label class="field-label" for="trip_start">Start Date</label>
@@ -555,6 +558,55 @@
     };
     document.getElementById('trip_start').value = fmt(today);
     document.getElementById('trip_end').value   = fmt(end);
+  }
+
+  const locationForm = document.getElementById('locationForm');
+  if (locationForm) {
+    locationForm.addEventListener('submit', function (event) {
+      const address = document.getElementById('address');
+      const radius = document.getElementById('radius');
+      address.setCustomValidity('');
+      radius.setCustomValidity('');
+
+      const value = (address.value || '').trim();
+      const coordsPattern = /^\s*-?\d+(?:\.\d+)?\s*,\s*-?\d+(?:\.\d+)?\s*$/;
+      if (!value || (!coordsPattern.test(value) && value.length < 3)) {
+        address.setCustomValidity('Please enter a valid postal code, address, or coordinates.');
+      }
+
+      const radiusValue = Number(radius.value);
+      if (!Number.isFinite(radiusValue) || radiusValue < 0.5 || radiusValue > 10) {
+        radius.setCustomValidity('Search radius must be between 0.5 km and 10 km.');
+      }
+
+      if (!locationForm.checkValidity()) {
+        event.preventDefault();
+        locationForm.reportValidity();
+      }
+    });
+  }
+
+  const tripDatesForm = document.getElementById('tripDatesForm');
+  if (tripDatesForm) {
+    tripDatesForm.addEventListener('submit', function (event) {
+      const start = document.getElementById('trip_start');
+      const end = document.getElementById('trip_end');
+      start.setCustomValidity('');
+      end.setCustomValidity('');
+
+      if ((start.value && !end.value) || (!start.value && end.value)) {
+        const message = 'Please set both trip dates, or leave both blank.';
+        start.setCustomValidity(message);
+        end.setCustomValidity(message);
+      } else if (start.value && end.value && start.value > end.value) {
+        end.setCustomValidity('End date must be on or after start date.');
+      }
+
+      if (!tripDatesForm.checkValidity()) {
+        event.preventDefault();
+        tripDatesForm.reportValidity();
+      }
+    });
   }
 
   // ── GPS auto-locate ───────────────────────────────────────────────────────

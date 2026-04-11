@@ -40,6 +40,10 @@
               id="username"
               name="username"
               required
+              minlength="3"
+              maxlength="30"
+              pattern="[A-Za-z0-9_]+"
+              title="Use 3-30 letters, numbers, or underscores."
               style="width:100%; padding:0.8rem 1rem; border:1.5px solid var(--bone); background:#fff; font-size:0.9rem;"
             >
           </div>
@@ -51,6 +55,8 @@
               id="password"
               name="password"
               required
+              minlength="6"
+              title="Password must be at least 6 characters."
               style="width:100%; padding:0.8rem 1rem; border:1.5px solid var(--bone); background:#fff; font-size:0.9rem;"
             >
           </div>

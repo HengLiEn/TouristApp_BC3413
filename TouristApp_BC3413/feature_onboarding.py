@@ -16,6 +16,7 @@ class TouristProfile:
     allergens: List[str]
     preferred_cuisines: List[str]
     created_at: str
+    email: str = ""
     saved_stalls: List[int] | None = None
     saved_hawker_center_ids: List[int] | None = None
     location_lat: Optional[float] = None
@@ -33,6 +34,7 @@ class TouristProfileDA:
         "username": "TEXT",
         "password": "TEXT",
         "name": "TEXT",
+        "email": "TEXT",
         "allergens": "TEXT",
         "preferred_cuisines": "TEXT",
         "created_at": "TEXT",
@@ -73,6 +75,7 @@ class TouristProfileDA:
             username TEXT PRIMARY KEY,
             password TEXT NOT NULL,
             name TEXT NOT NULL,
+            email TEXT,
             allergens TEXT,
             preferred_cuisines TEXT,
             created_at TEXT NOT NULL,
@@ -166,6 +169,7 @@ class TouristProfileDA:
             "username": p.username,
             "password": p.password,
             "name": p.name,
+            "email": p.email,
             "allergens": self._pack_list(p.allergens),
             "preferred_cuisines": self._pack_list(p.preferred_cuisines),
             "created_at": p.created_at,
@@ -197,7 +201,7 @@ class TouristProfileDA:
 
     def get_profile(self, username: str) -> Optional[TouristProfile]:
         sql = """
-        SELECT username, password, name, allergens, preferred_cuisines, created_at, saved_stalls, saved_hawker_center_ids, location_lat, location_lng, radius_km, trip_start, trip_end, stall_day_map, route_orders
+        SELECT username, password, name, email, allergens, preferred_cuisines, created_at, saved_stalls, saved_hawker_center_ids, location_lat, location_lng, radius_km, trip_start, trip_end, stall_day_map, route_orders
         FROM tourist_profiles
         WHERE username = ?;
         """
@@ -210,18 +214,19 @@ class TouristProfileDA:
             username=row[0],
             password=row[1] or "",
             name=row[2] or "",
-            allergens=self._unpack_list(row[3]),
-            preferred_cuisines=self._unpack_list(row[4]),
-            created_at=row[5] or "",
-            saved_stalls=self._unpack_ints(row[6]),
-            saved_hawker_center_ids=self._unpack_ints(row[7]),
-            location_lat=float(row[8]) if row[8] is not None else None,
-            location_lng=float(row[9]) if row[9] is not None else None,
-            radius_km=float(row[10]) if row[10] is not None else 2.0,
-            trip_start=row[11] if row[11] else None,
-            trip_end=row[12] if row[12] else None,
-            stall_day_map=json.loads(row[13]) if row[13] else {},
-            route_orders=json.loads(row[14]) if row[14] else {},
+            email=row[3] or "",
+            allergens=self._unpack_list(row[4]),
+            preferred_cuisines=self._unpack_list(row[5]),
+            created_at=row[6] or "",
+            saved_stalls=self._unpack_ints(row[7]),
+            saved_hawker_center_ids=self._unpack_ints(row[8]),
+            location_lat=float(row[9]) if row[9] is not None else None,
+            location_lng=float(row[10]) if row[10] is not None else None,
+            radius_km=float(row[11]) if row[11] is not None else 2.0,
+            trip_start=row[12] if row[12] else None,
+            trip_end=row[13] if row[13] else None,
+            stall_day_map=json.loads(row[14]) if row[14] else {},
+            route_orders=json.loads(row[15]) if row[15] else {},
         )
 
     def update_preferences(self, username: str, allergens: List[str], preferred_cuisines: List[str]) -> None:
@@ -373,12 +378,14 @@ def create_account(da: TouristProfileDA) -> Optional[TouristProfile]:
             break
         print("Passwords do not match. Try again.")
     name = input_nonempty("\nWhat is your name? ")
+    email = input_nonempty("Email: ")
     allergens = input_list("Allergens to avoid (comma-separated) [optional]: ")
     cuisines = input_list("Preferred cuisines (comma-separated) [optional]: ")
     profile = TouristProfile(
         username=username,
         password=password,
         name=name,
+        email=email,
         allergens=allergens,
         preferred_cuisines=cuisines,
         created_at=now_iso(),

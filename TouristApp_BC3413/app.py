@@ -1,6 +1,5 @@
 import warnings
 warnings.filterwarnings("ignore", message=".*urllib3 v2 only supports OpenSSL.*")
-
 from flask import Flask, render_template, request, redirect, url_for, session, flash, Response, jsonify
 from typing import Optional
 import re
@@ -140,6 +139,9 @@ def login():
 
         if not username or not password:
             flash("Please enter both username and password.", "error")
+            return redirect(url_for("login"))
+        if not re.fullmatch(r"[A-Za-z0-9_]{3,30}", username):
+            flash("Username must be 3-30 characters and use only letters, numbers, or underscores.", "error")
             return redirect(url_for("login"))
 
         conn = get_db()
@@ -833,10 +835,20 @@ def update_location():
     - Redirects back to /location
     """
     address   = request.form.get("address", "").strip()
-    radius_km = float(request.form.get("radius_km", 2.0))
+    try:
+        radius_km = float(request.form.get("radius_km", 2.0))
+    except (TypeError, ValueError):
+        flash("Please choose a valid search radius.", "error")
+        return redirect(url_for("location"))
 
     if not address:
         flash("Please enter a postal code or address.", "error")
+        return redirect(url_for("location"))
+    if not parse_coords_input(address) and len(address) < 3:
+        flash("Please enter a more specific address or postal code.", "error")
+        return redirect(url_for("location"))
+    if radius_km < 0.5 or radius_km > 10:
+        flash("Search radius must be between 0.5 km and 10 km.", "error")
         return redirect(url_for("location"))
 
     coords = parse_coords_input(address) or planner.get_coords(address, prompt_on_fail=False)
@@ -1535,7 +1547,7 @@ def onboarding():
     if request.method == "POST":
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "").strip()
-        name = request.form.get("name", "").strip()
+        email = request.form.get("email", "").strip()
         allergens = request.form.getlist("allergens")
         preferred_cuisines = request.form.getlist("preferred_cuisines")
         location_lat = float(request.form.get("location_lat", 1.3521))
@@ -1543,9 +1555,22 @@ def onboarding():
         radius_km = float(request.form.get("radius_km", 3))
         trip_start_raw = request.form.get("trip_start", "").strip()
         trip_end_raw = request.form.get("trip_end", "").strip()
+        name = username
 
-        if not username or not password or not name:
-            flash("Please fill in your name, username, and password.", "error")
+        if not username or not password or not email:
+            flash("Please fill in your email, username, and password.", "error")
+            return redirect(url_for("onboarding"))
+        if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
+            flash("Please enter a valid email address.", "error")
+            return redirect(url_for("onboarding"))
+        if not re.fullmatch(r"[A-Za-z0-9_]{3,30}", username):
+            flash("Username must be 3-30 characters and use only letters, numbers, or underscores.", "error")
+            return redirect(url_for("onboarding"))
+        if len(password) < 6:
+            flash("Password must be at least 6 characters long.", "error")
+            return redirect(url_for("onboarding"))
+        if radius_km < 0.5 or radius_km > 10:
+            flash("Search radius must be between 0.5 km and 10 km.", "error")
             return redirect(url_for("onboarding"))
 
         trip_start = _iso_to_ddmmyyyy(trip_start_raw) if trip_start_raw else None
@@ -1562,6 +1587,7 @@ def onboarding():
             username=username,
             password=password,
             name=name,
+            email=email,
             allergens=allergens,
             preferred_cuisines=preferred_cuisines,
             created_at=datetime.now().isoformat(),
@@ -1599,7 +1625,7 @@ def onboarding():
         singapore_center={"lat": 1.3521, "lng": 103.8198},
         selected_cuisines=[],
         selected_allergens=[],
-        prefill_name="",
+        prefill_email="",
         prefill_username="",
         current_trip_start=None,
         current_trip_end=None,
@@ -1615,15 +1641,31 @@ def preferences():
         flash("Profile not found.", "error")
         return redirect(url_for("dashboard"))
 
+    saved_ids = da.get_saved_stalls(session["username"])
+    saved_stall_rows = []
+    if saved_ids:
+        handler = CuisineFeatureHandler()
+        stalls_df = handler.get_stalls_by_ids(saved_ids, coords=None, radius_km=999)
+        id_order = {sid: index for index, sid in enumerate(saved_ids)}
+        stalls_df["_saved_order"] = stalls_df["stall_id"].map(id_order)
+        stalls_df = stalls_df.sort_values("_saved_order")
+        for _, row in stalls_df.head(8).iterrows():
+            saved_stall_rows.append({
+                "stall_id": int(row.get("stall_id")),
+                "stall_name": str(row.get("stall_name", "")),
+                "hawker_name": str(row.get("hawker_name", "")),
+                "cuisine_type": str(row.get("cuisine_type", "")),
+            })
+
     if request.method == "POST":
         allergens = request.form.getlist("allergens")
         preferred_cuisines = request.form.getlist("preferred_cuisines")
         trip_start_raw = request.form.get("trip_start", "").strip()
         trip_end_raw = request.form.get("trip_end", "").strip()
-        radius_km = float(request.form.get("radius_km", profile.radius_km or 3))
         coords = None
         if profile.location_lat is not None and profile.location_lng is not None:
             coords = (float(profile.location_lat), float(profile.location_lng))
+        radius_km = float(profile.radius_km) if profile.radius_km else 3.0
 
         trip_start = _iso_to_ddmmyyyy(trip_start_raw) if trip_start_raw else profile.trip_start
         trip_end = _iso_to_ddmmyyyy(trip_end_raw) if trip_end_raw else profile.trip_end
@@ -1641,27 +1683,24 @@ def preferences():
         return redirect(url_for("preferences"))
 
     return render_template(
-        "feature_onboarding_edit.html",
-        active_page="preferences",
+        "feature_profile.html",
+        active_page="profile",
+        profile=profile,
         allergens=get_allergen_labels(),
         cuisines=[
             "Chinese", "Malay", "Indian", "Japanese", "Korean", "Thai",
             "Western", "Seafood", "Vegetables", "Beverage",
             "Dessert", "Fruits", "Peranakan"
         ],
-        singapore_center={
-            "lat": profile.location_lat if profile.location_lat is not None else 1.3521,
-            "lng": profile.location_lng if profile.location_lng is not None else 103.8198,
-        },
         selected_cuisines=profile.preferred_cuisines,
         selected_allergens=allergen_display_labels(profile.allergens),
-        prefill_name=profile.name,
-        prefill_username=profile.username,
-        current_trip_start=_ddmmyyyy_to_iso(profile.trip_start),
-        current_trip_end=_ddmmyyyy_to_iso(profile.trip_end),
-        current_radius=profile.radius_km,
-        hide_account_fields=True,
+        current_trip_start=_ddmmyyyy_to_iso(profile.trip_start) if profile.trip_start else None,
+        current_trip_end=_ddmmyyyy_to_iso(profile.trip_end) if profile.trip_end else None,
+        current_radius=float(profile.radius_km) if profile.radius_km else 3.0,
+        saved_stalls=saved_stall_rows,
+        saved_stall_count=len(saved_ids),
+        has_location=bool(profile.location_lat is not None and profile.location_lng is not None),
     )
 
 if __name__ == "__main__":
-    app.run(debug=True, host="127.0.0.1", port=5000)
+    app.run(debug=True, host="127.0.0.1", port=5051)
