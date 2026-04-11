@@ -36,9 +36,9 @@
         </button>
         <div class="panel-body" id="panel-cuisine">
           <div class="chips-grid">
-            {% for c in cuisines %}
+           {% for c in cuisines %}
             <button type="submit" name="cuisine" value="{{ c|lower }}"
-              class="chip {{ 'active' if selected_cuisine == c|lower or (not selected_cuisine and c|lower in (onboarding_cuisines | default([]))) }}">
+              class="chip {% if selected_cuisine == c|lower %}active{% elif not selected_cuisine and c|lower in (onboarding_cuisines | default([])) %}preferred{% endif %}">
               {{ c }}
             </button>
             {% endfor %}

@@ -647,8 +647,19 @@ def cuisines():
         stalls_list.sort(key=lambda x: x.get('n_reviews', 0), reverse=True)
     elif selected_sort == 'distance':
         stalls_list.sort(key=lambda x: x.get('distance_km', 999))
-    elif not using_onboarding_order:
-        stalls_list.sort(key=lambda x: x.get('bayes_score', 0), reverse=True)
+    elif selected_sort == 'score' and not using_onboarding_order:
+        max_dist = max((s.get('distance_km') or 0 for s in stalls_list), default=5.0) or 5.0
+
+        def best_match_score(s):
+            bayes = s.get('bayes_score', 0) or 0  # already normalised rating
+            reviews = min((s.get('n_reviews', 0) or 0) / 300, 1.0)  # cap at 300
+            cuisine = 1.0 if s.get('cuisine_type', '').lower() in onboarding_cuisines else 0.0
+            dist_km = s.get('distance_km') or max_dist
+            proximity = max(0.0, 1.0 - dist_km / max_dist)
+
+            return (bayes * 0.40) + (reviews * 0.20) + (cuisine * 0.25) + (proximity * 0.15)
+
+        stalls_list.sort(key=best_match_score, reverse=True)
 
     # Cap at 50 hawker stalls
     stalls_list = stalls_list[:50]
