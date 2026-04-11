@@ -585,7 +585,7 @@ def cuisines():
             stalls_df[~stalls_df['stall_id'].isin(per_cuisine['stall_id'])]
             .sort_values('bayes_score', ascending=False)
         )
-        varied = pd.concat([per_cuisine, remaining]).sample(frac=1, random_state=42).head(50)
+        varied = pd.concat([per_cuisine, remaining]).sample(frac=1, random_state=42)
 
     stalls_list = varied.to_dict(orient='records')
 
