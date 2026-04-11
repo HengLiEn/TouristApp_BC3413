@@ -473,6 +473,9 @@ def dashboard():
         if result:
             hc_data = result
 
+    # ── WhereCrowded URL ─────────────────────────────────────────────
+    wherecrowded_url = "https://wherecrowded.sg/at/crowd"
+
     return render_template(
         "dashboard.html",
         username=session["username"],
@@ -491,6 +494,7 @@ def dashboard():
         top_stall_names=stall_names,
         top_stall_scores=stall_scores,
         all_centres=all_centres,
+        wherecrowded_url=wherecrowded_url,
         **hc_data,
     )
 

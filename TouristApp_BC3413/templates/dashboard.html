@@ -767,7 +767,56 @@
           </div>
         </div>
         {% endif %}
+        <!-- ── CROWD LEVEL CARD (add after the OneMap card) ── -->
+        <div class="hc-map-card" style="margin-top:1.25rem;">
+          <div class="chart-head">
+            <div class="chart-head-left">
+              <span class="chart-tag">Crowd Levels</span>
+              <span class="chart-title">How Busy Is It Right Now?</span>
+            </div>
+            <span class="chart-badge">WhereCrowded.sg</span>
+          </div>
 
+          <div style="padding: 1.5rem; background: var(--cream); display: flex; flex-direction: column; gap: 1rem;">
+
+            <!-- Explanation text -->
+            <p style="font-size:0.82rem; color:var(--smoke); line-height:1.7;">
+              Real-time crowd data for <strong style="color:var(--soy);">{{ hc_center_name }}</strong>
+              is powered by WhereCrowded.sg — Singapore's crowd tracking platform for hawker centres and malls.
+              Click below to check current crowd levels before heading out.
+            </p>
+
+            <!-- Peak hours guide -->
+            <div style="display:grid; grid-template-columns: repeat(3,1fr); gap:0.75rem;">
+              <div style="background:white; border:1.5px solid var(--bone); padding:0.85rem; text-align:center; border-radius:1px;">
+                <div style="font-size:1.1rem; margin-bottom:0.3rem;">🟢</div>
+                <div style="font-family:'DM Mono',monospace; font-size:0.58rem; letter-spacing:2px; text-transform:uppercase; color:var(--pandan); margin-bottom:0.2rem;">Quiet</div>
+                <div style="font-size:0.72rem; color:var(--smoke);">Before 11am<br>After 2pm</div>
+              </div>
+              <div style="background:white; border:1.5px solid var(--bone); padding:0.85rem; text-align:center; border-radius:1px;">
+                <div style="font-size:1.1rem; margin-bottom:0.3rem;">🟡</div>
+                <div style="font-family:'DM Mono',monospace; font-size:0.58rem; letter-spacing:2px; text-transform:uppercase; color:var(--turmeric); margin-bottom:0.2rem;">Moderate</div>
+                <div style="font-size:0.72rem; color:var(--smoke);">11am – 12pm<br>1:30 – 2pm</div>
+              </div>
+              <div style="background:white; border:1.5px solid var(--bone); padding:0.85rem; text-align:center; border-radius:1px;">
+                <div style="font-size:1.1rem; margin-bottom:0.3rem;">🔴</div>
+                <div style="font-family:'DM Mono',monospace; font-size:0.58rem; letter-spacing:2px; text-transform:uppercase; color:var(--chili); margin-bottom:0.2rem;">Busy</div>
+                <div style="font-size:0.72rem; color:var(--smoke);">12pm – 1:30pm<br>Lunch peak</div>
+              </div>
+            </div>
+
+            <!-- Dynamic link to WhereCrowded -->
+            <a href="{{ wherecrowded_url }}"
+               target="_blank"
+               rel="noopener"
+               class="hc-map-open-btn"
+               style="justify-content:center; font-size:0.65rem; letter-spacing:2.5px; margin-top:0.25rem;">
+              🌐 &nbsp;Check Live Crowd Levels on WhereCrowded.sg
+            </a>
+
+          </div>
+        </div>
+        <!-- ── END CROWD LEVEL CARD ── -->
       </div><!-- end #hcContent -->
 
     {% else %}
