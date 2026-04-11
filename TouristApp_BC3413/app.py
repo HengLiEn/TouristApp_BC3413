@@ -1797,5 +1797,9 @@ def preferences():
         has_location=bool(profile.location_lat is not None and profile.location_lng is not None),
     )
 
+@app.template_filter('truncate_1dp')
+def truncate_1dp(value):
+    return math.floor(float(value) * 10) / 10
+
 if __name__ == "__main__":
     app.run(debug=True, host="127.0.0.1", port=5051)
