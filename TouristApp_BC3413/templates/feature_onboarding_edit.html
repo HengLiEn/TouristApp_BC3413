@@ -443,6 +443,9 @@
             <label for="password">Password</label>
             <input type="password" id="password" name="password" required minlength="6" title="Password must be at least 6 characters long.">
           </div>
+          <p style="margin-top: 0.15rem; font-size: 0.85rem; color: var(--smoke);">
+            Already have an account? <a href="{{ url_for('login') }}" style="color: var(--chili);">Login here</a>.
+          </p>
         </div>
         {% else %}
         <div class="field-block" style="margin-top:1.5rem;">
@@ -539,6 +542,7 @@
           <button type="submit" id="finishBtn" class="onboard-btn finish hidden">Finish ✓</button>
     </div>
   </form>
+
 </div>
 
 <script>
