@@ -491,7 +491,7 @@
 <body>
 
   <header>
-    <a href="{{ url_for('cuisines') if session.get('username') else url_for('landing') }}" class="logo">
+    <a href="{{ url_for('landing') if active_page in ['landing', 'login', 'onboarding'] else url_for('cuisines') }}" class="logo">
       <span>🍜</span>
       <div>Hawker Hunt<span class="logo-sub">Singapore Food Discovery</span></div>
     </a>
