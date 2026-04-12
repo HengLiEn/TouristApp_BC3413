@@ -40,10 +40,10 @@
               id="username"
               name="username"
               required
-              minlength="3"
+              minlength="6"
               maxlength="30"
-              pattern="[A-Za-z0-9_]+"
-              title="Use 3-30 letters, numbers, or underscores."
+              pattern="(?=.*[A-Za-z])[A-Za-z0-9_]+"
+              title="Use 6-30 characters with at least one letter. Numbers and underscores are allowed."
               style="width:100%; padding:0.8rem 1rem; border:1.5px solid var(--bone); background:#fff; font-size:0.9rem;"
             >
           </div>

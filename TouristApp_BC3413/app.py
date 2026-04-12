@@ -74,6 +74,8 @@ ALLERGEN_ALIASES = {
     "sesame": ["sesame"],
     "pork": ["pork"],
 }
+USERNAME_REGEX = r"(?=.*[A-Za-z])[A-Za-z0-9_]{6,30}"
+USERNAME_ERROR = "Username must be 6-30 characters, include at least one letter, and use only letters, numbers, or underscores."
 
 @lru_cache(maxsize=1)
 def get_allergen_options():
@@ -141,8 +143,8 @@ def login():
         if not username or not password:
             flash("Please enter both username and password.", "error")
             return redirect(url_for("login"))
-        if not re.fullmatch(r"[A-Za-z0-9_]{3,30}", username):
-            flash("Username must be 3-30 characters and use only letters, numbers, or underscores.", "error")
+        if not re.fullmatch(USERNAME_REGEX, username):
+            flash(USERNAME_ERROR, "error")
             return redirect(url_for("login"))
 
         conn = get_db()
@@ -1620,8 +1622,8 @@ def onboarding():
         if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
             flash("Please enter a valid email address.", "error")
             return redirect(url_for("onboarding"))
-        if not re.fullmatch(r"[A-Za-z0-9_]{3,30}", username):
-            flash("Username must be 3-30 characters and use only letters, numbers, or underscores.", "error")
+        if not re.fullmatch(USERNAME_REGEX, username):
+            flash(USERNAME_ERROR, "error")
             return redirect(url_for("onboarding"))
         if len(password) < 6:
             flash("Password must be at least 6 characters long.", "error")

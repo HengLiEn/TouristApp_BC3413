@@ -437,7 +437,7 @@
           </div>
           <div class="field-block">
             <label for="username">Username</label>
-            <input type="text" id="username" name="username" value="{{ prefill_username | default('') }}" required minlength="3" maxlength="30" pattern="[A-Za-z0-9_]+" title="Use 3-30 letters, numbers, or underscores.">
+            <input type="text" id="username" name="username" value="{{ prefill_username | default('') }}" required minlength="6" maxlength="30" pattern="(?=.*[A-Za-z])[A-Za-z0-9_]+" title="Use 6-30 characters with at least one letter. Numbers and underscores are allowed.">
           </div>
           <div class="field-block">
             <label for="password">Password</label>
@@ -630,7 +630,7 @@
     usernameInput.addEventListener("blur", async () => {
       const value = usernameInput.value.trim();
       usernameInput.setCustomValidity('');
-      if (value.length < 3 || !/^[A-Za-z0-9_]+$/.test(value)) return;
+      if (value.length < 6 || !/^(?=.*[A-Za-z])[A-Za-z0-9_]+$/.test(value)) return;
       try {
         const data = await checkAvailability("username", value);
         setAvailabilityState(
