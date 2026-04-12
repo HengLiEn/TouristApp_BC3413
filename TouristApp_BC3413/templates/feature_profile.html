@@ -320,17 +320,6 @@
       <div class="profile-card-header">Update Preferences</div>
       <div class="profile-card-body">
         <form method="POST" action="{{ url_for('preferences') }}" id="profilePreferencesForm">
-          <div class="field-grid">
-            <div class="field-block">
-              <label for="trip_start">Trip Start</label>
-              <input type="date" id="trip_start" name="trip_start" value="{{ current_trip_start or '' }}">
-            </div>
-            <div class="field-block">
-              <label for="trip_end">Trip End</label>
-              <input type="date" id="trip_end" name="trip_end" value="{{ current_trip_end or '' }}">
-            </div>
-          </div>
-
           <div class="field-block">
             <label>Allergens to Avoid</label>
             <div class="check-grid">
@@ -375,26 +364,6 @@
   (function () {
     const form = document.getElementById('profilePreferencesForm');
     if (!form) return;
-
-    form.addEventListener('submit', function (event) {
-      const start = document.getElementById('trip_start');
-      const end = document.getElementById('trip_end');
-      start.setCustomValidity('');
-      end.setCustomValidity('');
-
-      if ((start.value && !end.value) || (!start.value && end.value)) {
-        const message = 'Please set both trip dates, or leave both blank.';
-        start.setCustomValidity(message);
-        end.setCustomValidity(message);
-      } else if (start.value && end.value && start.value > end.value) {
-        end.setCustomValidity('Trip end must be on or after trip start.');
-      }
-
-      if (!form.checkValidity()) {
-        event.preventDefault();
-        form.reportValidity();
-      }
-    });
   })();
 </script>
 {% endblock %}

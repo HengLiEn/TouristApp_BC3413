@@ -1749,25 +1749,7 @@ def preferences():
     if request.method == "POST":
         allergens = request.form.getlist("allergens")
         preferred_cuisines = request.form.getlist("preferred_cuisines")
-        trip_start_raw = request.form.get("trip_start", "").strip()
-        trip_end_raw = request.form.get("trip_end", "").strip()
-        coords = None
-        if profile.location_lat is not None and profile.location_lng is not None:
-            coords = (float(profile.location_lat), float(profile.location_lng))
-        radius_km = float(profile.radius_km) if profile.radius_km else 3.0
-
-        trip_start = _iso_to_ddmmyyyy(trip_start_raw) if trip_start_raw else profile.trip_start
-        trip_end = _iso_to_ddmmyyyy(trip_end_raw) if trip_end_raw else profile.trip_end
-
-        if trip_start and trip_end:
-            start_dt = datetime.strptime(trip_start, "%d/%m/%Y")
-            end_dt = datetime.strptime(trip_end, "%d/%m/%Y")
-            if start_dt > end_dt:
-                flash("Trip start must be before trip end.", "error")
-                return redirect(url_for("preferences"))
-
         da.update_preferences(session["username"], allergens, preferred_cuisines)
-        da.update_trip_context(session["username"], coords, radius_km, trip_start, trip_end)
         flash("Preferences updated.", "success")
         return redirect(url_for("preferences"))
 
